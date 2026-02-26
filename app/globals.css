@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 13 16 23;
+    --foreground: 230 230 230;
+    --card: 22 27 34;
+    --card-foreground: 230 230 230;
+    --primary: 34 197 94;
+    --primary-foreground: 13 16 23;
+    --secondary: 239 68 68;
+    --secondary-foreground: 13 16 23;
+    --muted: 88 96 105;
+    --muted-foreground: 139 148 155;
+    --accent: 88 166 255;
+    --ring: 88 166 255;
+  }
+
+  * {
+    @apply border-[hsl(var(--ring))];
+  }
+
+  body {
+    @apply bg-[hsl(var(--background))] text-[hsl(var(--foreground))];
+  }
+}
+
+@layer components {
+  .glass {
+    @apply bg-[rgba(22,27,34,0.7)] backdrop-blur-md border border-[hsl(var(--muted))];
+  }
+
+  .btn-primary {
+    @apply px-4 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-medium hover:opacity-90 transition-opacity;
+  }
+
+  .btn-secondary {
+    @apply px-4 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] font-medium hover:opacity-90 transition-opacity;
+  }
+
+  .btn-ghost {
+    @apply px-4 py-2 rounded-lg hover:bg-[hsl(var(--muted)/0.2)] transition-colors;
+  }
+
+  .price-up {
+    @apply text-[hsl(var(--primary))];
+  }
+
+  .price-down {
+    @apply text-[hsl(var(--secondary))];
+  }
+
+  .card-glass {
+    @apply glass rounded-lg p-6;
+  }
+}
+
+::selection {
+  @apply bg-[hsl(var(--accent))] text-[hsl(var(--background))];
+}
+
+::-webkit-scrollbar {
+  @apply w-2 h-2;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-[hsl(var(--background))];
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-[hsl(var(--muted))] rounded-full hover:bg-[hsl(var(--muted)/0.8)];
+}
+

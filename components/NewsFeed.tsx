@@ -1,0 +1,145 @@
+'use client';
+
+import React, { useState } from 'react';
+import { NewsItem, Sentiment } from '@/lib/types';
+import { MOCK_NEWS, getNewsByAsset } from '@/lib/mockData';
+import { Zap, Heart, Share2 } from 'lucide-react';
+import { format } from 'date-fns';
+
+interface NewsFeedProps {
+  symbol?: string;
+}
+
+export function NewsFeed({ symbol }: NewsFeedProps) {
+  const [isFavorited, setIsFavorited] = useState<Set<string>>(new Set());
+
+  const news = symbol ? getNewsByAsset(symbol) : MOCK_NEWS;
+
+  const getSentimentColor = (sentiment: Sentiment) => {
+    switch (sentiment) {
+      case 'positive':
+        return 'text-primary';
+      case 'negative':
+        return 'text-secondary';
+      case 'neutral':
+        return 'text-muted-foreground';
+    }
+  };
+
+  const getSentimentLabel = (sentiment: Sentiment) => {
+    switch (sentiment) {
+      case 'positive':
+        return '📈 Positivo';
+      case 'negative':
+        return '📉 Negativo';
+      case 'neutral':
+        return '➡️ Neutral';
+    }
+  };
+
+  const getSentimentBg = (sentiment: Sentiment) => {
+    switch (sentiment) {
+      case 'positive':
+        return 'bg-primary/10 border border-primary/30';
+      case 'negative':
+        return 'bg-secondary/10 border border-secondary/30';
+      case 'neutral':
+        return 'bg-muted/10 border border-muted/30';
+    }
+  };
+
+  return (
+    <div className="card-glass">
+      <div className="mb-6">
+        <h2 className="text-lg font-bold">Noticias Financieras</h2>
+        <p className="text-sm text-muted-foreground">
+          {symbol ? `Últimas noticias sobre ${symbol}` : 'Últimas noticias del mercado'}
+        </p>
+      </div>
+
+      <div className="space-y-4 max-h-96 overflow-y-auto">
+        {news.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <Zap className="w-8 h-8 mx-auto mb-2 opacity-50" />
+            <p className="text-sm">No hay noticias disponibles para {symbol}</p>
+          </div>
+        ) : (
+          news.map((item) => (
+            <div
+              key={item.id}
+              className="p-4 bg-muted/10 hover:bg-muted/20 rounded-lg transition-colors group cursor-pointer"
+            >
+              {/* Encabezado con sentimiento */}
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex-1">
+                  <h3 className="font-semibold text-sm leading-tight mb-2">
+                    {item.title}
+                  </h3>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`text-xs font-semibold px-2 py-1 rounded ${getSentimentBg(item.sentiment)} ${getSentimentColor(item.sentiment)}`}>
+                      {getSentimentLabel(item.sentiment)}
+                    </span>
+                    <span className="text-xs text-muted-foreground">{item.source}</span>
+                  </div>
+                </div>
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={() => {
+                      const newFav = new Set(isFavorited);
+                      newFav.has(item.id) ? newFav.delete(item.id) : newFav.add(item.id);
+                      setIsFavorited(newFav);
+                    }}
+                    className="p-2 hover:bg-muted/30 rounded-lg transition-colors"
+                    title="Favorito"
+                  >
+                    <Heart
+                      className={`w-4 h-4 ${isFavorited.has(item.id) ? 'fill-secondary text-secondary' : ''}`}
+                    />
+                  </button>
+                  <button
+                    className="p-2 hover:bg-muted/30 rounded-lg transition-colors"
+                    title="Compartir"
+                  >
+                    <Share2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Descripción */}
+              <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                {item.description}
+              </p>
+
+              {/* Imagen (si existe) */}
+              {item.imageUrl && (
+                <img
+                  src={item.imageUrl}
+                  alt={item.title}
+                  className="w-full h-32 object-cover rounded-lg mb-3"
+                />
+              )}
+
+              {/* Activos relacionados y tiempo */}
+              <div className="flex items-center justify-between">
+                <div className="flex gap-2 flex-wrap">
+                  {item.relevantAssets.map((asset) => (
+                    <span
+                      key={asset}
+                      className="text-xs px-2 py-1 rounded-full bg-accent/20 text-accent font-medium"
+                    >
+                      ${asset}
+                    </span>
+                  ))}
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {format(new Date(item.timestamp), 'HH:mm')}
+                </span>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
