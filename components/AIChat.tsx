@@ -3,7 +3,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { ChatMessage, TimeFrame } from '@/lib/types';
 import { useMarketStore } from '@/lib/store';
-import { generateMockAIChatResponse } from '@/lib/mockData';
 import { Send, MessageCircle, Trash2 } from 'lucide-react';
 
 interface ChatPanelProps {
@@ -28,40 +27,64 @@ export function ChatPanel({ symbol, timeframe }: ChatPanelProps) {
     scrollToBottom();
   }, [chatMessages, scrollToBottom]);
 
-  const handleSendMessage = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputValue.trim() || isLoading) return;
+  const handleSendMessage = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!inputValue.trim() || isLoading) return;
 
-    const message = inputValue.trim();
-    setInputValue('');
+      const message = inputValue.trim();
+      setInputValue('');
 
-    // Agregar mensaje del usuario
-    const userMessage: ChatMessage = {
-      id: Math.random().toString(36).substr(2, 9),
-      role: 'user',
-      content: message,
-      timestamp: Date.now(),
-      context: { symbol, timeframe },
-    };
-
-    addChatMessage(userMessage);
-    setIsLoading(true);
-
-    // Simular respuesta de IA
-    const timeout = setTimeout(() => {
-      const aiResponse = generateMockAIChatResponse(message, symbol);
-      const assistantMessage: ChatMessage = {
+      // Agregar mensaje del usuario
+      const userMessage: ChatMessage = {
         id: Math.random().toString(36).substr(2, 9),
-        role: 'assistant',
-        content: aiResponse,
+        role: 'user',
+        content: message,
         timestamp: Date.now(),
+        context: { symbol, timeframe },
       };
-      addChatMessage(assistantMessage);
-      setIsLoading(false);
-    }, 800);
 
-    return () => clearTimeout(timeout);
-  }, [inputValue, isLoading, symbol, timeframe, addChatMessage]);
+      addChatMessage(userMessage);
+      setIsLoading(true);
+
+      try {
+        // Llamada REAL a la API
+        const response = await fetch(
+          `/api/ai?message=${encodeURIComponent(message)}&symbol=${symbol}`
+        );
+
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        const assistantMessage: ChatMessage = {
+          id: Math.random().toString(36).substr(2, 9),
+          role: 'assistant',
+          content: data.response || 'No se recibió respuesta de la IA',
+          timestamp: Date.now(),
+        };
+
+        addChatMessage(assistantMessage);
+      } catch (error) {
+        console.error('Error en chat:', error);
+
+        const errorMessage: ChatMessage = {
+          id: Math.random().toString(36).substr(2, 9),
+          role: 'assistant',
+          content:
+            'Lo siento, hubo un error al procesar tu solicitud. Por favor intenta de nuevo.',
+          timestamp: Date.now(),
+        };
+
+        addChatMessage(errorMessage);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [inputValue, isLoading, symbol, timeframe, addChatMessage]
+  );
 
   return (
     <div className="card-glass flex flex-col h-full max-h-[500px]">

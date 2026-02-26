@@ -73,18 +73,37 @@ export interface CacheEntry<T> {
   ttl: number;
 }
 
+// ==================== CONSTANTES ====================
+
+const API_TIMEOUTS = {
+  COINGECKO_PRICE: 30000, // 30 segundos
+  COINGECKO_HISTORY: 600000, // 10 minutos
+  FINNHUB_QUOTE: 5000, // 5 segundos
+  FINNHUB_CANDLES: 300000, // 5 minutos
+  NEWSAPI: 300000, // 5 minutos
+  ALPHAVANTAGE: 600000, // 10 minutos
+} as const;
+
+const SENTIMENT_KEYWORDS = {
+  positive: ['sube', 'gana', 'crece', 'récord', 'alcista', 'compra', 'bullish', 'rally', 'boom', 'éxito', 'ganancias', 'aprueban', 'acuerdo'],
+  negative: ['baja', 'pierde', 'caída', 'crisis', 'bajista', 'vende', 'bearish', 'crash', 'pánico', 'fracaso', 'pérdidas', 'rechazo', 'conflicto'],
+} as const;
+
 // ==================== CACHE MANAGER ====================
 
 class CacheManager {
   private cache = new Map<string, CacheEntry<any>>();
   private static readonly DEFAULT_TTL = 60000; // 1 minuto
 
+  private isExpired(entry: CacheEntry<any>): boolean {
+    return Date.now() - entry.timestamp > entry.ttl;
+  }
+
   get<T>(key: string): T | null {
     const entry = this.cache.get(key);
     if (!entry) return null;
 
-    const isExpired = Date.now() - entry.timestamp > entry.ttl;
-    if (isExpired) {
+    if (this.isExpired(entry)) {
       this.cache.delete(key);
       return null;
     }
@@ -111,12 +130,20 @@ class CacheManager {
   has(key: string): boolean {
     const entry = this.cache.get(key);
     if (!entry) return false;
-    const isExpired = Date.now() - entry.timestamp > entry.ttl;
-    if (isExpired) {
+
+    if (this.isExpired(entry)) {
       this.cache.delete(key);
       return false;
     }
+
     return true;
+  }
+
+  getStats(): { size: number; keys: string[] } {
+    return {
+      size: this.cache.size,
+      keys: Array.from(this.cache.keys()),
+    };
   }
 }
 
@@ -130,15 +157,45 @@ class CoinGeckoService {
     this.cache = cache;
   }
 
+  private buildPriceUrl(coinIds: string[]): string {
+    const params = new URLSearchParams({
+      ids: coinIds.join(','),
+      vs_currencies: 'usd',
+      include_market_cap: 'true',
+      include_24hr_vol: 'true',
+      include_24hr_change: 'true',
+      include_7d_change: 'true',
+      include_30d_change: 'true',
+      sparkline: 'true',
+    });
+
+    return `${this.baseUrl}/simple/price?${params}`;
+  }
+
+  private formatCoinPrice(coinId: string, coinData: any): CoinPrice {
+    return {
+      id: coinId,
+      symbol: coinId.toLowerCase(),
+      name: coinId,
+      price: coinData.usd || 0,
+      marketCap: coinData.usd_market_cap || 0,
+      volume24h: coinData.usd_24h_vol || 0,
+      priceChangePercentage24h: coinData.usd_24h_change || 0,
+      priceChangePercentage7d: coinData.usd_7d_change || 0,
+      priceChangePercentage30d: coinData.usd_30d_change || 0,
+      sparkline: coinData.sparkline_in_7d?.price || [],
+      lastUpdated: Date.now(),
+    };
+  }
+
   async getCoinPrice(coinId: string): Promise<CoinPrice> {
     const cacheKey = `coingecko:price:${coinId}`;
     const cached = this.cache.get<CoinPrice>(cacheKey);
     if (cached) return cached;
 
     try {
-      const response = await fetch(
-        `${this.baseUrl}/simple/price?ids=${coinId}&vs_currencies=usd&include_market_cap=true&include_24hr_vol=true&include_24hr_change=true&include_7d_change=true&include_30d_change=true&sparkline=true`
-      );
+      const url = this.buildPriceUrl([coinId]);
+      const response = await fetch(url);
 
       if (!response.ok) throw new Error(`CoinGecko API error: ${response.status}`);
 
@@ -148,22 +205,8 @@ class CoinGeckoService {
         throw new Error(`Coin ${coinId} not found`);
       }
 
-      const coinData = data[coinId];
-      const result: CoinPrice = {
-        id: coinId,
-        symbol: coinId.toLowerCase(),
-        name: coinId,
-        price: coinData.usd || 0,
-        marketCap: coinData.usd_market_cap || 0,
-        volume24h: coinData.usd_24h_vol || 0,
-        priceChangePercentage24h: coinData.usd_24h_change || 0,
-        priceChangePercentage7d: coinData.usd_7d_change || 0,
-        priceChangePercentage30d: coinData.usd_30d_change || 0,
-        sparkline: coinData.sparkline_in_7d?.price || [],
-        lastUpdated: Date.now(),
-      };
-
-      this.cache.set(cacheKey, result, 30000); // Cache por 30 segundos
+      const result = this.formatCoinPrice(coinId, data[coinId]);
+      this.cache.set(cacheKey, result, 30000);
       return result;
     } catch (error) {
       console.error('Error fetching from CoinGecko:', error);
@@ -173,33 +216,15 @@ class CoinGeckoService {
 
   async getCoinPrices(coinIds: string[]): Promise<CoinPrice[]> {
     try {
-      const response = await fetch(
-        `${this.baseUrl}/simple/price?ids=${coinIds.join(',')}&vs_currencies=usd&include_market_cap=true&include_24hr_vol=true&include_24hr_change=true&sparkline=true`
-      );
+      const url = this.buildPriceUrl(coinIds);
+      const response = await fetch(url);
 
       if (!response.ok) throw new Error(`CoinGecko API error: ${response.status}`);
 
       const data = await response.json();
-      const results: CoinPrice[] = [];
-
-      for (const coinId of coinIds) {
-        if (data[coinId]) {
-          const coinData = data[coinId];
-          results.push({
-            id: coinId,
-            symbol: coinId.toLowerCase(),
-            name: coinId,
-            price: coinData.usd || 0,
-            marketCap: coinData.usd_market_cap || 0,
-            volume24h: coinData.usd_24h_vol || 0,
-            priceChangePercentage24h: coinData.usd_24h_change || 0,
-            priceChangePercentage7d: coinData.usd_7d_change || 0,
-            priceChangePercentage30d: coinData.usd_30d_change || 0,
-            sparkline: coinData.sparkline_in_7d?.price || [],
-            lastUpdated: Date.now(),
-          });
-        }
-      }
+      const results: CoinPrice[] = coinIds
+        .filter(coinId => data[coinId])
+        .map(coinId => this.formatCoinPrice(coinId, data[coinId]));
 
       return results;
     } catch (error) {
@@ -214,9 +239,7 @@ class CoinGeckoService {
     if (cached) return cached;
 
     try {
-      const response = await fetch(
-        `${this.baseUrl}/search/trending`
-      );
+      const response = await fetch(`${this.baseUrl}/search/trending`);
 
       if (!response.ok) throw new Error(`CoinGecko API error: ${response.status}`);
 
@@ -233,7 +256,7 @@ class CoinGeckoService {
         priceChangePercentage24h: 0,
       }));
 
-      this.cache.set(cacheKey, results, 300000); // Cache por 5 minutos
+      this.cache.set(cacheKey, results, 300000);
       return results;
     } catch (error) {
       console.error('Error fetching trending coins:', error);
@@ -241,18 +264,14 @@ class CoinGeckoService {
     }
   }
 
-  async getCoinHistory(
-    coinId: string,
-    days: number = 30
-  ): Promise<OHLCV[]> {
+  async getCoinHistory(coinId: string, days: number = 30): Promise<OHLCV[]> {
     const cacheKey = `coingecko:history:${coinId}:${days}`;
     const cached = this.cache.get<OHLCV[]>(cacheKey);
     if (cached) return cached;
 
     try {
-      const response = await fetch(
-        `${this.baseUrl}/coins/${coinId}/market_chart?vs_currency=usd&days=${days}&interval=daily`
-      );
+      const url = `${this.baseUrl}/coins/${coinId}/market_chart?vs_currency=usd&days=${days}&interval=daily`;
+      const response = await fetch(url);
 
       if (!response.ok) throw new Error(`CoinGecko API error: ${response.status}`);
 
@@ -260,22 +279,16 @@ class CoinGeckoService {
       const prices = data.prices || [];
       const volumes = data.total_volumes || [];
 
-      const result: OHLCV[] = prices.map((price: any[], index: number) => {
-        const timestamp = price[0];
-        const priceValue = price[1];
-        const volume = volumes[index]?.[1] || 0;
+      const result: OHLCV[] = prices.map((price: any[], index: number) => ({
+        time: price[0],
+        open: price[1],
+        high: price[1] * 1.02,
+        low: price[1] * 0.98,
+        close: price[1],
+        volume: volumes[index]?.[1] || 0,
+      }));
 
-        return {
-          time: timestamp,
-          open: priceValue,
-          high: priceValue * 1.02,
-          low: priceValue * 0.98,
-          close: priceValue,
-          volume,
-        };
-      });
-
-      this.cache.set(cacheKey, result, 600000); // Cache por 10 minutos
+      this.cache.set(cacheKey, result, 600000);
       return result;
     } catch (error) {
       console.error('Error fetching coin history:', error);
@@ -291,10 +304,44 @@ class FinnhubService {
   private apiKey: string;
   private cache: CacheManager;
   private wsConnections = new Map<string, WebSocket>();
+  private readonly resolutionMap: Record<string, string> = {
+    '1m': '1',
+    '5m': '5',
+    '15m': '15',
+    '1h': '60',
+    '4h': '240',
+    '1d': 'D',
+    '1w': 'W',
+  };
 
   constructor(apiKey: string, cache: CacheManager) {
     this.apiKey = apiKey;
     this.cache = cache;
+  }
+
+  private mapResolution(timeframe: string): string {
+    return this.resolutionMap[timeframe] || '60';
+  }
+
+  private handleApiError(status: number): void {
+    if (status === 429) {
+      throw new Error('Rate limit exceeded');
+    }
+    throw new Error(`Finnhub API error: ${status}`);
+  }
+
+  private formatStockQuote(symbol: string, data: any): StockQuote {
+    return {
+      symbol,
+      price: data.c || 0,
+      change: data.d || 0,
+      changePercent: data.dp || 0,
+      timestamp: Date.now(),
+      bid: data.bp,
+      ask: data.ap,
+      bidSize: data.bv,
+      askSize: data.av,
+    };
   }
 
   async getStockQuote(symbol: string): Promise<StockQuote> {
@@ -303,32 +350,15 @@ class FinnhubService {
     if (cached) return cached;
 
     try {
-      const response = await fetch(
-        `${this.baseUrl}/quote?symbol=${symbol}&token=${this.apiKey}`
-      );
+      const url = `${this.baseUrl}/quote?symbol=${symbol}&token=${this.apiKey}`;
+      const response = await fetch(url);
 
-      if (!response.ok) {
-        if (response.status === 429) {
-          throw new Error('Rate limit exceeded');
-        }
-        throw new Error(`Finnhub API error: ${response.status}`);
-      }
+      if (!response.ok) this.handleApiError(response.status);
 
       const data = await response.json();
+      const result = this.formatStockQuote(symbol, data);
 
-      const result: StockQuote = {
-        symbol,
-        price: data.c || 0,
-        change: data.d || 0,
-        changePercent: data.dp || 0,
-        timestamp: Date.now(),
-        bid: data.bp,
-        ask: data.ap,
-        bidSize: data.bv,
-        askSize: data.av,
-      };
-
-      this.cache.set(cacheKey, result, 5000); // Cache por 5 segundos
+      this.cache.set(cacheKey, result, 5000);
       return result;
     } catch (error) {
       console.error('Error fetching stock quote:', error);
@@ -347,16 +377,10 @@ class FinnhubService {
     if (cached) return cached;
 
     try {
-      const response = await fetch(
-        `${this.baseUrl}/stock/candle?symbol=${symbol}&resolution=${resolution}&from=${from}&to=${to}&token=${this.apiKey}`
-      );
+      const url = `${this.baseUrl}/stock/candle?symbol=${symbol}&resolution=${resolution}&from=${from}&to=${to}&token=${this.apiKey}`;
+      const response = await fetch(url);
 
-      if (!response.ok) {
-        if (response.status === 429) {
-          throw new Error('Rate limit exceeded');
-        }
-        throw new Error(`Finnhub API error: ${response.status}`);
-      }
+      if (!response.ok) this.handleApiError(response.status);
 
       const data = await response.json();
 
@@ -373,7 +397,7 @@ class FinnhubService {
         volume: data.v?.[index] || 0,
       }));
 
-      this.cache.set(cacheKey, result, 300000); // Cache por 5 minutos
+      this.cache.set(cacheKey, result, 300000);
       return result;
     } catch (error) {
       console.error('Error fetching stock candles:', error);
@@ -422,7 +446,6 @@ class FinnhubService {
 
       this.wsConnections.set(symbol, ws);
 
-      // Return unsubscribe function
       return () => {
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ type: 'unsubscribe', symbol }));
@@ -434,19 +457,6 @@ class FinnhubService {
       console.error('Error setting up WebSocket:', error);
       return () => {};
     }
-  }
-
-  private mapResolution(timeframe: string): string {
-    const mapping: Record<string, string> = {
-      '1m': '1',
-      '5m': '5',
-      '15m': '15',
-      '1h': '60',
-      '4h': '240',
-      '1d': 'D',
-      '1w': 'W',
-    };
-    return mapping[timeframe] || '60';
   }
 }
 
@@ -462,15 +472,39 @@ class NewsAPIService {
     this.cache = cache;
   }
 
+  private analyzeSentiment(text: string): 'positive' | 'negative' | 'neutral' {
+    const lowerText = text.toLowerCase();
+    const positiveCount = SENTIMENT_KEYWORDS.positive.filter(word => lowerText.includes(word)).length;
+    const negativeCount = SENTIMENT_KEYWORDS.negative.filter(word => lowerText.includes(word)).length;
+
+    if (positiveCount > negativeCount) return 'positive';
+    if (negativeCount > positiveCount) return 'negative';
+    return 'neutral';
+  }
+
+  private formatArticle(article: any): NewsArticle {
+    const text = article.title + ' ' + (article.description || '');
+    return {
+      id: article.url,
+      title: article.title,
+      description: article.description,
+      content: article.content,
+      image: article.urlToImage,
+      source: article.source.name,
+      url: article.url,
+      publishedAt: new Date(article.publishedAt).getTime(),
+      sentiment: this.analyzeSentiment(text),
+    };
+  }
+
   async getNews(query: string, limit: number = 10): Promise<NewsArticle[]> {
     const cacheKey = `newsapi:${query}:${limit}`;
     const cached = this.cache.get<NewsArticle[]>(cacheKey);
     if (cached) return cached;
 
     try {
-      const response = await fetch(
-        `${this.baseUrl}/everything?q=${encodeURIComponent(query)}&sortBy=publishedAt&language=es&pageSize=${limit}&apiKey=${this.apiKey}`
-      );
+      const url = `${this.baseUrl}/everything?q=${encodeURIComponent(query)}&sortBy=publishedAt&language=es&pageSize=${limit}&apiKey=${this.apiKey}`;
+      const response = await fetch(url);
 
       if (!response.ok) {
         if (response.status === 429) {
@@ -480,19 +514,9 @@ class NewsAPIService {
       }
 
       const data = await response.json();
-      const results: NewsArticle[] = (data.articles || []).map((article: any) => ({
-        id: article.url,
-        title: article.title,
-        description: article.description,
-        content: article.content,
-        image: article.urlToImage,
-        source: article.source.name,
-        url: article.url,
-        publishedAt: new Date(article.publishedAt).getTime(),
-        sentiment: this.analyzeSentiment(article.title + ' ' + (article.description || '')),
-      }));
+      const results: NewsArticle[] = (data.articles || []).map(this.formatArticle.bind(this));
 
-      this.cache.set(cacheKey, results, 300000); // Cache por 5 minutos
+      this.cache.set(cacheKey, results, 300000);
       return results;
     } catch (error) {
       console.error('Error fetching news:', error);
@@ -506,24 +530,13 @@ class NewsAPIService {
     if (cached) return cached;
 
     try {
-      const response = await fetch(
-        `${this.baseUrl}/top-headlines?category=${category}&language=es&pageSize=${limit}&apiKey=${this.apiKey}`
-      );
+      const url = `${this.baseUrl}/top-headlines?category=${category}&language=es&pageSize=${limit}&apiKey=${this.apiKey}`;
+      const response = await fetch(url);
 
       if (!response.ok) throw new Error(`NewsAPI error: ${response.status}`);
 
       const data = await response.json();
-      const results: NewsArticle[] = (data.articles || []).map((article: any) => ({
-        id: article.url,
-        title: article.title,
-        description: article.description,
-        content: article.content,
-        image: article.urlToImage,
-        source: article.source.name,
-        url: article.url,
-        publishedAt: new Date(article.publishedAt).getTime(),
-        sentiment: this.analyzeSentiment(article.title + ' ' + (article.description || '')),
-      }));
+      const results: NewsArticle[] = (data.articles || []).map(this.formatArticle.bind(this));
 
       this.cache.set(cacheKey, results, 300000);
       return results;
@@ -531,19 +544,6 @@ class NewsAPIService {
       console.error('Error fetching headlines:', error);
       throw error;
     }
-  }
-
-  private analyzeSentiment(text: string): 'positive' | 'negative' | 'neutral' {
-    const positiveWords = ['sube', 'gana', 'crece', 'récord', 'alcista', 'compra', 'bullish', 'rally', 'boom', 'éxito', 'ganancias', 'aprueban', 'acuerdo'];
-    const negativeWords = ['baja', 'pierde', 'caída', 'crisis', 'bajista', 'vende', 'bearish', 'crash', 'pánico', 'fracaso', 'pérdidas', 'rechazo', 'conflicto'];
-
-    const lowerText = text.toLowerCase();
-    const positiveCount = positiveWords.filter(word => lowerText.includes(word)).length;
-    const negativeCount = negativeWords.filter(word => lowerText.includes(word)).length;
-
-    if (positiveCount > negativeCount) return 'positive';
-    if (negativeCount > positiveCount) return 'negative';
-    return 'neutral';
   }
 }
 
@@ -559,6 +559,15 @@ class AlphaVantageService {
     this.cache = cache;
   }
 
+  private buildParams(params: Record<string, string>): URLSearchParams {
+    return new URLSearchParams(params);
+  }
+
+  private buildUrl(params: Record<string, string>): string {
+    const searchParams = this.buildParams(params);
+    return `${this.baseUrl}?${searchParams}`;
+  }
+
   async getCandles(
     symbol: string,
     interval: string = '60min',
@@ -569,15 +578,18 @@ class AlphaVantageService {
     if (cached) return cached;
 
     try {
-      const function_name = interval === 'daily' ? 'TIME_SERIES_DAILY' : 'TIME_SERIES_INTRADAY';
-      const params = new URLSearchParams({
-        function: function_name,
+      const functionName = interval === 'daily' ? 'TIME_SERIES_DAILY' : 'TIME_SERIES_INTRADAY';
+      const params: Record<string, string> = {
+        function: functionName,
         symbol,
-        interval: interval === 'daily' ? '' : interval,
         apikey: this.apiKey,
-      });
+      };
 
-      const url = `${this.baseUrl}?${params}`;
+      if (interval !== 'daily') {
+        params.interval = interval;
+      }
+
+      const url = this.buildUrl(params);
       const response = await fetch(url);
 
       if (!response.ok) throw new Error(`Alpha Vantage API error: ${response.status}`);
@@ -605,7 +617,7 @@ class AlphaVantageService {
           volume: parseInt(values['5. volume']),
         }));
 
-      this.cache.set(cacheKey, result, 600000); // Cache por 10 minutos
+      this.cache.set(cacheKey, result, 600000);
       return result;
     } catch (error) {
       console.error('Error fetching from Alpha Vantage:', error);
@@ -624,15 +636,15 @@ class AlphaVantageService {
     if (cached) return cached;
 
     try {
-      const params = new URLSearchParams({
+      const params: Record<string, string> = {
         function: indicator,
         symbol,
         interval,
         time_period: timePeriod.toString(),
         apikey: this.apiKey,
-      });
+      };
 
-      const url = `${this.baseUrl}?${params}`;
+      const url = this.buildUrl(params);
       const response = await fetch(url);
 
       if (!response.ok) throw new Error(`Alpha Vantage API error: ${response.status}`);
@@ -680,27 +692,56 @@ export class MarketService {
   }
 
   // ========== CRIPTOMONEDAS ==========
+
+  /**
+   * Obtiene el precio actual de una criptomoneda
+   * @param coinId - ID de la moneda (ej: bitcoin, ethereum)
+   */
   async getCoinPrice(coinId: string): Promise<CoinPrice> {
     return this.coingecko.getCoinPrice(coinId);
   }
 
+  /**
+   * Obtiene precios de múltiples criptomonedas
+   * @param coinIds - Array de IDs de monedas
+   */
   async getCoinPrices(coinIds: string[]): Promise<CoinPrice[]> {
     return this.coingecko.getCoinPrices(coinIds);
   }
 
+  /**
+   * Obtiene las criptomonedas en tendencia
+   */
   async getTrendingCoins(): Promise<Coin[]> {
     return this.coingecko.getTrendingCoins();
   }
 
+  /**
+   * Obtiene el historial de precios de una criptomoneda
+   * @param coinId - ID de la moneda
+   * @param days - Número de días a recuperar (default: 30)
+   */
   async getCoinHistory(coinId: string, days?: number): Promise<OHLCV[]> {
     return this.coingecko.getCoinHistory(coinId, days);
   }
 
   // ========== ACCIONES ==========
+
+  /**
+   * Obtiene la cotización actual de una acción
+   * @param symbol - Símbolo de la acción (ej: AAPL, MSFT)
+   */
   async getStockQuote(symbol: string): Promise<StockQuote> {
     return this.finnhub.getStockQuote(symbol);
   }
 
+  /**
+   * Obtiene datos de velas (candlesticks) de una acción
+   * @param symbol - Símbolo de la acción
+   * @param resolution - Resolución temporal (1, 5, 15, 60, D, W)
+   * @param from - Timestamp inicial (segundos)
+   * @param to - Timestamp final (segundos)
+   */
   async getStockCandles(
     symbol: string,
     resolution: string,
@@ -710,20 +751,44 @@ export class MarketService {
     return this.finnhub.getStockCandles(symbol, resolution, from, to);
   }
 
+  /**
+   * Se suscribe a actualizaciones en tiempo real de una acción
+   * @param symbol - Símbolo de la acción
+   * @param callback - Función a llamar cuando llegan datos
+   * @returns Función para desuscribirse
+   */
   subscribeToStock(symbol: string, callback: (data: StockQuote) => void): () => void {
     return this.finnhub.subscribeToStock(symbol, callback);
   }
 
   // ========== NOTICIAS ==========
+
+  /**
+   * Busca noticias por término de búsqueda
+   * @param query - Término a buscar
+   * @param limit - Número máximo de artículos (default: 10)
+   */
   async getNews(query: string, limit?: number): Promise<NewsArticle[]> {
     return this.newsapi.getNews(query, limit);
   }
 
+  /**
+   * Obtiene noticias destacadas por categoría
+   * @param category - Categoría (ej: business, technology) (default: business)
+   * @param limit - Número máximo de artículos (default: 10)
+   */
   async getHeadlines(category?: string, limit?: number): Promise<NewsArticle[]> {
     return this.newsapi.getHeadlines(category, limit);
   }
 
   // ========== DATOS HISTÓRICOS E INDICADORES ==========
+
+  /**
+   * Obtiene datos históricos de velas
+   * @param symbol - Símbolo del activo
+   * @param interval - Intervalo temporal (default: 60min)
+   * @param limit - Número máximo de velas (default: 100)
+   */
   async getCandles(
     symbol: string,
     interval?: string,
@@ -732,6 +797,13 @@ export class MarketService {
     return this.alphavantage.getCandles(symbol, interval, limit);
   }
 
+  /**
+   * Obtiene un indicador técnico
+   * @param symbol - Símbolo del activo
+   * @param indicator - Nombre del indicador (SMA, EMA, RSI, etc)
+   * @param interval - Intervalo temporal (default: 60min)
+   * @param timePeriod - Período de tiempo (default: 20)
+   */
   async getTechnicalIndicator(
     symbol: string,
     indicator: string,
@@ -741,21 +813,46 @@ export class MarketService {
     return this.alphavantage.getTechnicalIndicator(symbol, indicator, interval, timePeriod);
   }
 
-  // ========== CACHE ==========
+  // ========== CACHE MANAGEMENT ==========
+
+  /**
+   * Obtiene datos cacheados
+   * @param key - Clave del caché
+   */
   getCachedData<T>(key: string): T | null {
     return this.cache.get<T>(key);
   }
 
+  /**
+   * Establece datos en caché
+   * @param key - Clave del caché
+   * @param data - Datos a cachear
+   * @param ttl - Tiempo de vida en milisegundos (default: 60000)
+   */
   setCachedData<T>(key: string, data: T, ttl: number = 60000): void {
     this.cache.set(key, data, ttl);
   }
 
+  /**
+   * Limpia todo el caché
+   */
   clearCache(): void {
     this.cache.clear();
   }
 
+  /**
+   * Elimina una entrada del caché
+   * @param key - Clave a eliminar
+   */
   deleteCachedData(key: string): void {
     this.cache.delete(key);
+  }
+
+  /**
+   * Obtiene estadísticas del caché
+   */
+  getCacheStats(): { size: number; keys: string[] } {
+    return this.cache.getStats();
   }
 }
 

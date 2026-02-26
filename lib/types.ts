@@ -141,3 +141,52 @@ export interface AIChatResponse {
   suggestedAssets?: string[];
 }
 
+// ==================== TIPOS PARA DATOS EN TIEMPO REAL ====================
+
+/**
+ * Estado de conexión a WebSocket o servicio en tiempo real
+ */
+export interface ConnectionStatus {
+  status: 'connected' | 'disconnected' | 'connecting' | 'error';
+  lastUpdate: number | null;
+  message?: string;
+}
+
+/**
+ * Precio en tiempo real de un activo
+ * Se utiliza para WebSocket y actualizaciones de precio en vivo
+ */
+export interface RealtimePrice {
+  symbol: string;
+  price: number;
+  volume: number;
+  timestamp: number;
+}
+
+/**
+ * Interfaz para caché de datos de mercado
+ * Proporciona métodos para almacenar y recuperar datos con TTL
+ */
+export interface MarketCache {
+  /**
+   * Obtiene un valor del caché
+   * @param key - Clave del caché
+   * @returns Valor cacheado o null si no existe o ha expirado
+   */
+  get: <T>(key: string) => T | null;
+
+  /**
+   * Establece un valor en el caché
+   * @param key - Clave del caché
+   * @param value - Valor a almacenar
+   * @param ttl - Tiempo de vida en milisegundos (opcional)
+   */
+  set: <T>(key: string, value: T, ttl?: number) => void;
+
+  /**
+   * Limpia el caché
+   * @param key - Clave específica a limpiar (opcional). Si no se proporciona, limpia todo
+   */
+  clear: (key?: string) => void;
+}
+
