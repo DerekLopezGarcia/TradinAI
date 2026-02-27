@@ -1,6 +1,6 @@
 // Tipos de datos para la aplicación
 
-export type AssetType = 'stock' | 'crypto' | 'forex';
+export type AssetType = 'stock' | 'crypto' | 'forex' | 'index' | 'commodity';
 export type TimeFrame = '1m' | '5m' | '15m' | '1h' | '4h' | '1d' | '1w';
 export type Sentiment = 'positive' | 'negative' | 'neutral';
 export type AlertType = 'price_above' | 'price_below' | 'sma_cross' | 'ema_cross';

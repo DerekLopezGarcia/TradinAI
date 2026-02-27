@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useMarketStore } from '@/lib/store';
 import { Header, TimeFrameSelector } from '@/components/Header';
 import { PriceChart, RSIChart } from '@/components/Charts';
@@ -9,8 +9,9 @@ import { NewsFeed } from '@/components/NewsFeed';
 import { AlertManager } from '@/components/AlertManager';
 import { useMarketData } from '@/app/hooks/useMarketData';
 import { calculateSMA, calculateEMA, calculateRSI } from '@/lib/indicators';
-import { X, TrendingUp, TrendingDown } from 'lucide-react';
+import { X, TrendingUp, TrendingDown, Zap } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
+import {CandleData} from "@/lib/types.ts";
 
 export default function Home() {
   const {
@@ -23,83 +24,102 @@ export default function Home() {
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const indicatorsRef = useRef<{ sma20: number[]; ema12: number[]; rsi: number[] }>({
+    sma20: [],
+    ema12: [],
+    rsi: [],
+  });
+
   const { data, loading, error: dataError } = useMarketData(
     selectedAsset?.symbol || 'BTCUSD',
     selectedTimeframe
   );
 
-  // Manejo de errores de datos
   useEffect(() => {
     if (dataError) {
       setError(dataError);
-      toast.error(`Error: ${dataError}`);
+      setTimeout(() => toast.error(`Error: ${dataError}`), 100);
     }
   }, [dataError]);
 
-  // Memoizar cálculo de indicadores con validación
-  const { sma20, ema12, rsi } = useMemo(() => {
+  useEffect(() => {
     if (!data || data.length === 0) {
-      return { sma20: [], ema12: [], rsi: [] };
+      indicatorsRef.current = { sma20: [], ema12: [], rsi: [] };
+      return;
     }
 
-    try {
-      const closePrices = data.map(d => d.close).filter(p => !isNaN(p) && isFinite(p));
+    const calculateAsync = async () => {
+      try {
+        const closePrices = data
+          .map((d: CandleData) => d.close)
+          .filter((p: number) => !isNaN(p) && isFinite(p));
 
-      if (closePrices.length < 14) {
-        return { sma20: [], ema12: [], rsi: [] };
+        if (closePrices.length < 14) {
+          indicatorsRef.current = { sma20: [], ema12: [], rsi: [] };
+          return;
+        }
+
+        await new Promise(resolve => {
+          requestAnimationFrame(() => {
+            indicatorsRef.current = {
+              sma20: calculateSMA(closePrices, 20),
+              ema12: calculateEMA(closePrices, 12),
+              rsi: calculateRSI(closePrices, 14),
+            };
+            resolve(null);
+          });
+        });
+      } catch (err) {
+        console.error('Error calculating indicators:', err);
+        indicatorsRef.current = { sma20: [], ema12: [], rsi: [] };
       }
+    };
 
-      return {
-        sma20: calculateSMA(closePrices, 20),
-        ema12: calculateEMA(closePrices, 12),
-        rsi: calculateRSI(closePrices, 14),
-      };
-    } catch (err) {
-      console.error('Error calculating indicators:', err);
-      return { sma20: [], ema12: [], rsi: [] };
-    }
+    calculateAsync();
   }, [data]);
 
-  // Actualización de precios más eficiente
-  const priceUpdateInterval = useCallback(() => {
-    if (!selectedAsset) return;
+  const indicators = useMemo(() => indicatorsRef.current, [data]);
 
-    const interval = setInterval(() => {
+  // Actualizar precio desde API - DATOS REALES sin simulación
+  useEffect(() => {
+    if (!selectedAsset?.symbol) return;
+
+    const updatePrice = async () => {
       try {
-        useMarketStore.setState((state) => {
-          if (!state.selectedAsset) return state;
-
-          const change = (Math.random() - 0.5) * (selectedAsset.price * 0.001);
-          const newPrice = Math.max(selectedAsset.price + change, 0.01);
-          const changePercent = ((change / selectedAsset.price) * 100);
-
-          return {
-            selectedAsset: {
-              ...state.selectedAsset,
-              price: parseFloat(newPrice.toFixed(2)),
-              change: parseFloat(change.toFixed(2)),
-              changePercent: parseFloat(changePercent.toFixed(2)),
-            },
-          };
-        });
+        const response = await fetch(
+          `/api/market?symbol=${selectedAsset.symbol}&type=price`
+        );
+        if (response.ok) {
+          const priceData = await response.json();
+          useMarketStore.setState((state) => ({
+            selectedAsset: state.selectedAsset
+              ? {
+                  ...state.selectedAsset,
+                  price: priceData.price || state.selectedAsset.price,
+                  change: priceData.change || 0,
+                  changePercent: priceData.changePercent || 0,
+                }
+              : null,
+          }));
+        }
       } catch (err) {
         console.error('Error updating price:', err);
       }
-    }, 5000);
+    };
+
+    // Actualizar inmediatamente y luego cada 10 segundos
+    updatePrice();
+    const interval = setInterval(updatePrice, 10000);
 
     return () => clearInterval(interval);
-  }, [selectedAsset]);
-
-  useEffect(() => {
-    return priceUpdateInterval();
-  }, [priceUpdateInterval]);
+  }, [selectedAsset?.symbol]);
 
   if (!selectedAsset) {
     return (
-      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-muted border-t-primary rounded-full animate-spin mx-auto mb-6"></div>
-          <p className="text-muted-foreground text-lg">Inicializando TradingIA...</p>
+          <div className="w-16 h-16 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
+          <p className="text-cyan-400 text-lg font-semibold">Inicializando...</p>
         </div>
       </div>
     );
@@ -109,47 +129,44 @@ export default function Home() {
   const isPositive = selectedAsset.changePercent >= 0;
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
       <Toaster
         position="top-right"
         toastOptions={{
           style: {
-            background: 'hsl(var(--card))',
-            color: 'hsl(var(--foreground))',
-            border: '1px solid hsl(var(--muted))',
+            background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+            color: '#00f0ff',
+            border: '1px solid #00f0ff',
+            borderRadius: '8px',
           },
         }}
       />
 
-      {/* Header */}
       <Header onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} />
 
       <div className="flex h-[calc(100vh-80px)]">
         {/* Sidebar */}
         <aside
-          className={`fixed lg:relative w-64 bg-card border-r border-muted/30 transition-all duration-300 z-40 lg:z-0 ${
+          className={`fixed lg:relative w-72 bg-gradient-to-b from-slate-900 to-slate-950 border-r border-cyan-500/20 transition-all duration-300 z-40 lg:z-0 ${
             isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
           } h-full overflow-y-auto`}
         >
-          <div className="p-6 space-y-8">
-            {/* Botón cerrar en móvil */}
+          <div className="p-6 space-y-6">
             <button
               onClick={() => setIsSidebarOpen(false)}
-              className="lg:hidden absolute top-4 right-4 p-2 hover:bg-muted/20 rounded-lg"
+              className="lg:hidden absolute top-4 right-4 p-2 hover:bg-cyan-500/10 rounded-lg"
             >
-              <X className="w-5 h-5" />
+              <X className="w-5 h-5 text-cyan-400" />
             </button>
 
-            {/* Información del activo seleccionado */}
-            <div className="mt-6 lg:mt-0 p-4 bg-primary/5 rounded-lg border border-primary/20">
-              <p className="text-xs text-muted-foreground mb-2">ACTIVO ACTUAL</p>
-              <p className="text-2xl font-bold mb-2">{selectedAsset.symbol}</p>
-              <p className="text-sm text-muted-foreground mb-3">{selectedAsset.name}</p>
+            <div className="mt-6 lg:mt-0 p-4 bg-gradient-to-br from-cyan-500/10 to-blue-500/10 rounded-lg border border-cyan-500/30">
+              <p className="text-xs text-cyan-400 mb-2 uppercase font-semibold">Actual</p>
+              <p className="text-2xl font-bold text-white mb-2">{selectedAsset.symbol}</p>
               <div className="flex items-center justify-between">
-                <p className="text-xl font-bold">${selectedAsset.price.toFixed(2)}</p>
+                <p className="text-lg font-bold text-cyan-300">${selectedAsset.price.toFixed(2)}</p>
                 <p
                   className={`text-sm font-semibold flex items-center gap-1 ${
-                    isPositive ? 'text-primary' : 'text-secondary'
+                    isPositive ? 'text-emerald-400' : 'text-red-400'
                   }`}
                 >
                   {isPositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
@@ -158,50 +175,42 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Favoritos */}
             {favoriteAssets.length > 0 && (
-              <>
-                <div>
-                  <h3 className="font-bold text-sm mb-3 uppercase text-muted-foreground tracking-wider">
-                    ⭐ Favoritos ({favoriteAssets.length})
-                  </h3>
-                  <div className="space-y-2">
-                    {favoriteAssets.map((asset) => (
-                      <button
-                        key={asset.id}
-                        onClick={() => {
-                          setSelectedAsset(asset);
-                          setIsSidebarOpen(false);
-                        }}
-                        className={`w-full text-left px-3 py-3 rounded-lg transition-all ${
-                          selectedAsset.id === asset.id
-                            ? 'bg-primary/20 border border-primary/50'
-                            : 'hover:bg-muted/20 border border-transparent'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <p className="font-semibold text-sm">{asset.symbol}</p>
-                          <p
-                            className={`text-xs font-bold ${
-                              asset.changePercent >= 0 ? 'text-primary' : 'text-secondary'
-                            }`}
-                          >
-                            {asset.changePercent >= 0 ? '+' : ''}{asset.changePercent.toFixed(2)}%
-                          </p>
-                        </div>
-                        <p className="text-xs text-muted-foreground">${asset.price.toFixed(2)}</p>
-                      </button>
-                    ))}
-                  </div>
+              <div>
+                <h3 className="font-bold text-sm mb-3 uppercase text-cyan-400">⭐ Favoritos</h3>
+                <div className="space-y-2">
+                  {favoriteAssets.map((asset) => (
+                    <button
+                      key={asset.id}
+                      onClick={() => {
+                        setSelectedAsset(asset);
+                        setIsSidebarOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-3 rounded-lg transition-all ${
+                        selectedAsset.id === asset.id
+                          ? 'bg-cyan-500/20 border border-cyan-400'
+                          : 'hover:bg-slate-700/50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="font-semibold text-sm text-white">{asset.symbol}</p>
+                        <p
+                          className={`text-xs font-bold ${
+                            asset.changePercent >= 0 ? 'text-emerald-400' : 'text-red-400'
+                          }`}
+                        >
+                          {asset.changePercent >= 0 ? '+' : ''}{asset.changePercent.toFixed(2)}%
+                        </p>
+                      </div>
+                      <p className="text-xs text-slate-400">${asset.price.toFixed(2)}</p>
+                    </button>
+                  ))}
                 </div>
-              </>
+              </div>
             )}
 
-            {/* Todos los activos */}
             <div>
-              <h3 className="font-bold text-sm mb-3 uppercase text-muted-foreground tracking-wider">
-                📊 Todos los Activos
-              </h3>
+              <h3 className="font-bold text-sm mb-3 uppercase text-cyan-400">📊 Activos</h3>
               <div className="space-y-2 max-h-96 overflow-y-auto">
                 {assets.map((asset) => (
                   <button
@@ -210,17 +219,17 @@ export default function Home() {
                       setSelectedAsset(asset);
                       setIsSidebarOpen(false);
                     }}
-                    className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all ${
+                    className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-all ${
                       selectedAsset.id === asset.id
-                        ? 'bg-primary/20 border border-primary/50'
-                        : 'hover:bg-muted/20 border border-transparent'
+                        ? 'bg-cyan-500/20 border border-cyan-400'
+                        : 'hover:bg-slate-700/50'
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-medium">{asset.symbol}</span>
+                      <span className="font-medium text-white">{asset.symbol}</span>
                       <span
                         className={`text-xs font-bold ${
-                          asset.changePercent >= 0 ? 'text-primary' : 'text-secondary'
+                          asset.changePercent >= 0 ? 'text-emerald-400' : 'text-red-400'
                         }`}
                       >
                         {asset.changePercent >= 0 ? '+' : ''}{asset.changePercent.toFixed(2)}%
@@ -233,7 +242,6 @@ export default function Home() {
           </div>
         </aside>
 
-        {/* Overlay para cerrar sidebar en móvil */}
         {isSidebarOpen && (
           <div
             className="fixed inset-0 bg-black/50 lg:hidden z-30"
@@ -241,30 +249,31 @@ export default function Home() {
           />
         )}
 
-        {/* Contenido principal */}
+        {/* Main Content */}
         <main className="flex-1 overflow-hidden flex flex-col">
           <div className="flex-1 p-4 md:p-6 overflow-y-auto space-y-6">
-            {/* Error banner */}
             {error && (
-              <div className="bg-secondary/10 border border-secondary/50 rounded-lg p-4 flex items-center justify-between">
-                <div>
-                  <p className="font-semibold text-secondary">Error de carga</p>
-                  <p className="text-sm text-muted-foreground">{error}</p>
+              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Zap className="w-5 h-5 text-red-400" />
+                  <div>
+                    <p className="font-semibold text-red-400">Error</p>
+                    <p className="text-sm text-red-300/80">{error}</p>
+                  </div>
                 </div>
                 <button
                   onClick={() => setError(null)}
-                  className="p-2 hover:bg-secondary/20 rounded-lg transition-colors"
+                  className="p-2 hover:bg-red-500/20 rounded-lg"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-5 h-5 text-red-400" />
                 </button>
               </div>
             )}
 
-            {/* Selector de timeframe */}
-            <div className="flex items-center justify-between sticky top-0 bg-background/80 backdrop-blur-sm -mx-4 md:-mx-6 px-4 md:px-6 py-4 z-20">
+            <div className="flex items-center justify-between sticky top-0 bg-gradient-to-r from-slate-950/80 to-slate-900/80 backdrop-blur-sm -mx-4 md:-mx-6 px-4 md:px-6 py-4 z-20 border-b border-cyan-500/10">
               <div>
-                <h2 className="text-xl font-bold">Análisis Técnico</h2>
-                <p className="text-sm text-muted-foreground">{selectedAsset.symbol} • {selectedAsset.name}</p>
+                <h2 className="text-2xl font-bold text-white">Análisis</h2>
+                <p className="text-sm text-slate-400">{selectedAsset.symbol}</p>
               </div>
               <TimeFrameSelector
                 selectedTimeframe={selectedTimeframe}
@@ -272,44 +281,37 @@ export default function Home() {
               />
             </div>
 
-            {/* Grid principal */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Gráfico de precios (columna izquierda) */}
               <div className="lg:col-span-2 space-y-6">
-                {/* Price Chart */}
                 {loading ? (
-                  <div className="card-glass h-96 flex items-center justify-center rounded-xl">
+                  <div className="h-96 bg-gradient-to-br from-slate-800/50 to-slate-900/50 rounded-xl border border-cyan-500/20 flex items-center justify-center">
                     <div className="text-center">
-                      <div className="w-12 h-12 border-4 border-muted border-t-primary rounded-full animate-spin mx-auto mb-4"></div>
-                      <p className="text-muted-foreground">Cargando gráfico...</p>
+                      <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                      <p className="text-slate-400">Cargando...</p>
                     </div>
                   </div>
                 ) : data.length > 0 ? (
-                  <div className="card-glass rounded-xl overflow-hidden">
+                  <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 rounded-xl border border-cyan-500/20 overflow-hidden">
                     <PriceChart
                       data={data}
                       symbol={selectedAsset.symbol}
                       showVolume={true}
-                      indicators={{ sma20, ema12 }}
+                      indicators={indicators}
                     />
                   </div>
                 ) : (
-                  <div className="card-glass h-96 flex items-center justify-center rounded-xl">
-                    <div className="text-center">
-                      <p className="text-muted-foreground">Sin datos disponibles</p>
-                    </div>
+                  <div className="h-96 bg-gradient-to-br from-slate-800/50 to-slate-900/50 rounded-xl border border-cyan-500/20 flex items-center justify-center">
+                    <p className="text-slate-400">Sin datos</p>
                   </div>
                 )}
 
-                {/* RSI Chart */}
-                {rsi.length > 0 && (
-                  <div className="card-glass rounded-xl overflow-hidden">
-                    <RSIChart data={rsi} />
+                {indicators.rsi.length > 0 && (
+                  <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 rounded-xl border border-cyan-500/20 overflow-hidden">
+                    <RSIChart data={indicators.rsi} />
                   </div>
                 )}
 
-                {/* Análisis de IA */}
-                <div className="card-glass rounded-xl overflow-hidden">
+                <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 rounded-xl border border-cyan-500/20 overflow-hidden">
                   <AnalysisCard
                     symbol={selectedAsset.symbol}
                     timeframe={selectedTimeframe}
@@ -317,18 +319,15 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Sidebar derecho */}
               <div className="space-y-6">
-                {/* Chat con IA */}
-                <div className="card-glass rounded-xl overflow-hidden">
+                <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 rounded-xl border border-cyan-500/20 overflow-hidden">
                   <ChatPanel
                     symbol={selectedAsset.symbol}
                     timeframe={selectedTimeframe}
                   />
                 </div>
 
-                {/* Noticias */}
-                <div className="card-glass rounded-xl overflow-hidden">
+                <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 rounded-xl border border-cyan-500/20 overflow-hidden">
                   <NewsFeed symbol={selectedAsset.symbol} />
                 </div>
               </div>
@@ -337,9 +336,9 @@ export default function Home() {
         </main>
       </div>
 
-      {/* Alert Manager */}
       <AlertManager />
     </div>
   );
 }
+
 

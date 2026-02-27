@@ -9,12 +9,11 @@ import {
   Area,
   BarChart,
   Bar,
-  ComposedChart,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
+  ReferenceLine,
   ResponsiveContainer,
 } from 'recharts';
 import { format } from 'date-fns';
@@ -31,46 +30,41 @@ interface PriceChartProps {
 }
 
 export function PriceChart({ data, symbol, showVolume = true, indicators }: PriceChartProps) {
-  // Memoizar transformación de datos para evitar recalcular en cada render
-  const chartData = useMemo(() =>
-    data.map((candle, index) => ({
+  // Mostrar solo últimas 50 velas para claridad
+  const displayData = useMemo(() => {
+    const lastData = data.slice(-50);
+    return lastData.map((candle, index) => ({
       time: format(new Date(candle.time), 'HH:mm'),
-      open: candle.open,
-      high: candle.high,
-      low: candle.low,
-      close: candle.close,
+      close: parseFloat(candle.close.toFixed(2)),
+      open: parseFloat(candle.open.toFixed(2)),
+      high: parseFloat(candle.high.toFixed(2)),
+      low: parseFloat(candle.low.toFixed(2)),
       volume: candle.volume,
-      sma20: indicators?.sma20?.[index] ?? null,
-      ema12: indicators?.ema12?.[index] ?? null,
-    })),
-    [data, indicators]
-  );
+      sma20: indicators?.sma20?.[data.length - 50 + index] ?? null,
+      ema12: indicators?.ema12?.[data.length - 50 + index] ?? null,
+    }));
+  }, [data, indicators]);
 
-  // Memoizar cálculos de min/max para evitar recalcular
-  const { minPrice, maxPrice, avgPrice } = useMemo(() => {
-    if (data.length === 0) return { minPrice: 0, maxPrice: 100, avgPrice: 50 };
-    const prices = data.map(d => d.low);
-    const highs = data.map(d => d.high);
-    const min = Math.min(...prices);
-    const max = Math.max(...highs);
-    return {
-      minPrice: min,
-      maxPrice: max,
-      avgPrice: (min + max) / 2,
-    };
-  }, [data]);
+  const stats = useMemo(() => {
+    if (displayData.length === 0) return { min: 0, max: 100, avg: 50, change: 0 };
+    const closes = displayData.map(d => d.close);
+    const min = Math.min(...closes);
+    const max = Math.max(...closes);
+    const avg = (min + max) / 2;
+    const change = displayData[displayData.length - 1].close - displayData[0].close;
+    return { min, max, avg, change };
+  }, [displayData]);
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div className="glass p-3 rounded-lg border border-muted text-xs">
-          <p className="text-muted-foreground">{data.time}</p>
-          <p className="text-foreground">Abierto: ${data.open.toFixed(2)}</p>
-          <p className="text-foreground">Alto: ${data.high.toFixed(2)}</p>
-          <p className="text-foreground">Bajo: ${data.low.toFixed(2)}</p>
-          <p className="font-semibold">{data.close >= data.open ? '🟢' : '🔴'} Cierre: ${data.close.toFixed(2)}</p>
-          {data.volume && <p className="text-muted-foreground">Vol: {(data.volume / 1e6).toFixed(2)}M</p>}
+        <div className="bg-slate-950 border border-cyan-500/50 p-3 rounded-lg text-xs">
+          <p className="text-cyan-400 font-semibold">{data.time}</p>
+          <p className="text-white">Cierre: ${data.close.toFixed(2)}</p>
+          <p className="text-slate-300">Alto: ${data.high.toFixed(2)}</p>
+          <p className="text-slate-300">Bajo: ${data.low.toFixed(2)}</p>
+          {data.volume && <p className="text-slate-400 text-xs mt-1">Vol: {(data.volume / 1e6).toFixed(1)}M</p>}
         </div>
       );
     }
@@ -78,52 +72,50 @@ export function PriceChart({ data, symbol, showVolume = true, indicators }: Pric
   };
 
   return (
-    <div className="card-glass">
-      <div className="mb-4">
-        <h2 className="text-lg font-bold">{symbol}</h2>
-        <p className="text-sm text-muted-foreground">Gráfico de precios en tiempo real</p>
+    <div className="p-6 space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-white">{symbol}</h2>
+          <p className="text-sm text-slate-400">Últimas 50 velas</p>
+        </div>
+        <div className="text-right">
+          <p className={`text-2xl font-bold ${stats.change >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+            ${displayData[displayData.length - 1]?.close.toFixed(2) || '0.00'}
+          </p>
+          <p className={`text-sm ${stats.change >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+            {stats.change >= 0 ? '+' : ''}{stats.change.toFixed(2)}
+          </p>
+        </div>
       </div>
 
       {/* Gráfico de precios */}
-      <div className="w-full h-80 -mx-2">
+      <div className="w-full h-80 bg-gradient-to-br from-slate-900 to-slate-950 rounded-lg">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart
-            data={chartData}
-            margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
-          >
+          <AreaChart data={displayData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
             <defs>
-              <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+              <linearGradient id="colorClose" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.3} />
+                <stop offset="95%" stopColor="#22d3ee" stopOpacity={0.01} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted)/0.2)" />
-            <XAxis
-              dataKey="time"
-              stroke="hsl(var(--muted-foreground))"
-              style={{ fontSize: '12px' }}
-            />
-            <YAxis
-              domain={[minPrice * 0.99, maxPrice * 1.01]}
-              stroke="hsl(var(--muted-foreground))"
-              style={{ fontSize: '12px' }}
-              width={60}
-            />
+            <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
+            <XAxis dataKey="time" stroke="#64748b" style={{ fontSize: '12px' }} />
+            <YAxis stroke="#64748b" style={{ fontSize: '12px' }} />
             <Tooltip content={<CustomTooltip />} />
             <Area
               type="monotone"
               dataKey="close"
-              stroke="hsl(var(--primary))"
+              stroke="#22d3ee"
               strokeWidth={2}
-              fill="url(#colorPrice)"
+              fill="url(#colorClose)"
               isAnimationActive={false}
             />
             {indicators?.sma20 && (
               <Line
                 type="monotone"
                 dataKey="sma20"
-                stroke="hsl(var(--accent))"
-                strokeWidth={1}
+                stroke="#fbbf24"
+                strokeWidth={1.5}
                 dot={false}
                 isAnimationActive={false}
                 name="SMA(20)"
@@ -133,69 +125,57 @@ export function PriceChart({ data, symbol, showVolume = true, indicators }: Pric
               <Line
                 type="monotone"
                 dataKey="ema12"
-                stroke="hsl(var(--secondary))"
-                strokeWidth={1}
+                stroke="#f87171"
+                strokeWidth={1.5}
                 strokeDasharray="5 5"
                 dot={false}
                 isAnimationActive={false}
                 name="EMA(12)"
               />
             )}
-          </ComposedChart>
+          </AreaChart>
         </ResponsiveContainer>
       </div>
 
-      {/* Gráfico de volumen */}
+      {/* Estadísticas */}
+      <div className="grid grid-cols-4 gap-3 text-sm">
+        <div className="p-3 bg-slate-800/50 rounded-lg border border-cyan-500/20">
+          <p className="text-slate-400 text-xs">Máximo</p>
+          <p className="text-cyan-400 font-bold">${stats.max.toFixed(2)}</p>
+        </div>
+        <div className="p-3 bg-slate-800/50 rounded-lg border border-cyan-500/20">
+          <p className="text-slate-400 text-xs">Mínimo</p>
+          <p className="text-red-400 font-bold">${stats.min.toFixed(2)}</p>
+        </div>
+        <div className="p-3 bg-slate-800/50 rounded-lg border border-cyan-500/20">
+          <p className="text-slate-400 text-xs">Promedio</p>
+          <p className="text-yellow-400 font-bold">${stats.avg.toFixed(2)}</p>
+        </div>
+        <div className="p-3 bg-slate-800/50 rounded-lg border border-cyan-500/20">
+          <p className="text-slate-400 text-xs">Cambio</p>
+          <p className={`font-bold ${stats.change >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+            {stats.change >= 0 ? '+' : ''}{stats.change.toFixed(2)}
+          </p>
+        </div>
+      </div>
+
+      {/* Volumen */}
       {showVolume && (
-        <div className="mt-6 pt-6 border-t border-muted/30">
-          <h3 className="text-sm font-semibold mb-4">Volumen</h3>
-          <div className="w-full h-24 -mx-2">
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold text-slate-300">Volumen</h3>
+          <div className="w-full h-20 bg-gradient-to-br from-slate-900 to-slate-950 rounded-lg">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={chartData}
-                margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted)/0.2)" />
-                <XAxis
-                  dataKey="time"
-                  stroke="hsl(var(--muted-foreground))"
-                  style={{ fontSize: '12px' }}
-                />
-                <YAxis
-                  stroke="hsl(var(--muted-foreground))"
-                  style={{ fontSize: '12px' }}
-                  width={60}
-                />
-                <Bar
-                  dataKey="volume"
-                  fill="hsl(var(--accent)/0.5)"
-                  radius={[4, 4, 0, 0]}
-                />
+              <BarChart data={displayData} margin={{ top: 5, right: 30, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.2} />
+                <XAxis dataKey="time" stroke="#64748b" style={{ fontSize: '11px' }} />
+                <YAxis stroke="#64748b" style={{ fontSize: '11px' }} />
+                <Tooltip content={<CustomTooltip />} />
+                <Bar dataKey="volume" fill="#22d3ee" opacity={0.6} isAnimationActive={false} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
       )}
-
-      {/* Información de estadísticas */}
-      <div className="mt-6 grid grid-cols-4 gap-3 text-sm">
-        <div className="p-3 bg-muted/10 rounded-lg">
-          <p className="text-muted-foreground text-xs">Alto</p>
-          <p className="font-semibold">${maxPrice.toFixed(2)}</p>
-        </div>
-        <div className="p-3 bg-muted/10 rounded-lg">
-          <p className="text-muted-foreground text-xs">Bajo</p>
-          <p className="font-semibold">${minPrice.toFixed(2)}</p>
-        </div>
-        <div className="p-3 bg-muted/10 rounded-lg">
-          <p className="text-muted-foreground text-xs">Promedio</p>
-          <p className="font-semibold">${avgPrice.toFixed(2)}</p>
-        </div>
-        <div className="p-3 bg-muted/10 rounded-lg">
-          <p className="text-muted-foreground text-xs">Velas</p>
-          <p className="font-semibold">{data.length}</p>
-        </div>
-      </div>
     </div>
   );
 }
@@ -205,64 +185,111 @@ interface RSIChartProps {
 }
 
 export function RSIChart({ data }: RSIChartProps) {
-  const chartData = useMemo(() =>
-    data.map((rsi, index) => ({
-      index,
-      rsi: rsi || null,
-    })),
-    [data]
-  );
+  // Mostrar solo últimos 50 valores
+  const displayData = useMemo(() => {
+    const lastData = data.slice(-50);
+    return lastData.map((rsi, index) => ({
+      index: index + 1,
+      rsi: rsi ? parseFloat(rsi.toFixed(2)) : null,
+    }));
+  }, [data]);
+
+  const CustomRSITooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const value = payload[0].value;
+      let status: string;
+      let color: string;
+
+      if (value > 70) {
+        status = 'Sobrecomprado';
+        color = 'text-red-400';
+      } else if (value < 30) {
+        status = 'Sobrevendido';
+        color = 'text-emerald-400';
+      } else if (value > 50) {
+        status = 'Alcista';
+        color = 'text-emerald-400';
+      } else {
+        status = 'Bajista';
+        color = 'text-red-400';
+      }
+
+      return (
+        <div className="bg-slate-950 border border-cyan-500/50 p-2 rounded-lg text-xs">
+          <p className={`font-semibold ${color}`}>{value?.toFixed(2) || '0'}</p>
+          <p className="text-slate-400">{status}</p>
+        </div>
+      );
+    }
+    return null;
+  };
 
   return (
-    <div className="card-glass">
-      <h3 className="text-lg font-bold mb-4">RSI (14)</h3>
-      <div className="w-full h-48 -mx-2">
+    <div className="p-6 space-y-4">
+      <div>
+        <h3 className="text-xl font-bold text-white">RSI (14)</h3>
+        <p className="text-sm text-slate-400">Índice de Fuerza Relativa - Últimos 50 valores</p>
+      </div>
+
+      <div className="w-full h-72 bg-gradient-to-br from-slate-900 to-slate-950 rounded-lg">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart
-            data={chartData}
-            margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted)/0.2)" />
-            <XAxis dataKey="index" stroke="hsl(var(--muted-foreground))" style={{ fontSize: '12px' }} />
-            <YAxis domain={[0, 100]} stroke="hsl(var(--muted-foreground))" style={{ fontSize: '12px' }} />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: 'hsl(var(--card))',
-                border: '1px solid hsl(var(--muted))',
-                borderRadius: '8px',
+          <LineChart data={displayData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
+            <XAxis dataKey="index" stroke="#64748b" style={{ fontSize: '12px' }} />
+            <YAxis domain={[0, 100]} stroke="#64748b" style={{ fontSize: '12px' }} />
+            <Tooltip content={<CustomRSITooltip />} />
+
+            <ReferenceLine
+              y={70}
+              stroke="#f87171"
+              strokeDasharray="5 5"
+              strokeWidth={1.5}
+              label={{
+                value: '70 - Sobrecomprado',
+                position: 'right',
+                fill: '#f87171',
+                fontSize: 11,
               }}
             />
+            <ReferenceLine
+              y={30}
+              stroke="#10b981"
+              strokeDasharray="5 5"
+              strokeWidth={1.5}
+              label={{
+                value: '30 - Sobrevendido',
+                position: 'right',
+                fill: '#10b981',
+                fontSize: 11,
+              }}
+            />
+            <ReferenceLine y={50} stroke="#64748b" strokeDasharray="3 3" strokeWidth={1} />
+
             <Line
               type="monotone"
               dataKey="rsi"
-              stroke="hsl(var(--accent))"
+              stroke="#22d3ee"
               strokeWidth={2}
               dot={false}
               isAnimationActive={false}
             />
-            {/* Líneas de referencia */}
-            <Line
-              type="monotone"
-              dataKey={() => 70}
-              stroke="hsl(var(--secondary)/0.5)"
-              strokeDasharray="5 5"
-              dot={false}
-              isAnimationActive={false}
-              name="Overbought (70)"
-            />
-            <Line
-              type="monotone"
-              dataKey={() => 30}
-              stroke="hsl(var(--primary)/0.5)"
-              strokeDasharray="5 5"
-              dot={false}
-              isAnimationActive={false}
-              name="Oversold (30)"
-            />
           </LineChart>
         </ResponsiveContainer>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <div className="p-3 bg-red-900/20 border border-red-500/30 rounded-lg">
+          <p className="text-slate-400 text-xs">Sobrecomprado</p>
+          <p className="text-red-400 font-bold">RSI {'>'} 70</p>
+        </div>
+        <div className="p-3 bg-emerald-900/20 border border-emerald-500/30 rounded-lg">
+          <p className="text-slate-400 text-xs">Sobrevendido</p>
+          <p className="text-emerald-400 font-bold">RSI {'<'} 30</p>
+        </div>
       </div>
     </div>
   );
 }
+
+
 

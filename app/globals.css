@@ -4,22 +4,31 @@
 
 @layer base {
   :root {
-    --background: 13 16 23;
-    --foreground: 230 230 230;
-    --card: 22 27 34;
-    --card-foreground: 230 230 230;
-    --primary: 34 197 94;
-    --primary-foreground: 13 16 23;
-    --secondary: 239 68 68;
-    --secondary-foreground: 13 16 23;
-    --muted: 88 96 105;
-    --muted-foreground: 139 148 155;
-    --accent: 88 166 255;
-    --ring: 88 166 255;
+    /* Fondo: Gris oscuro profesional */
+    --background: 15 23 42;
+    --foreground: 248 250 252;
+
+    /* Cards: Ligeramente más claros que fondo */
+    --card: 30 41 59;
+    --card-foreground: 248 250 252;
+
+    /* Colores primarios mejorados */
+    --primary: 34 211 238;        /* Cyan brillante */
+    --primary-foreground: 15 23 42;
+    --secondary: 239 68 68;        /* Rojo claro */
+    --secondary-foreground: 248 250 252;
+
+    /* Neutral */
+    --muted: 100 116 139;
+    --muted-foreground: 203 213 225;
+
+    /* Accent: Verde emergente */
+    --accent: 16 185 129;
+    --ring: 34 211 238;
   }
 
   * {
-    @apply border-[hsl(var(--ring))];
+    @apply border-[hsl(var(--ring))/20];
   }
 
   body {
@@ -29,15 +38,15 @@
 
 @layer components {
   .glass {
-    @apply bg-[rgba(22,27,34,0.8)] backdrop-blur-lg border border-[hsl(var(--muted))/20] shadow-lg;
+    @apply bg-[rgba(30,41,59,0.6)] backdrop-blur-xl border border-[hsl(var(--ring))/20] shadow-2xl;
   }
 
   .btn-primary {
-    @apply px-4 py-2 rounded-lg bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--primary))/90] text-[hsl(var(--primary-foreground))] font-medium hover:shadow-lg hover:shadow-[hsl(var(--primary))/30] transition-all duration-200;
+    @apply px-4 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-semibold hover:shadow-lg hover:shadow-[hsl(var(--primary))/40] transition-all duration-200 hover:scale-105 active:scale-95;
   }
 
   .btn-secondary {
-    @apply px-4 py-2 rounded-lg bg-gradient-to-r from-[hsl(var(--secondary))] to-[hsl(var(--secondary))/90] text-[hsl(var(--secondary-foreground))] font-medium hover:shadow-lg hover:shadow-[hsl(var(--secondary))/30] transition-all duration-200;
+    @apply px-4 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] font-semibold hover:shadow-lg hover:shadow-[hsl(var(--secondary))/40] transition-all duration-200 hover:scale-105 active:scale-95;
   }
 
   .btn-ghost {
@@ -45,11 +54,11 @@
   }
 
   .price-up {
-    @apply text-[hsl(var(--primary))];
+    @apply text-[hsl(16,185,129)];
   }
 
   .price-down {
-    @apply text-[hsl(var(--secondary))];
+    @apply text-[hsl(239,68,68)];
   }
 
   .card-glass {
@@ -99,11 +108,7 @@
   }
 }
 
-/* Scrollbar mejorado */
-::selection {
-  @apply bg-[hsl(var(--accent))] text-[hsl(var(--background))];
-}
-
+/* Scrollbar personalizado */
 ::-webkit-scrollbar {
   @apply w-2 h-2;
 }
@@ -113,22 +118,29 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-[hsl(var(--muted))/50] rounded-full hover:bg-[hsl(var(--muted))/80] transition-colors;
+  @apply bg-[hsl(var(--primary))/40] rounded-full hover:bg-[hsl(var(--primary))/60] transition-colors;
 }
 
-/* Efectos de hover suaves */
+/* Selection */
+::selection {
+  @apply bg-[hsl(var(--primary))] text-[hsl(var(--background))];
+}
+
+/* Input focus */
 input:focus,
-textarea:focus,
-button:focus {
-  @apply outline-none;
+textarea:focus {
+  @apply outline-none ring-2 ring-[hsl(var(--primary))/40];
 }
 
-/* Backgrounds bonitos */
-.gradient-primary {
-  @apply bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--accent))];
+/* Gradientes útiles */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
-.gradient-secondary {
-  @apply bg-gradient-to-r from-[hsl(var(--secondary))] to-[hsl(var(--primary))];
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
+
+
 
