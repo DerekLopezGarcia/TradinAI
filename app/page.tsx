@@ -8,7 +8,7 @@ import { ChatPanel, AnalysisCard } from '@/components/AIChat';
 import { NewsFeed } from '@/components/NewsFeed';
 import { AlertManager } from '@/components/AlertManager';
 import { useMarketData } from '@/app/hooks/useMarketData';
-import { calculateSMA, calculateEMA, calculateRSI } from '@/lib/mockData';
+import { calculateSMA, calculateEMA, calculateRSI } from '@/lib/indicators';
 import { Menu, X } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 

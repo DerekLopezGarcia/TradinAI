@@ -1,8 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NewsItem, Sentiment } from '@/lib/types';
-import { MOCK_NEWS, getNewsByAsset } from '@/lib/mockData';
 import { Zap, Heart, Share2 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -12,8 +11,41 @@ interface NewsFeedProps {
 
 export function NewsFeed({ symbol }: NewsFeedProps) {
   const [isFavorited, setIsFavorited] = useState<Set<string>>(new Set());
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const news = symbol ? getNewsByAsset(symbol) : MOCK_NEWS;
+  // Obtener noticias reales de la API
+  useEffect(() => {
+    const fetchNews = async () => {
+      if (!symbol) {
+        setNews([]);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const response = await fetch(`/api/market?symbol=${symbol}&type=news`);
+
+        if (!response.ok) {
+          throw new Error(`Error ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        setNews(data.news || []);
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching news:', err);
+        setError(err instanceof Error ? err.message : 'Error loading news');
+        setNews([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchNews();
+  }, [symbol]);
 
   const getSentimentColor = (sentiment: Sentiment) => {
     switch (sentiment) {
@@ -58,7 +90,17 @@ export function NewsFeed({ symbol }: NewsFeedProps) {
       </div>
 
       <div className="space-y-4 max-h-96 overflow-y-auto">
-        {news.length === 0 ? (
+        {loading ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <Zap className="w-8 h-8 mx-auto mb-2 opacity-50 animate-pulse" />
+            <p className="text-sm">Cargando noticias...</p>
+          </div>
+        ) : error ? (
+          <div className="text-center py-8 text-secondary">
+            <Zap className="w-8 h-8 mx-auto mb-2 opacity-50" />
+            <p className="text-sm">{error}</p>
+          </div>
+        ) : news.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <Zap className="w-8 h-8 mx-auto mb-2 opacity-50" />
             <p className="text-sm">No hay noticias disponibles para {symbol}</p>

@@ -36,16 +36,36 @@ export function usePriceUpdate(symbol: string) {
   const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setIsUpdating(true);
-      // Simular cambio de precio
-      setPrice((prev) => {
-        const change = (Math.random() - 0.5) * 100;
-        return prev + change;
-      });
+    // Obtener precio inicial
+    const fetchInitialPrice = async () => {
+      try {
+        const response = await fetch(`/api/market?symbol=${symbol}&type=price`);
+        if (response.ok) {
+          const data = await response.json();
+          setPrice(data.price || 0);
+        }
+      } catch (error) {
+        console.error('Error fetching initial price:', error);
+      }
+    };
 
-      setTimeout(() => setIsUpdating(false), 500);
-    }, 5000);
+    fetchInitialPrice();
+
+    // Actualizar precio cada 10 segundos
+    const interval = setInterval(async () => {
+      setIsUpdating(true);
+      try {
+        const response = await fetch(`/api/market?symbol=${symbol}&type=price`);
+        if (response.ok) {
+          const data = await response.json();
+          setPrice(data.price || 0);
+        }
+      } catch (error) {
+        console.error('Error updating price:', error);
+      } finally {
+        setTimeout(() => setIsUpdating(false), 500);
+      }
+    }, 10000); // 10 segundos
 
     return () => clearInterval(interval);
   }, [symbol]);
