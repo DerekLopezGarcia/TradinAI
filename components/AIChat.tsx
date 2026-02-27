@@ -48,10 +48,16 @@ export function ChatPanel({ symbol, timeframe }: ChatPanelProps) {
       setIsLoading(true);
 
       try {
-        // Llamada REAL a la API
+        // Llamada REAL a la API con timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+
         const response = await fetch(
-          `/api/ai?message=${encodeURIComponent(message)}&symbol=${symbol}`
+          `/api/ai?message=${encodeURIComponent(message)}&symbol=${symbol}`,
+          { signal: controller.signal }
         );
+
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
           throw new Error(`API error: ${response.status}`);
@@ -74,7 +80,9 @@ export function ChatPanel({ symbol, timeframe }: ChatPanelProps) {
           id: Math.random().toString(36).substr(2, 9),
           role: 'assistant',
           content:
-            'Lo siento, hubo un error al procesar tu solicitud. Por favor intenta de nuevo.',
+            error instanceof Error && error.name === 'AbortError'
+              ? 'La solicitud tardó demasiado. Intenta de nuevo.'
+              : 'Lo siento, hubo un error al procesar tu solicitud. Por favor intenta de nuevo.',
           timestamp: Date.now(),
         };
 
@@ -87,8 +95,8 @@ export function ChatPanel({ symbol, timeframe }: ChatPanelProps) {
   );
 
   return (
-    <div className="card-glass flex flex-col h-full max-h-[500px]">
-      <div className="flex items-center justify-between mb-4">
+    <div className="card-glass flex flex-col h-full max-h-[500px] rounded-xl">
+      <div className="flex items-center justify-between mb-4 pb-4 border-b border-muted/20">
         <div className="flex items-center gap-2">
           <MessageCircle className="w-5 h-5 text-accent" />
           <h2 className="text-lg font-bold">Chat con IA</h2>
@@ -96,7 +104,7 @@ export function ChatPanel({ symbol, timeframe }: ChatPanelProps) {
         {chatMessages.length > 0 && (
           <button
             onClick={() => clearChatMessages()}
-            className="p-2 hover:bg-muted/20 rounded-lg transition-colors text-muted-foreground hover:text-foreground"
+            className="p-2 hover:bg-muted/20 rounded-lg transition-all duration-200 hover:scale-110 text-muted-foreground hover:text-foreground"
             title="Limpiar chat"
           >
             <Trash2 className="w-4 h-4" />
@@ -105,7 +113,7 @@ export function ChatPanel({ symbol, timeframe }: ChatPanelProps) {
       </div>
 
       {/* Mensajes */}
-      <div ref={containerRef} className="flex-1 overflow-y-auto mb-4 space-y-4 min-h-40">
+      <div ref={containerRef} className="flex-1 overflow-y-auto mb-4 space-y-3 min-h-40">
         {chatMessages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
             <MessageCircle className="w-12 h-12 opacity-30 mb-4" />
@@ -120,16 +128,16 @@ export function ChatPanel({ symbol, timeframe }: ChatPanelProps) {
             {chatMessages.map((message) => (
               <div
                 key={message.id}
-                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}
               >
                 <div
-                  className={`max-w-xs px-4 py-2 rounded-lg ${
+                  className={`max-w-xs px-4 py-2.5 rounded-lg text-sm transition-all duration-200 ${
                     message.role === 'user'
-                      ? 'bg-primary text-primary-foreground rounded-br-none'
-                      : 'bg-muted/30 text-foreground rounded-bl-none'
+                      ? 'bg-gradient-to-r from-primary to-primary/90 text-primary-foreground rounded-br-none shadow-md'
+                      : 'bg-muted/20 text-foreground rounded-bl-none border border-muted/30'
                   }`}
                 >
-                  <p className="text-sm">{message.content}</p>
+                  <p className="text-sm break-words">{message.content}</p>
                   <p className="text-xs opacity-70 mt-1">
                     {new Date(message.timestamp).toLocaleTimeString()}
                   </p>
@@ -137,8 +145,8 @@ export function ChatPanel({ symbol, timeframe }: ChatPanelProps) {
               </div>
             ))}
             {isLoading && (
-              <div className="flex justify-start">
-                <div className="bg-muted/30 px-4 py-3 rounded-lg rounded-bl-none">
+              <div className="flex justify-start animate-fade-in">
+                <div className="bg-muted/20 px-4 py-3 rounded-lg rounded-bl-none border border-muted/30">
                   <div className="flex gap-1">
                     <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" />
                     <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
@@ -153,19 +161,19 @@ export function ChatPanel({ symbol, timeframe }: ChatPanelProps) {
       </div>
 
       {/* Input */}
-      <form onSubmit={handleSendMessage} className="flex gap-2">
+      <form onSubmit={handleSendMessage} className="flex gap-2 mt-4 pt-4 border-t border-muted/20">
         <input
           type="text"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           placeholder="Pregunta sobre el mercado..."
           disabled={isLoading}
-          className="flex-1 bg-muted/20 px-4 py-2 rounded-lg border border-muted focus:border-accent focus:outline-none transition-colors text-foreground placeholder-muted-foreground disabled:opacity-50"
+          className="flex-1 bg-muted/10 rounded-lg px-4 py-2 text-sm border border-muted/30 focus:border-primary focus:outline-none transition-all duration-200 disabled:opacity-50 placeholder-muted-foreground/50"
         />
         <button
           type="submit"
           disabled={isLoading || !inputValue.trim()}
-          className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+          className="bg-gradient-to-r from-primary to-primary/90 text-primary-foreground px-4 py-2 rounded-lg hover:shadow-lg hover:shadow-primary/30 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95"
         >
           <Send className="w-4 h-4" />
         </button>

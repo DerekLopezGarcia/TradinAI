@@ -70,20 +70,20 @@ export function Header({ onMenuClick }: HeaderProps) {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setDarkMode(!darkMode)}
-              className="p-2 hover:bg-muted/20 rounded-lg transition-colors"
+              className="p-2.5 hover:bg-muted/20 rounded-lg transition-all duration-200 hover:scale-110"
               title="Cambiar tema"
             >
               {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
             <button
-              className="p-2 hover:bg-muted/20 rounded-lg transition-colors relative"
+              className="p-2.5 hover:bg-muted/20 rounded-lg transition-all duration-200 hover:scale-110 relative"
               title="Alertas"
             >
               <Bell className="w-5 h-5" />
               <span className="absolute top-1 right-1 w-2 h-2 bg-secondary rounded-full animate-pulse"></span>
             </button>
             <button
-              className="p-2 hover:bg-muted/20 rounded-lg transition-colors"
+              className="p-2.5 hover:bg-muted/20 rounded-lg transition-all duration-200 hover:scale-110"
               title="Configuración"
             >
               <Settings className="w-5 h-5" />

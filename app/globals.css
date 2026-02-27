@@ -29,19 +29,19 @@
 
 @layer components {
   .glass {
-    @apply bg-[rgba(22,27,34,0.7)] backdrop-blur-md border border-[hsl(var(--muted))];
+    @apply bg-[rgba(22,27,34,0.8)] backdrop-blur-lg border border-[hsl(var(--muted))/20] shadow-lg;
   }
 
   .btn-primary {
-    @apply px-4 py-2 rounded-lg bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] font-medium hover:opacity-90 transition-opacity;
+    @apply px-4 py-2 rounded-lg bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--primary))/90] text-[hsl(var(--primary-foreground))] font-medium hover:shadow-lg hover:shadow-[hsl(var(--primary))/30] transition-all duration-200;
   }
 
   .btn-secondary {
-    @apply px-4 py-2 rounded-lg bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] font-medium hover:opacity-90 transition-opacity;
+    @apply px-4 py-2 rounded-lg bg-gradient-to-r from-[hsl(var(--secondary))] to-[hsl(var(--secondary))/90] text-[hsl(var(--secondary-foreground))] font-medium hover:shadow-lg hover:shadow-[hsl(var(--secondary))/30] transition-all duration-200;
   }
 
   .btn-ghost {
-    @apply px-4 py-2 rounded-lg hover:bg-[hsl(var(--muted)/0.2)] transition-colors;
+    @apply px-4 py-2 rounded-lg hover:bg-[hsl(var(--muted))/10] transition-all duration-200;
   }
 
   .price-up {
@@ -53,10 +53,53 @@
   }
 
   .card-glass {
-    @apply glass rounded-lg p-6;
+    @apply glass rounded-xl p-6 shadow-xl;
+  }
+
+  /* Animaciones suaves */
+  .fade-in {
+    @apply animate-fade-in;
+  }
+
+  .slide-in {
+    @apply animate-slide-in;
   }
 }
 
+/* Animaciones personalizadas */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  .animate-slide-in {
+    animation: slideIn 0.3s ease-out;
+  }
+}
+
+/* Scrollbar mejorado */
 ::selection {
   @apply bg-[hsl(var(--accent))] text-[hsl(var(--background))];
 }
@@ -70,6 +113,22 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-[hsl(var(--muted))] rounded-full hover:bg-[hsl(var(--muted)/0.8)];
+  @apply bg-[hsl(var(--muted))/50] rounded-full hover:bg-[hsl(var(--muted))/80] transition-colors;
+}
+
+/* Efectos de hover suaves */
+input:focus,
+textarea:focus,
+button:focus {
+  @apply outline-none;
+}
+
+/* Backgrounds bonitos */
+.gradient-primary {
+  @apply bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--accent))];
+}
+
+.gradient-secondary {
+  @apply bg-gradient-to-r from-[hsl(var(--secondary))] to-[hsl(var(--primary))];
 }
 
