@@ -142,23 +142,38 @@ function generateRealisticCandleData(symbol: string, basePrice: number, days: nu
   const now = Date.now();
   const interval = Math.floor((days * 24 * 60 * 60 * 1000) / 50); // 50 velas
 
+  // Agregar seed aleatoria basada en timestamp para que cambien en cada llamada
+  const seed = Math.random();
+
   let price = basePrice;
-  const volatility = basePrice > 100 ? 0.02 : basePrice > 10 ? 0.01 : 0.005;
+  // Aumentar volatilidad 3-5x para movimientos más pronunciados
+  const baseVolatility = basePrice > 100 ? 0.06 : basePrice > 10 ? 0.03 : 0.015;
+  const volatility = baseVolatility * (0.8 + seed * 0.4); // Varía entre 0.8x y 1.2x
+
+  // Tendencia aleatoria (alcista o bajista)
+  const trend = (Math.random() - 0.5) * 0.02;
 
   for (let i = 0; i < 50; i++) {
     const timestamp = now - (49 - i) * interval;
 
-    // Simular movimiento de precio realista
-    const change = (Math.random() - 0.5) * volatility * price;
+    // Simular movimiento de precio más pronunciado con tendencia
+    const randomComponent = (Math.random() - 0.5) * volatility * price;
+    const trendComponent = trend * price * (i / 50); // Tendencia gradual
+    const change = randomComponent + trendComponent;
+
     const open = price;
     price = price + change;
+    price = Math.max(price, basePrice * 0.5); // No caer más del 50%
 
-    const high = Math.max(open, price) * (1 + Math.random() * 0.005);
-    const low = Math.min(open, price) * (1 - Math.random() * 0.005);
-    const close = open + (price - open) * (0.5 + Math.random() * 0.5);
+    // Rangos más amplios (high-low)
+    const volatilityMultiplier = 1 + (Math.random() * 0.015); // 0-1.5% adicional
+    const high = Math.max(open, price) * (1 + Math.random() * volatilityMultiplier);
+    const low = Math.min(open, price) * (1 - Math.random() * volatilityMultiplier);
+    const close = low + (high - low) * Math.random();
 
-    // Volumen realista
-    const volume = Math.floor(Math.random() * 10000000) + 1000000;
+    // Volumen más variable
+    const baseVolume = 5000000;
+    const volume = Math.floor(baseVolume + Math.random() * 15000000);
 
     data.push({
       time: timestamp,

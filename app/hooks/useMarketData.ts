@@ -11,7 +11,7 @@ export function useMarketData(symbol: string, interval: TimeFrame) {
       try {
         setLoading(true);
         const response = await fetch(
-          `/api/market?symbol=${symbol}&type=history&interval=${interval}`
+          `/api/market?symbol=${symbol}&type=history&interval=${interval}&t=${Date.now()}`
         );
 
         if (!response.ok) {
@@ -30,7 +30,13 @@ export function useMarketData(symbol: string, interval: TimeFrame) {
       }
     };
 
+    // Cargar datos inmediatamente
     loadData();
+
+    // Recargar datos cada 30 segundos para mostrar nuevos movimientos
+    const interval30s = setInterval(loadData, 30000);
+
+    return () => clearInterval(interval30s);
   }, [symbol, interval]);
 
   return { data, loading, error };
