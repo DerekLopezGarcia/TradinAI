@@ -3,7 +3,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useMarketStore } from '@/lib/store';
 import { Header, TimeFrameSelector } from '@/components/Header';
-import { PriceChart, RSIChart } from '@/components/Charts';
+import { TradingViewChart } from '@/components/TradingViewChart';
+import { RSIChart } from '@/components/Charts';
 import { ChatPanel, AnalysisCard } from '@/components/AIChat';
 import { NewsFeed } from '@/components/NewsFeed';
 import { AlertManager } from '@/components/AlertManager';
@@ -291,8 +292,8 @@ export default function Home() {
                     </div>
                   </div>
                 ) : data.length > 0 ? (
-                  <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 rounded-xl border border-cyan-500/20 overflow-hidden">
-                    <PriceChart
+                  <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 rounded-xl border border-cyan-500/20 overflow-hidden p-6">
+                    <TradingViewChart
                       data={data}
                       symbol={selectedAsset.symbol}
                       showVolume={true}

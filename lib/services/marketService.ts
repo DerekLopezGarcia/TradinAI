@@ -1,4 +1,4 @@
-import { CandleData } from '@/lib/types';
+import { CandleData, TimeFrame } from '@/lib/types';
 
 /**
  * Servicio centralizado para todas las APIs de mercado
@@ -749,6 +749,31 @@ export class MarketService {
     to: number
   ): Promise<CandleData[]> {
     return this.finnhub.getStockCandles(symbol, resolution, from, to);
+  }
+
+  /**
+   * Obtiene datos históricos (candlesticks) para una acción
+   * @param symbol - Símbolo de la acción
+   * @param interval - Intervalo temporal (1m, 5m, 15m, 1h, 4h, 1d, 1w)
+   * @param days - Número de días a recuperar
+   */
+  async getStockHistory(symbol: string, interval: TimeFrame, days: number): Promise<CandleData[]> {
+    // Mapeo de TimeFrame a resolución de Finnhub
+    const resolutionMap: Record<TimeFrame, string> = {
+      '1m': '1',
+      '5m': '5',
+      '15m': '15',
+      '1h': '60',
+      '4h': '240',
+      '1d': 'D',
+      '1w': 'W',
+    };
+
+    const resolution = resolutionMap[interval] || '60';
+    const now = Math.floor(Date.now() / 1000);
+    const from = now - (days * 24 * 60 * 60);
+
+    return this.getStockCandles(symbol, resolution, from, now);
   }
 
   /**

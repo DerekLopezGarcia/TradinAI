@@ -109,71 +109,113 @@ function getDaysByInterval(interval: TimeFrame): number {
 async function getHistoryData(symbol: string, interval: TimeFrame) {
   const days = getDaysByInterval(interval);
 
-  if (isCrypto(symbol)) {
-    const coinId = COINGECKO_IDS[symbol] || 'bitcoin';
-    const data = await marketService.getCoinHistory(coinId, days);
-    return {
-      symbol,
-      interval,
-      data,
-      source: 'CoinGecko',
-      timestamp: Date.now(),
-    };
-  } else {
-    // Generar datos realistas para todos los otros tipos de activos
-    const basePrice = getDefaultPrice(symbol);
-    const data = generateRealisticCandleData(symbol, basePrice, days);
+  try {
+    if (isCrypto(symbol)) {
+      const coinId = COINGECKO_IDS[symbol] || 'bitcoin';
+      const data = await marketService.getCoinHistory(coinId, days);
 
-    return {
-      symbol,
-      interval,
-      data,
-      source: 'Market Data',
-      timestamp: Date.now(),
-    };
+      if (data && data.length > 0) {
+        return {
+          symbol,
+          interval,
+          data,
+          source: 'CoinGecko',
+          timestamp: Date.now(),
+        };
+      }
+    } else {
+      // Obtener datos reales de Finnhub para acciones, índices, forex, etc
+      const data = await marketService.getStockHistory(symbol, interval, days);
+
+      if (data && data.length > 0) {
+        return {
+          symbol,
+          interval,
+          data,
+          source: 'Finnhub',
+          timestamp: Date.now(),
+        };
+      }
+    }
+  } catch (error) {
+    console.error('Error fetching real data:', error);
   }
+
+  // Fallback: Generar datos cuando las APIs fallan
+  console.warn(`Generating fallback data for ${symbol} interval ${interval}`);
+  const fallbackData = generateFallbackCandleData(symbol, days, interval);
+  return {
+    symbol,
+    interval,
+    data: fallbackData,
+    source: 'Fallback',
+    timestamp: Date.now(),
+  };
 }
 
 /**
- * Genera datos realistas de candlesticks para un activo
+ * Genera datos fallback realistas para velas cuando las APIs no responden
+ * Ajusta el número de velas según el timeframe
  */
-function generateRealisticCandleData(symbol: string, basePrice: number, days: number): CandleData[] {
+function generateFallbackCandleData(symbol: string, days: number, interval: TimeFrame = '1d'): CandleData[] {
   const data: CandleData[] = [];
   const now = Date.now();
-  const interval = Math.floor((days * 24 * 60 * 60 * 1000) / 50); // 50 velas
+  const basePrice = getDefaultPrice(symbol);
 
-  // Agregar seed aleatoria basada en timestamp para que cambien en cada llamada
-  const seed = Math.random();
+  // Volatilidad realista según el tipo de activo
+  const volatility = basePrice > 100 ? 0.02 : basePrice > 10 ? 0.01 : 0.005;
 
   let price = basePrice;
-  // Aumentar volatilidad 3-5x para movimientos más pronunciados
-  const baseVolatility = basePrice > 100 ? 0.06 : basePrice > 10 ? 0.03 : 0.015;
-  const volatility = baseVolatility * (0.8 + seed * 0.4); // Varía entre 0.8x y 1.2x
 
-  // Tendencia aleatoria (alcista o bajista)
-  const trend = (Math.random() - 0.5) * 0.02;
+  // Calcular número de velas según el intervalo
+  let numCandles = 50;
+  let intervalMs = 24 * 60 * 60 * 1000; // 1 día por defecto
 
-  for (let i = 0; i < 50; i++) {
-    const timestamp = now - (49 - i) * interval;
+  switch (interval) {
+    case '1m':
+      numCandles = Math.min(60, days * 24 * 60); // Máx 60 velas de 1 minuto
+      intervalMs = 60 * 1000; // 1 minuto
+      break;
+    case '5m':
+      numCandles = Math.min(100, days * 24 * 12); // Máx 100 velas de 5 minutos
+      intervalMs = 5 * 60 * 1000; // 5 minutos
+      break;
+    case '15m':
+      numCandles = Math.min(100, days * 24 * 4); // Máx 100 velas de 15 minutos
+      intervalMs = 15 * 60 * 1000; // 15 minutos
+      break;
+    case '1h':
+      numCandles = Math.min(100, days * 24); // Máx 100 velas de 1 hora
+      intervalMs = 60 * 60 * 1000; // 1 hora
+      break;
+    case '4h':
+      numCandles = Math.min(100, days * 6); // Máx 100 velas de 4 horas
+      intervalMs = 4 * 60 * 60 * 1000; // 4 horas
+      break;
+    case '1d':
+      numCandles = Math.min(100, days); // Máx 100 velas diarias
+      intervalMs = 24 * 60 * 60 * 1000; // 1 día
+      break;
+    case '1w':
+      numCandles = Math.min(52, Math.ceil(days / 7)); // Máx 52 velas semanales
+      intervalMs = 7 * 24 * 60 * 60 * 1000; // 1 semana
+      break;
+  }
 
-    // Simular movimiento de precio más pronunciado con tendencia
-    const randomComponent = (Math.random() - 0.5) * volatility * price;
-    const trendComponent = trend * price * (i / 50); // Tendencia gradual
-    const change = randomComponent + trendComponent;
+  for (let i = 0; i < numCandles; i++) {
+    const timestamp = now - (numCandles - 1 - i) * intervalMs;
 
+    // Cambio pequeño y realista
+    const change = (Math.random() - 0.5) * volatility * price * 2;
     const open = price;
-    price = price + change;
-    price = Math.max(price, basePrice * 0.5); // No caer más del 50%
+    const close = Math.max(price + change, basePrice * 0.8);
 
-    // Rangos más amplios (high-low)
-    const volatilityMultiplier = 1 + (Math.random() * 0.015); // 0-1.5% adicional
-    const high = Math.max(open, price) * (1 + Math.random() * volatilityMultiplier);
-    const low = Math.min(open, price) * (1 - Math.random() * volatilityMultiplier);
-    const close = low + (high - low) * Math.random();
+    // High y low con rangos pequeños y realistas
+    const high = Math.max(open, close) * (1 + Math.abs(change) / (basePrice * 0.1));
+    const low = Math.min(open, close) * (1 - Math.abs(change) / (basePrice * 0.1));
 
-    // Volumen más variable
-    const baseVolume = 5000000;
-    const volume = Math.floor(baseVolume + Math.random() * 15000000);
+    // Volumen realista
+    const volume = Math.floor(5000000 + Math.random() * 10000000);
 
     data.push({
       time: timestamp,
@@ -181,8 +223,10 @@ function generateRealisticCandleData(symbol: string, basePrice: number, days: nu
       high: parseFloat(high.toFixed(2)),
       low: parseFloat(low.toFixed(2)),
       close: parseFloat(close.toFixed(2)),
-      volume: volume,
+      volume,
     });
+
+    price = close;
   }
 
   return data;
@@ -234,64 +278,54 @@ async function getPriceData(symbol: string) {
       timestamp: coinPrice.lastUpdated,
     };
   } else if (assetType === 'stock') {
-    // Para acciones - obtener datos reales
-    try {
-      const stockQuote = await marketService.getStockQuote(symbol);
-      return {
-        symbol,
-        price: stockQuote.price,
-        change: stockQuote.change,
-        changePercent: stockQuote.changePercent,
-        bid: stockQuote.bid,
-        ask: stockQuote.ask,
-        source: 'Finnhub',
-        type: 'stock',
-        timestamp: Date.now(),
-      };
-    } catch {
-      // Si no hay datos en tiempo real, devolver datos por defecto
-      return {
-        symbol,
-        price: getDefaultPrice(symbol),
-        change: getRandomChange(symbol),
-        changePercent: getRandomChangePercent(),
-        source: 'Default',
-        type: 'stock',
-        timestamp: Date.now(),
-      };
-    }
-  } else if (assetType === 'index') {
-    // Índices
+    // Para acciones - obtener datos reales o retornar error
+    const stockQuote = await marketService.getStockQuote(symbol);
     return {
       symbol,
-      price: getDefaultPrice(symbol),
-      change: getRandomChange(symbol),
-      changePercent: getRandomChangePercent(),
-      source: 'Market Data',
+      price: stockQuote.price,
+      change: stockQuote.change,
+      changePercent: stockQuote.changePercent,
+      bid: stockQuote.bid,
+      ask: stockQuote.ask,
+      source: 'Finnhub',
+      type: 'stock',
+      timestamp: Date.now(),
+    };
+  } else if (assetType === 'index') {
+    // Índices - intentar obtener datos reales
+    const stockQuote = await marketService.getStockQuote(symbol);
+    return {
+      symbol,
+      price: stockQuote.price,
+      change: stockQuote.change,
+      changePercent: stockQuote.changePercent,
+      source: 'Finnhub',
       type: 'index',
       timestamp: Date.now(),
     };
   } else if (assetType === 'forex') {
-    // Pares Forex
+    // Pares Forex - obtener datos reales o error
+    const stockQuote = await marketService.getStockQuote(symbol);
     return {
       symbol,
-      price: getDefaultPrice(symbol),
-      change: getRandomChange(symbol),
-      changePercent: getRandomChangePercent(),
-      bid: getDefaultPrice(symbol) - 0.0005,
-      ask: getDefaultPrice(symbol) + 0.0005,
-      source: 'Market Data',
+      price: stockQuote.price,
+      change: stockQuote.change,
+      changePercent: stockQuote.changePercent,
+      bid: stockQuote.bid,
+      ask: stockQuote.ask,
+      source: 'Finnhub',
       type: 'forex',
       timestamp: Date.now(),
     };
   } else {
-    // Commodities
+    // Commodities - obtener datos reales o error
+    const stockQuote = await marketService.getStockQuote(symbol);
     return {
       symbol,
-      price: getDefaultPrice(symbol),
-      change: getRandomChange(symbol),
-      changePercent: getRandomChangePercent(),
-      source: 'Market Data',
+      price: stockQuote.price,
+      change: stockQuote.change,
+      changePercent: stockQuote.changePercent,
+      source: 'Finnhub',
       type: 'commodity',
       timestamp: Date.now(),
     };
@@ -321,19 +355,19 @@ function getDefaultPrice(symbol: string): number {
 }
 
 /**
- * Genera cambio aleatorio pequeño (no simulación falsa)
+ * Obtiene cambio desde datos reales (no aleatorio)
  */
 function getRandomChange(symbol: string): number {
-  const basePrice = getDefaultPrice(symbol);
-  const volatility = basePrice > 100 ? 0.01 : basePrice > 10 ? 0.001 : 0.0001;
-  return (Math.random() - 0.5) * volatility * 2;
+  // Solo retornar 0 - los cambios deben venir de datos reales de APIs
+  return 0;
 }
 
 /**
- * Genera cambio porcentual pequeño
+ * Obtiene cambio porcentual desde datos reales (no aleatorio)
  */
 function getRandomChangePercent(): number {
-  return parseFloat(((Math.random() - 0.5) * 2).toFixed(2));
+  // Solo retornar 0 - los cambios deben venir de datos reales de APIs
+  return 0;
 }
 
 // ==================== HANDLER PRINCIPAL ====================

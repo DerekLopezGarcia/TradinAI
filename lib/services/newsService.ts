@@ -101,10 +101,10 @@ class NewsService {
 
   /**
    * Formatea una fecha ISO a timestamp
-   * @param date - Fecha en formato ISO
+   * @param date - Fecha en formato ISO, timestamp o Date
    * @returns Timestamp en milisegundos
    */
-  private formatDate(date: string | number): string {
+  private formatDate(date: string | number | Date): string {
     if (typeof date === 'number') {
       return new Date(date * 1000).toISOString().split('T')[0];
     }
