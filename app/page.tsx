@@ -1,18 +1,15 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useMarketStore } from '@/lib/store';
 import { Header, TimeFrameSelector } from '@/components/Header';
 import { TradingViewChart } from '@/components/TradingViewChart';
-import { RSIChart } from '@/components/Charts';
 import { ChatPanel, AnalysisCard } from '@/components/AIChat';
 import { NewsFeed } from '@/components/NewsFeed';
 import { AlertManager } from '@/components/AlertManager';
 import { useMarketData } from '@/app/hooks/useMarketData';
-import { calculateSMA, calculateEMA, calculateRSI } from '@/lib/indicators';
-import { X, TrendingUp, TrendingDown, Zap } from 'lucide-react';
+import {X, TrendingUp, TrendingDown, Zap} from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
-import {CandleData} from "@/lib/types.ts";
 
 export default function Home() {
   const {
@@ -25,13 +22,8 @@ export default function Home() {
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const indicatorsRef = useRef<{ sma20: number[]; ema12: number[]; rsi: number[] }>({
-    sma20: [],
-    ema12: [],
-    rsi: [],
-  });
 
-  const { data, loading, error: dataError } = useMarketData(
+  const { data, loading, error: dataError, isFallback } = useMarketData(
     selectedAsset?.symbol || 'BTCUSD',
     selectedTimeframe
   );
@@ -43,76 +35,34 @@ export default function Home() {
     }
   }, [dataError]);
 
-  useEffect(() => {
-    if (!data || data.length === 0) {
-      indicatorsRef.current = { sma20: [], ema12: [], rsi: [] };
-      return;
-    }
-
-    const calculateAsync = async () => {
-      try {
-        const closePrices = data
-          .map((d: CandleData) => d.close)
-          .filter((p: number) => !isNaN(p) && isFinite(p));
-
-        if (closePrices.length < 14) {
-          indicatorsRef.current = { sma20: [], ema12: [], rsi: [] };
-          return;
-        }
-
-        await new Promise(resolve => {
-          requestAnimationFrame(() => {
-            indicatorsRef.current = {
-              sma20: calculateSMA(closePrices, 20),
-              ema12: calculateEMA(closePrices, 12),
-              rsi: calculateRSI(closePrices, 14),
-            };
-            resolve(null);
-          });
-        });
-      } catch (err) {
-        console.error('Error calculating indicators:', err);
-        indicatorsRef.current = { sma20: [], ema12: [], rsi: [] };
-      }
-    };
-
-    calculateAsync();
-  }, [data]);
-
-  const indicators = useMemo(() => indicatorsRef.current, [data]);
-
-  // Actualizar precio desde API - DATOS REALES sin simulación
+  // Actualizar precio en tiempo real cada 30s
   useEffect(() => {
     if (!selectedAsset?.symbol) return;
 
     const updatePrice = async () => {
       try {
         const response = await fetch(
-          `/api/market?symbol=${selectedAsset.symbol}&type=price`
+          `/api/market?symbol=${selectedAsset.symbol}&type=price&t=${Date.now()}`
         );
-        if (response.ok) {
-          const priceData = await response.json();
-          useMarketStore.setState((state) => ({
-            selectedAsset: state.selectedAsset
-              ? {
-                  ...state.selectedAsset,
-                  price: priceData.price || state.selectedAsset.price,
-                  change: priceData.change || 0,
-                  changePercent: priceData.changePercent || 0,
-                }
-              : null,
-          }));
-        }
+        if (!response.ok) return;
+        const priceData = await response.json();
+        if (!priceData.price || isNaN(priceData.price)) return;
+
+        useMarketStore.getState().updateAssetPrice(
+          selectedAsset.symbol,
+          priceData.price,
+          priceData.change ?? 0,
+          priceData.changePercent ?? 0,
+        );
       } catch (err) {
         console.error('Error updating price:', err);
       }
     };
 
-    // Actualizar inmediatamente y luego cada 10 segundos
+    // Primera llamada inmediata, luego cada 30 segundos
     updatePrice();
-    const interval = setInterval(updatePrice, 10000);
-
-    return () => clearInterval(interval);
+    const timer = setInterval(updatePrice, 30_000);
+    return () => clearInterval(timer);
   }, [selectedAsset?.symbol]);
 
   if (!selectedAsset) {
@@ -292,23 +242,17 @@ export default function Home() {
                     </div>
                   </div>
                 ) : data.length > 0 ? (
-                  <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 rounded-xl border border-cyan-500/20 overflow-hidden p-6">
-                    <TradingViewChart
-                      data={data}
-                      symbol={selectedAsset.symbol}
-                      showVolume={true}
-                      indicators={indicators}
-                    />
-                  </div>
+                  <TradingViewChart
+                    data={data}
+                    symbol={selectedAsset.symbol}
+                    interval={selectedTimeframe}
+                    showVolume={true}
+                    showRSI={true}
+                    isFallback={isFallback}
+                  />
                 ) : (
                   <div className="h-96 bg-gradient-to-br from-slate-800/50 to-slate-900/50 rounded-xl border border-cyan-500/20 flex items-center justify-center">
                     <p className="text-slate-400">Sin datos</p>
-                  </div>
-                )}
-
-                {indicators.rsi.length > 0 && (
-                  <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 rounded-xl border border-cyan-500/20 overflow-hidden">
-                    <RSIChart data={indicators.rsi} />
                   </div>
                 )}
 

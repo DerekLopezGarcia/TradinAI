@@ -82,16 +82,18 @@ function isCrypto(symbol: string): boolean {
  * @returns Número de días a recuperar
  */
 function getDaysByInterval(interval: TimeFrame): number {
+  // Para crypto: getCoinHistory gestiona sus propios días según el endpoint OHLC.
+  // Para stocks (Yahoo): estos son los días que se piden al rango.
   const days: Record<string, number> = {
-    '1m': 1,
-    '5m': 1,
+    '1m':  1,
+    '5m':  1,
     '15m': 1,
-    '1h': 7,
-    '4h': 30,
-    '1d': 90,
-    '1w': 365,
+    '1h':  7,
+    '4h':  30,
+    '1d':  90,
+    '1w':  365,
   };
-  return days[interval] || 30;
+  return days[interval] ?? 30;
 }
 
 /**
@@ -104,133 +106,28 @@ function getDaysByInterval(interval: TimeFrame): number {
 // ==================== MANEJADORES DE TIPOS DE DATOS ====================
 
 /**
- * Obtiene datos históricos (candlesticks)
+ * Obtiene datos históricos reales (candlesticks). Sin fallback simulado.
+ * Si la API no responde lanza un error para que el cliente lo maneje.
  */
 async function getHistoryData(symbol: string, interval: TimeFrame) {
   const days = getDaysByInterval(interval);
 
-  try {
-    if (isCrypto(symbol)) {
-      const coinId = COINGECKO_IDS[symbol] || 'bitcoin';
-      const data = await marketService.getCoinHistory(coinId, days);
-
-      if (data && data.length > 0) {
-        return {
-          symbol,
-          interval,
-          data,
-          source: 'CoinGecko',
-          timestamp: Date.now(),
-        };
-      }
-    } else {
-      // Obtener datos reales de Finnhub para acciones, índices, forex, etc
-      const data = await marketService.getStockHistory(symbol, interval, days);
-
-      if (data && data.length > 0) {
-        return {
-          symbol,
-          interval,
-          data,
-          source: 'Finnhub',
-          timestamp: Date.now(),
-        };
-      }
+  if (isCrypto(symbol)) {
+    const coinId = COINGECKO_IDS[symbol] || 'bitcoin';
+    const data = await marketService.getCoinHistory(coinId, days, interval);
+    if (!data || data.length === 0) {
+      throw new Error(`No hay datos históricos para ${symbol}`);
     }
-  } catch (error) {
-    console.error('Error fetching real data:', error);
+    return { symbol, interval, data, source: 'CoinGecko', isFallback: false, timestamp: Date.now() };
+  } else {
+    const data = await marketService.getStockHistory(symbol, interval, days);
+    if (!data || data.length === 0) {
+      throw new Error(`No hay datos históricos para ${symbol}`);
+    }
+    return { symbol, interval, data, source: 'Finnhub', isFallback: false, timestamp: Date.now() };
   }
-
-  // Fallback: Generar datos cuando las APIs fallan
-  console.warn(`Generating fallback data for ${symbol} interval ${interval}`);
-  const fallbackData = generateFallbackCandleData(symbol, days, interval);
-  return {
-    symbol,
-    interval,
-    data: fallbackData,
-    source: 'Fallback',
-    timestamp: Date.now(),
-  };
 }
 
-/**
- * Genera datos fallback realistas para velas cuando las APIs no responden
- * Ajusta el número de velas según el timeframe
- */
-function generateFallbackCandleData(symbol: string, days: number, interval: TimeFrame = '1d'): CandleData[] {
-  const data: CandleData[] = [];
-  const now = Date.now();
-  const basePrice = getDefaultPrice(symbol);
-
-  // Volatilidad realista según el tipo de activo
-  const volatility = basePrice > 100 ? 0.02 : basePrice > 10 ? 0.01 : 0.005;
-
-  let price = basePrice;
-
-  // Calcular número de velas según el intervalo
-  let numCandles = 50;
-  let intervalMs = 24 * 60 * 60 * 1000; // 1 día por defecto
-
-  switch (interval) {
-    case '1m':
-      numCandles = Math.min(60, days * 24 * 60); // Máx 60 velas de 1 minuto
-      intervalMs = 60 * 1000; // 1 minuto
-      break;
-    case '5m':
-      numCandles = Math.min(100, days * 24 * 12); // Máx 100 velas de 5 minutos
-      intervalMs = 5 * 60 * 1000; // 5 minutos
-      break;
-    case '15m':
-      numCandles = Math.min(100, days * 24 * 4); // Máx 100 velas de 15 minutos
-      intervalMs = 15 * 60 * 1000; // 15 minutos
-      break;
-    case '1h':
-      numCandles = Math.min(100, days * 24); // Máx 100 velas de 1 hora
-      intervalMs = 60 * 60 * 1000; // 1 hora
-      break;
-    case '4h':
-      numCandles = Math.min(100, days * 6); // Máx 100 velas de 4 horas
-      intervalMs = 4 * 60 * 60 * 1000; // 4 horas
-      break;
-    case '1d':
-      numCandles = Math.min(100, days); // Máx 100 velas diarias
-      intervalMs = 24 * 60 * 60 * 1000; // 1 día
-      break;
-    case '1w':
-      numCandles = Math.min(52, Math.ceil(days / 7)); // Máx 52 velas semanales
-      intervalMs = 7 * 24 * 60 * 60 * 1000; // 1 semana
-      break;
-  }
-
-  for (let i = 0; i < numCandles; i++) {
-    const timestamp = now - (numCandles - 1 - i) * intervalMs;
-
-    // Cambio pequeño y realista
-    const change = (Math.random() - 0.5) * volatility * price * 2;
-    const open = price;
-    const close = Math.max(price + change, basePrice * 0.8);
-
-    // High y low con rangos pequeños y realistas
-    const high = Math.max(open, close) * (1 + Math.abs(change) / (basePrice * 0.1));
-    const low = Math.min(open, close) * (1 - Math.abs(change) / (basePrice * 0.1));
-
-    // Volumen realista
-    const volume = Math.floor(5000000 + Math.random() * 10000000);
-
-    data.push({
-      time: timestamp,
-      open: parseFloat(open.toFixed(2)),
-      high: parseFloat(high.toFixed(2)),
-      low: parseFloat(low.toFixed(2)),
-      close: parseFloat(close.toFixed(2)),
-      volume,
-    });
-
-    price = close;
-  }
-
-  return data;
-}
 
 /**
  * Obtiene noticias relacionadas al símbolo
@@ -258,7 +155,10 @@ async function getNewsData(symbol: string) {
 }
 
 /**
- * Obtiene el precio actual del activo
+ * Obtiene el precio actual del activo.
+ * Crypto → CoinGecko
+ * Todo lo demás → Yahoo Finance (sin API key, funciona en plan gratuito)
+ *                con fallback a Finnhub si Yahoo falla.
  */
 async function getPriceData(symbol: string) {
   const assetType = getAssetType(symbol);
@@ -277,98 +177,37 @@ async function getPriceData(symbol: string) {
       type: 'crypto',
       timestamp: coinPrice.lastUpdated,
     };
-  } else if (assetType === 'stock') {
-    // Para acciones - obtener datos reales o retornar error
-    const stockQuote = await marketService.getStockQuote(symbol);
-    return {
-      symbol,
-      price: stockQuote.price,
-      change: stockQuote.change,
-      changePercent: stockQuote.changePercent,
-      bid: stockQuote.bid,
-      ask: stockQuote.ask,
-      source: 'Finnhub',
-      type: 'stock',
-      timestamp: Date.now(),
-    };
-  } else if (assetType === 'index') {
-    // Índices - intentar obtener datos reales
-    const stockQuote = await marketService.getStockQuote(symbol);
-    return {
-      symbol,
-      price: stockQuote.price,
-      change: stockQuote.change,
-      changePercent: stockQuote.changePercent,
-      source: 'Finnhub',
-      type: 'index',
-      timestamp: Date.now(),
-    };
-  } else if (assetType === 'forex') {
-    // Pares Forex - obtener datos reales o error
-    const stockQuote = await marketService.getStockQuote(symbol);
-    return {
-      symbol,
-      price: stockQuote.price,
-      change: stockQuote.change,
-      changePercent: stockQuote.changePercent,
-      bid: stockQuote.bid,
-      ask: stockQuote.ask,
-      source: 'Finnhub',
-      type: 'forex',
-      timestamp: Date.now(),
-    };
-  } else {
-    // Commodities - obtener datos reales o error
-    const stockQuote = await marketService.getStockQuote(symbol);
-    return {
-      symbol,
-      price: stockQuote.price,
-      change: stockQuote.change,
-      changePercent: stockQuote.changePercent,
-      source: 'Finnhub',
-      type: 'commodity',
-      timestamp: Date.now(),
-    };
   }
-}
 
-/**
- * Obtiene precio por defecto basado en el símbolo
- */
-function getDefaultPrice(symbol: string): number {
-  const prices: Record<string, number> = {
-    // Acciones
-    'AAPL': 192.35, 'GOOGL': 138.42, 'TSLA': 242.84, 'MSFT': 420.15,
-    'AMZN': 185.42, 'META': 485.95, 'NVDA': 876.50,
-    'JPM': 197.35, 'BAC': 35.42, 'GS': 414.25,
-    'BA': 184.50, 'CAT': 342.15, 'MMM': 95.25,
-    // Índices
-    'SPX': 5328.75, 'INDU': 42525.50, 'CCMP': 19285.25, 'VIX': 18.42,
-    // Forex
-    'EURUSD': 1.0945, 'GBPUSD': 1.2685, 'JPYUSD': 0.00645,
-    'CHFUSD': 1.1245, 'AUDUSD': 0.6585, 'CADMXN': 17.25,
-    // Commodities
-    'XAUUSD': 2385.50, 'XAGUSD': 28.95, 'XPTUSD': 1035.25,
-    'XPDUSD': 985.50, 'COPPER': 4.25, 'CRUDE': 82.45, 'NATGAS': 3.15,
+  // Stocks, índices, forex, commodities → Yahoo Finance primero
+  try {
+    const yp = await marketService.getYahooPrice(symbol);
+    return {
+      symbol,
+      price: yp.price,
+      change: yp.change,
+      changePercent: yp.changePercent,
+      source: 'Yahoo Finance',
+      type: assetType,
+      timestamp: Date.now(),
+    };
+  } catch (yahooErr) {
+    console.warn(`Yahoo price failed for ${symbol}, trying Finnhub:`, yahooErr);
+  }
+
+  // Fallback: Finnhub (puede dar 403 en plan gratuito para algunos símbolos)
+  const stockQuote = await marketService.getStockQuote(symbol);
+  return {
+    symbol,
+    price: stockQuote.price,
+    change: stockQuote.change,
+    changePercent: stockQuote.changePercent,
+    source: 'Finnhub',
+    type: assetType,
+    timestamp: Date.now(),
   };
-  return prices[symbol] || 100;
 }
 
-/**
- * Obtiene cambio desde datos reales (no aleatorio)
- */
-function getRandomChange(symbol: string): number {
-  // Solo retornar 0 - los cambios deben venir de datos reales de APIs
-  return 0;
-}
-
-/**
- * Obtiene cambio porcentual desde datos reales (no aleatorio)
- */
-function getRandomChangePercent(): number {
-  // Solo retornar 0 - los cambios deben venir de datos reales de APIs
-  return 0;
-}
 
 // ==================== HANDLER PRINCIPAL ====================
 

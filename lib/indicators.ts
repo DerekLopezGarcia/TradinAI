@@ -50,26 +50,49 @@ export function calculateEMA(data: number[], period: number): number[] {
  * @param period - Período del RSI (default: 14)
  * @returns Array con los valores de RSI (0-100)
  */
+/**
+ * Calcula el RSI con el método de Wilder (EMA suavizada) — estándar real.
+ * Fórmula:
+ *   1. Calcular cambios: change[i] = close[i] - close[i-1]
+ *   2. Separar ganancias (gain) y pérdidas (loss, valor positivo)
+ *   3. Primera media: SMA de los primeros `period` valores
+ *   4. Siguientes medias: Wilder smoothing = (prevAvg * (period-1) + current) / period
+ *   5. RS = avgGain / avgLoss
+ *   6. RSI = 100 - (100 / (1 + RS))
+ *
+ * @param data   - Array de precios de cierre
+ * @param period - Período (default: 14)
+ * @returns Array del mismo tamaño que data. Los primeros `period` valores son NaN.
+ */
 export function calculateRSI(data: number[], period: number = 14): number[] {
-  const result: number[] = [];
-  const changes = [];
+  const result: number[] = new Array(data.length).fill(NaN);
+  if (data.length <= period) return result;
 
+  // Calcular ganancias y pérdidas
+  const gains: number[] = [];
+  const losses: number[] = [];
   for (let i = 1; i < data.length; i++) {
-    changes.push(data[i] - data[i - 1]);
+    const diff = data[i] - data[i - 1];
+    gains.push(diff > 0 ? diff : 0);
+    losses.push(diff < 0 ? -diff : 0);
   }
 
-  for (let i = 0; i < changes.length; i++) {
-    if (i < period - 1) {
-      result.push(0);
-    } else {
-      const gains = changes.slice(i - period + 1, i + 1).filter(c => c > 0).reduce((a, b) => a + b, 0);
-      const losses = Math.abs(changes.slice(i - period + 1, i + 1).filter(c => c < 0).reduce((a, b) => a + b, 0));
+  // Primera media simple (SMA) de los primeros `period` valores
+  let avgGain = gains.slice(0, period).reduce((a, b) => a + b, 0) / period;
+  let avgLoss = losses.slice(0, period).reduce((a, b) => a + b, 0) / period;
 
-      const rs = gains / (losses || 1);
-      const rsi = 100 - (100 / (1 + rs));
-      result.push(rsi);
-    }
+  // RSI en posición `period` (índice en data = period)
+  const rs0 = avgLoss === 0 ? Infinity : avgGain / avgLoss;
+  result[period] = avgLoss === 0 ? 100 : 100 - 100 / (1 + rs0);
+
+  // Suavizado de Wilder para el resto
+  for (let i = period; i < gains.length; i++) {
+    avgGain = (avgGain * (period - 1) + gains[i]) / period;
+    avgLoss = (avgLoss * (period - 1) + losses[i]) / period;
+    const rs = avgLoss === 0 ? Infinity : avgGain / avgLoss;
+    result[i + 1] = avgLoss === 0 ? 100 : 100 - 100 / (1 + rs);
   }
+
   return result;
 }
 

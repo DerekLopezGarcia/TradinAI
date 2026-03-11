@@ -190,25 +190,40 @@ class CoinGeckoService {
 
   async getCoinPrice(coinId: string): Promise<CoinPrice> {
     const cacheKey = `coingecko:price:${coinId}`;
+    // Intentar caché vigente primero
     const cached = this.cache.get<CoinPrice>(cacheKey);
     if (cached) return cached;
+
+    // Caché expirado pero existente (stale) — lo devolvemos si la API falla
+    const staleKey = `coingecko:price:stale:${coinId}`;
+    const stale = this.cache.get<CoinPrice>(staleKey);
 
     try {
       const url = this.buildPriceUrl([coinId]);
       const response = await fetch(url);
 
+      if (response.status === 429) {
+        console.warn(`CoinGecko rate limit (429) for ${coinId} — returning stale data`);
+        if (stale) return stale;
+        throw new Error('CoinGecko rate limit exceeded');
+      }
+
       if (!response.ok) throw new Error(`CoinGecko API error: ${response.status}`);
 
       const data = await response.json();
-
-      if (!data[coinId]) {
-        throw new Error(`Coin ${coinId} not found`);
-      }
+      if (!data[coinId]) throw new Error(`Coin ${coinId} not found`);
 
       const result = this.formatCoinPrice(coinId, data[coinId]);
-      this.cache.set(cacheKey, result, 30000);
+      // Caché principal: 30 s (seguro para plan gratuito ~30 req/min)
+      this.cache.set(cacheKey, result, 30_000);
+      // Caché stale: 5 min (fallback si hay rate limit)
+      this.cache.set(staleKey, result, 300_000);
       return result;
     } catch (error) {
+      if (stale) {
+        console.warn(`CoinGecko error for ${coinId}, using stale cache`);
+        return stale;
+      }
       console.error('Error fetching from CoinGecko:', error);
       throw error;
     }
@@ -264,35 +279,176 @@ class CoinGeckoService {
     }
   }
 
-  async getCoinHistory(coinId: string, days: number = 30): Promise<OHLCV[]> {
-    const cacheKey = `coingecko:history:${coinId}:${days}`;
+  async getCoinHistory(coinId: string, days: number = 30, interval: string = '1d'): Promise<OHLCV[]> {
+    const cacheKey = `coingecko:history:${coinId}:${days}:${interval}`;
     const cached = this.cache.get<OHLCV[]>(cacheKey);
     if (cached) return cached;
 
-    try {
-      const url = `${this.baseUrl}/coins/${coinId}/market_chart?vs_currency=usd&days=${days}&interval=daily`;
-      const response = await fetch(url);
+    const staleKey = `coingecko:history:stale:${coinId}:${days}:${interval}`;
+    const stale = this.cache.get<OHLCV[]>(staleKey);
 
+    const ttlMap: Record<string, number> = {
+      '1m': 60_000, '5m': 60_000, '15m': 120_000,
+      '1h': 180_000, '4h': 300_000,
+      '1d': 600_000, '1w': 900_000,
+    };
+    const cacheTtl = ttlMap[interval] ?? 180_000;
+
+    /** Fetch con manejo de 429 */
+    const safeFetch = async (url: string): Promise<Response> => {
+      const res = await fetch(url);
+      if (res.status === 429) {
+        console.warn(`CoinGecko 429 on ${url}`);
+        if (stale) throw Object.assign(new Error('rate_limit'), { isRateLimit: true });
+        // Esperar 10 s y reintentar una vez
+        await new Promise(r => setTimeout(r, 10_000));
+        const retry = await fetch(url);
+        if (retry.status === 429) throw Object.assign(new Error('rate_limit'), { isRateLimit: true });
+        return retry;
+      }
+      return res;
+    };
+
+    // ── Intervalos ≥ 1h → endpoint /ohlc que devuelve OHLC reales ───────────
+    // El endpoint /ohlc de CoinGecko devuelve [timestamp, open, high, low, close]
+    // con granularidad fija según days:
+    //   days=1  → velas de 30 min
+    //   days=7  → velas de 4 h
+    //   days≤30 → velas de 4 h
+    //   days≤90 → velas de 4 h  (usamos 90 para 4h)
+    //   days≤365→ velas de 4 h o 1 día según la moneda
+    if (['1h', '4h', '1d', '1w'].includes(interval)) {
+      const ohlcDaysMap: Record<string, number> = {
+        '1h':  1,
+        '4h':  7,
+        '1d':  30,
+        '1w':  180,
+      };
+      const ohlcDays = ohlcDaysMap[interval] ?? 7;
+
+      try {
+        const ohlcUrl = `${this.baseUrl}/coins/${coinId}/ohlc?vs_currency=usd&days=${ohlcDays}`;
+        const ohlcResp = await safeFetch(ohlcUrl);
+        if (!ohlcResp.ok) throw new Error(`CoinGecko OHLC error ${ohlcResp.status}`);
+        const ohlcRaw: number[][] = await ohlcResp.json();
+        if (!Array.isArray(ohlcRaw) || ohlcRaw.length === 0) throw new Error('Empty OHLC');
+
+        // Volúmenes via market_chart (silenciamos errores de rate limit aquí)
+        const volMap = new Map<number, number>();
+        try {
+          const chartUrl = `${this.baseUrl}/coins/${coinId}/market_chart?vs_currency=usd&days=${ohlcDays}`;
+          const chartResp = await safeFetch(chartUrl);
+          if (chartResp.ok) {
+            const chartData = await chartResp.json();
+            const vBucket = 60 * 60_000;
+            (chartData.total_volumes ?? []).forEach(([ts, vol]: [number, number]) => {
+              const b = Math.floor(ts / vBucket) * vBucket;
+              volMap.set(b, (volMap.get(b) ?? 0) + vol);
+            });
+          }
+        } catch { /* volumen no crítico */ }
+
+        const needAgg = interval === '1h' || interval === '1d' || interval === '1w';
+
+        let result: OHLCV[];
+        if (!needAgg) {
+          result = ohlcRaw.map(([ts, o, h, l, c]) => {
+            const b = Math.floor(ts / (60 * 60_000)) * (60 * 60_000);
+            return { time: ts, open: o, high: h, low: l, close: c, volume: volMap.get(b) ?? 0 };
+          });
+        } else {
+          type C = { open: number; high: number; low: number; close: number; vol: number; ts: number };
+          const aggMs: Record<string, number> = {
+            '1h': 60 * 60_000,
+            '1d': 24 * 60 * 60_000,
+            '1w': 7 * 24 * 60 * 60_000,
+          };
+          const bMs = aggMs[interval];
+          const map = new Map<number, C>();
+          ohlcRaw.forEach(([ts, o, h, l, c]) => {
+            const b  = Math.floor(ts / bMs) * bMs;
+            const vb = Math.floor(ts / (60 * 60_000)) * (60 * 60_000);
+            const ex = map.get(b);
+            if (!ex) {
+              map.set(b, { open: o, high: h, low: l, close: c, vol: volMap.get(vb) ?? 0, ts: b });
+            } else {
+              if (h > ex.high) ex.high = h;
+              if (l < ex.low)  ex.low  = l;
+              ex.close = c;
+              ex.vol  += volMap.get(vb) ?? 0;
+            }
+          });
+          result = Array.from(map.values())
+            .sort((a, b) => a.ts - b.ts)
+            .map(c => ({ time: c.ts, open: c.open, high: c.high, low: c.low, close: c.close, volume: c.vol }));
+        }
+
+        this.cache.set(cacheKey, result, cacheTtl);
+        this.cache.set(staleKey, result, 3_600_000); // stale 1h
+        return result;
+      } catch (err: any) {
+        if (err?.isRateLimit && stale) {
+          console.warn(`Rate limit on OHLC for ${coinId} — returning stale`);
+          return stale;
+        }
+        console.error('CoinGecko OHLC failed, falling back to market_chart:', err);
+        if (stale) return stale;
+        // cae al bloque intraday abajo
+      }
+    }
+
+    // ── Intraday (1m, 5m, 15m) ────────────────────────────────────────────────
+    const bucketMsMap: Record<string, number> = {
+      '1m':  60_000,
+      '5m':  5 * 60_000,
+      '15m': 15 * 60_000,
+    };
+    const bucketMs = bucketMsMap[interval] ?? 60_000;
+
+    try {
+      const chartUrl = `${this.baseUrl}/coins/${coinId}/market_chart?vs_currency=usd&days=${days}`;
+      const response = await safeFetch(chartUrl);
       if (!response.ok) throw new Error(`CoinGecko API error: ${response.status}`);
 
       const data = await response.json();
-      const prices = data.prices || [];
-      const volumes = data.total_volumes || [];
+      const prices: [number, number][] = data.prices ?? [];
+      const volumes: [number, number][] = data.total_volumes ?? [];
+      if (prices.length === 0) throw new Error('No price data');
 
-      const result: OHLCV[] = prices.map((price: any[], index: number) => ({
-        time: price[0],
-        open: price[1],
-        high: price[1] * 1.02,
-        low: price[1] * 0.98,
-        close: price[1],
-        volume: volumes[index]?.[1] || 0,
-      }));
+      const volumeMap = new Map<number, number>();
+      volumes.forEach(([ts, vol]) => {
+        const b = Math.floor(ts / bucketMs) * bucketMs;
+        volumeMap.set(b, (volumeMap.get(b) ?? 0) + vol);
+      });
 
-      this.cache.set(cacheKey, result, 600000);
+      type Candle = { open: number; high: number; low: number; close: number; volume: number; ts: number };
+      const candleMap = new Map<number, Candle>();
+      prices.forEach(([ts, price]) => {
+        const b = Math.floor(ts / bucketMs) * bucketMs;
+        const ex = candleMap.get(b);
+        if (!ex) {
+          candleMap.set(b, { open: price, high: price, low: price, close: price, volume: 0, ts: b });
+        } else {
+          if (price > ex.high) ex.high = price;
+          if (price < ex.low)  ex.low  = price;
+          ex.close = price;
+        }
+      });
+      candleMap.forEach((c, b) => { c.volume = volumeMap.get(b) ?? 0; });
+
+      const result: OHLCV[] = Array.from(candleMap.values())
+        .sort((a, b) => a.ts - b.ts)
+        .map(c => ({ time: c.ts, open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume }));
+
+      this.cache.set(cacheKey, result, cacheTtl);
+      this.cache.set(staleKey, result, 3_600_000);
       return result;
-    } catch (error) {
-      console.error('Error fetching coin history:', error);
-      throw error;
+    } catch (err: any) {
+      if (stale) {
+        console.warn(`CoinGecko error for ${coinId} intraday, using stale`);
+        return stale;
+      }
+      throw err;
     }
   }
 }
@@ -358,7 +514,7 @@ class FinnhubService {
       const data = await response.json();
       const result = this.formatStockQuote(symbol, data);
 
-      this.cache.set(cacheKey, result, 5000);
+      this.cache.set(cacheKey, result, 10_000); // 10 s — sincronizado con polling
       return result;
     } catch (error) {
       console.error('Error fetching stock quote:', error);
@@ -670,6 +826,161 @@ class AlphaVantageService {
   }
 }
 
+// ==================== YAHOO FINANCE SERVICE ====================
+// Sin API key — usa el endpoint público v8 de Yahoo Finance.
+// Soporta stocks, índices (^GSPC, ^DJI…), forex (EURUSD=X), commodities (GC=F).
+
+class YahooFinanceService {
+  private cache: CacheManager;
+
+  constructor(cache: CacheManager) {
+    this.cache = cache;
+  }
+
+  /** Convierte nuestro símbolo interno al ticker de Yahoo */
+  private toYahooTicker(symbol: string): string {
+    const map: Record<string, string> = {
+      // Índices
+      'SPX': '^GSPC', 'INDU': '^DJI', 'CCMP': '^IXIC', 'VIX': '^VIX',
+      // Forex  (Yahoo usa el sufijo =X)
+      'EURUSD': 'EURUSD=X', 'GBPUSD': 'GBPUSD=X', 'JPYUSD': 'JPYUSD=X',
+      'CHFUSD': 'CHFUSD=X', 'AUDUSD': 'AUDUSD=X', 'CADMXN': 'CADMXN=X',
+      // Commodities (futuros continuos de Yahoo)
+      'XAUUSD': 'GC=F', 'XAGUSD': 'SI=F', 'XPTUSD': 'PL=F',
+      'XPDUSD': 'PA=F', 'CRUDE': 'CL=F', 'NATGAS': 'NG=F', 'COPPER': 'HG=F',
+    };
+    return map[symbol] ?? symbol; // stocks (AAPL, GOOGL…) coinciden tal cual
+  }
+
+  /** Mapea nuestro TimeFrame al intervalo y rango de Yahoo Finance v8 */
+  private toYahooParams(interval: TimeFrame, days: number): { yahooInterval: string; range: string } {
+    const map: Record<TimeFrame, { yahooInterval: string; range: string }> = {
+      '1m':  { yahooInterval: '1m',  range: '1d'  },
+      '5m':  { yahooInterval: '5m',  range: '5d'  },
+      '15m': { yahooInterval: '15m', range: '5d'  },
+      '1h':  { yahooInterval: '60m', range: '7d'  },
+      '4h':  { yahooInterval: '60m', range: '30d' }, // Yahoo no tiene 4h, agrupamos 1h→4h
+      '1d':  { yahooInterval: '1d',  range: '3mo' },
+      '1w':  { yahooInterval: '1wk', range: '2y'  },
+    };
+    return map[interval] ?? { yahooInterval: '1d', range: '3mo' };
+  }
+
+  /** Agrupa velas de 1h en velas de 4h */
+  private aggregate4h(candles: CandleData[]): CandleData[] {
+    if (candles.length === 0) return [];
+    const bucketMs = 4 * 60 * 60_000;
+    type C = { open: number; high: number; low: number; close: number; volume: number; ts: number };
+    const map = new Map<number, C>();
+
+    candles.forEach(c => {
+      const bucket = Math.floor(c.time / bucketMs) * bucketMs;
+      const ex = map.get(bucket);
+      if (!ex) {
+        map.set(bucket, { open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume, ts: bucket });
+      } else {
+        if (c.high > ex.high) ex.high = c.high;
+        if (c.low  < ex.low)  ex.low  = c.low;
+        ex.close   = c.close;
+        ex.volume += c.volume;
+      }
+    });
+
+    return Array.from(map.values())
+      .sort((a, b) => a.ts - b.ts)
+      .map(c => ({ time: c.ts, open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume }));
+  }
+
+  async getHistory(symbol: string, interval: TimeFrame, days: number): Promise<CandleData[]> {
+    const cacheKey = `yahoo:${symbol}:${interval}`;
+    const cached = this.cache.get<CandleData[]>(cacheKey);
+    if (cached) return cached;
+
+    const ticker = this.toYahooTicker(symbol);
+    const { yahooInterval, range } = this.toYahooParams(interval, days);
+
+    // Yahoo Finance v8 — endpoint público (no requiere API key)
+    const url =
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}` +
+      `?interval=${yahooInterval}&range=${range}&includePrePost=false`;
+
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Yahoo Finance error ${response.status} para ${symbol} (${ticker})`);
+    }
+
+    const json = await response.json();
+    const result = json?.chart?.result?.[0];
+    if (!result) throw new Error(`Sin datos en Yahoo Finance para ${symbol}`);
+
+    const timestamps: number[]  = result.timestamp ?? [];
+    const quote                  = result.indicators?.quote?.[0] ?? {};
+    const opens: number[]        = quote.open   ?? [];
+    const highs: number[]        = quote.high   ?? [];
+    const lows: number[]         = quote.low    ?? [];
+    const closes: number[]       = quote.close  ?? [];
+    const volumes: number[]      = quote.volume ?? [];
+
+    const candles: CandleData[] = timestamps
+      .map((ts, i) => ({
+        time:   ts * 1000,          // Yahoo devuelve segundos → ms
+        open:   opens[i]   ?? closes[i] ?? 0,
+        high:   highs[i]   ?? closes[i] ?? 0,
+        low:    lows[i]    ?? closes[i] ?? 0,
+        close:  closes[i]  ?? 0,
+        volume: volumes[i] ?? 0,
+      }))
+      .filter(c => c.close > 0);   // descartar velas vacías (pre/post market, festivos)
+
+    const finalCandles = interval === '4h' ? this.aggregate4h(candles) : candles;
+
+    // TTL según intervalo
+    const ttl: Record<TimeFrame, number> = {
+      '1m': 30_000, '5m': 30_000, '15m': 60_000,
+      '1h': 120_000, '4h': 120_000,
+      '1d': 300_000, '1w': 600_000,
+    };
+    this.cache.set(cacheKey, finalCandles, ttl[interval] ?? 120_000);
+    return finalCandles;
+  }
+
+  /** Precio actual via Yahoo — útil para activos no soportados por Finnhub gratis */
+  async getPrice(symbol: string): Promise<{ price: number; change: number; changePercent: number }> {
+    const cacheKey = `yahoo:price:${symbol}`;
+    const cached = this.cache.get<{ price: number; change: number; changePercent: number }>(cacheKey);
+    if (cached) return cached;
+
+    const ticker = this.toYahooTicker(symbol);
+    const url =
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}` +
+      `?interval=1d&range=5d&includePrePost=false`;
+
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' },
+    });
+    if (!response.ok) throw new Error(`Yahoo Finance price error ${response.status}`);
+
+    const json = await response.json();
+    const result = json?.chart?.result?.[0];
+    const meta   = result?.meta ?? {};
+
+    const price         = meta.regularMarketPrice ?? 0;
+    const prevClose     = meta.chartPreviousClose ?? meta.previousClose ?? price;
+    const change        = price - prevClose;
+    const changePercent = prevClose !== 0 ? (change / prevClose) * 100 : 0;
+
+    const out = { price, change, changePercent };
+    this.cache.set(cacheKey, out, 10_000);
+    return out;
+  }
+}
+
 // ==================== MARKET SERVICE (MAIN) ====================
 
 export class MarketService {
@@ -678,6 +989,7 @@ export class MarketService {
   private finnhub: FinnhubService;
   private newsapi: NewsAPIService;
   private alphavantage: AlphaVantageService;
+  private yahoo: YahooFinanceService;
 
   constructor(
     finnhubKey: string = process.env.NEXT_PUBLIC_FINNHUB_KEY || '',
@@ -685,10 +997,11 @@ export class MarketService {
     alphavantageKey: string = process.env.NEXT_PUBLIC_ALPHAVANTAGE_KEY || ''
   ) {
     this.cache = new CacheManager();
-    this.coingecko = new CoinGeckoService(this.cache);
-    this.finnhub = new FinnhubService(finnhubKey, this.cache);
-    this.newsapi = new NewsAPIService(newsapiKey, this.cache);
+    this.coingecko   = new CoinGeckoService(this.cache);
+    this.finnhub     = new FinnhubService(finnhubKey, this.cache);
+    this.newsapi     = new NewsAPIService(newsapiKey, this.cache);
     this.alphavantage = new AlphaVantageService(alphavantageKey, this.cache);
+    this.yahoo       = new YahooFinanceService(this.cache);
   }
 
   // ========== CRIPTOMONEDAS ==========
@@ -720,9 +1033,10 @@ export class MarketService {
    * Obtiene el historial de precios de una criptomoneda
    * @param coinId - ID de la moneda
    * @param days - Número de días a recuperar (default: 30)
+   * @param interval - Intervalo de vela (default: 1d)
    */
-  async getCoinHistory(coinId: string, days?: number): Promise<OHLCV[]> {
-    return this.coingecko.getCoinHistory(coinId, days);
+  async getCoinHistory(coinId: string, days?: number, interval?: string): Promise<OHLCV[]> {
+    return this.coingecko.getCoinHistory(coinId, days, interval);
   }
 
   // ========== ACCIONES ==========
@@ -752,28 +1066,19 @@ export class MarketService {
   }
 
   /**
-   * Obtiene datos históricos (candlesticks) para una acción
-   * @param symbol - Símbolo de la acción
-   * @param interval - Intervalo temporal (1m, 5m, 15m, 1h, 4h, 1d, 1w)
-   * @param days - Número de días a recuperar
+   * Obtiene datos históricos para stocks, índices, forex y commodities.
+   * Usa Yahoo Finance (sin API key) como fuente principal — Finnhub plan
+   * gratuito da 403 en el endpoint /stock/candle.
    */
   async getStockHistory(symbol: string, interval: TimeFrame, days: number): Promise<CandleData[]> {
-    // Mapeo de TimeFrame a resolución de Finnhub
-    const resolutionMap: Record<TimeFrame, string> = {
-      '1m': '1',
-      '5m': '5',
-      '15m': '15',
-      '1h': '60',
-      '4h': '240',
-      '1d': 'D',
-      '1w': 'W',
-    };
+    return this.yahoo.getHistory(symbol, interval, days);
+  }
 
-    const resolution = resolutionMap[interval] || '60';
-    const now = Math.floor(Date.now() / 1000);
-    const from = now - (days * 24 * 60 * 60);
-
-    return this.getStockCandles(symbol, resolution, from, now);
+  /**
+   * Obtiene precio actual desde Yahoo Finance (stocks, índices, forex, commodities).
+   */
+  async getYahooPrice(symbol: string): Promise<{ price: number; change: number; changePercent: number }> {
+    return this.yahoo.getPrice(symbol);
   }
 
   /**
