@@ -26,7 +26,7 @@ export interface CandleData {
 }
 
 export interface Indicator {
-  type: 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'BB';
+  type: 'SMA' | 'EMA' | 'RSI' | 'MACD' | 'BB' | 'ADX' | 'Stochastic';
   period?: number;
   values: number[];
 }

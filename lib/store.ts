@@ -418,6 +418,7 @@ interface MarketStore {
   addAlert: (alert: Alert) => void;
   removeAlert: (alertId: string) => void;
   updateAlert: (alertId: string, triggered: boolean) => void;
+  addAsset: (data: { symbol: string; name: string; type: string }) => void;
 }
 
 export const useMarketStore = create<MarketStore>()(
@@ -490,6 +491,23 @@ export const useMarketStore = create<MarketStore>()(
               : a
           ),
         })),
+
+      addAsset: (data) =>
+        set((state) => {
+          const newAsset: Asset = {
+            id: String(Date.now()),
+            symbol: data.symbol,
+            name: data.name,
+            type: data.type as any,
+            price: 0,
+            change: 0,
+            changePercent: 0,
+            isFavorite: false,
+          };
+          return {
+            assets: [...state.assets, newAsset],
+          };
+        }),
     }),
     {
       name: 'trading-ia-store',

@@ -87,9 +87,11 @@ export function useMarketData(symbol: string, interval: TimeFrame) {
     };
   }, [symbol, interval]);
 
-  // ── Polling de precio cada 30 s (respeta rate limit CoinGecko gratis) ────
+  // ── Polling de precio cada 10 s (respeta rate limit) ────
   useEffect(() => {
-    const priceTimer = setInterval(pollPrice, 30_000);
+    const priceTimer = setInterval(pollPrice, 10_000);
+    // Primera llamada inmediata
+    pollPrice();
     return () => clearInterval(priceTimer);
   }, [pollPrice]);
 

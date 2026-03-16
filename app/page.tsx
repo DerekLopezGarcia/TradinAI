@@ -3,12 +3,14 @@
 import { useState, useEffect } from 'react';
 import { useMarketStore } from '@/lib/store';
 import { Header, TimeFrameSelector } from '@/components/Header';
+import { NavBar } from '@/components/NavBar';
 import { TradingViewChart } from '@/components/TradingViewChart';
 import { ChatPanel, AnalysisCard } from '@/components/AIChat';
 import { NewsFeed } from '@/components/NewsFeed';
 import { AlertManager } from '@/components/AlertManager';
+import { Tooltip, IndicatorLegend } from '@/components/IndicatorTooltip';
 import { useMarketData } from '@/app/hooks/useMarketData';
-import {X, TrendingUp, TrendingDown, Zap} from 'lucide-react';
+import {X, TrendingUp, TrendingDown, Zap, Eye, EyeOff} from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
 export default function Home() {
@@ -22,6 +24,10 @@ export default function Home() {
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [indicators, setIndicators] = useState<{ sma: number | null; ema: number | null; rsi: number | null; adx: number | null; stochasticK: number | null; stochasticD: number | null }>({ sma: null, ema: null, rsi: null, adx: null, stochasticK: null, stochasticD: null });
+  const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showBollinger, setShowBollinger] = useState(false);
 
   const { data, loading, error: dataError, isFallback } = useMarketData(
     selectedAsset?.symbol || 'BTCUSD',
@@ -35,35 +41,42 @@ export default function Home() {
     }
   }, [dataError]);
 
-  // Actualizar precio en tiempo real cada 30s
+  // Actualizar precio en tiempo real cada 30s para TODOS los activos
   useEffect(() => {
-    if (!selectedAsset?.symbol) return;
+    const updateAllPrices = async () => {
+      const store = useMarketStore.getState();
+      const symbols = store.assets.map(a => a.symbol);
 
-    const updatePrice = async () => {
-      try {
-        const response = await fetch(
-          `/api/market?symbol=${selectedAsset.symbol}&type=price&t=${Date.now()}`
-        );
-        if (!response.ok) return;
-        const priceData = await response.json();
-        if (!priceData.price || isNaN(priceData.price)) return;
+      const updatePromises = symbols.map(async (symbol) => {
+        try {
+          const response = await fetch(
+            `/api/market?symbol=${symbol}&type=price&t=${Date.now()}`
+          );
+          if (!response.ok) return;
+          const priceData = await response.json();
+          if (!priceData.price || isNaN(priceData.price)) return;
 
-        useMarketStore.getState().updateAssetPrice(
-          selectedAsset.symbol,
-          priceData.price,
-          priceData.change ?? 0,
-          priceData.changePercent ?? 0,
-        );
-      } catch (err) {
-        console.error('Error updating price:', err);
-      }
+          store.updateAssetPrice(
+            symbol,
+            priceData.price,
+            priceData.change ?? 0,
+            priceData.changePercent ?? 0,
+          );
+        } catch (err) {
+          console.error(`Error updating price for ${symbol}:`, err);
+        }
+      });
+
+      await Promise.allSettled(updatePromises);
     };
 
-    // Primera llamada inmediata, luego cada 30 segundos
-    updatePrice();
-    const timer = setInterval(updatePrice, 30_000);
+    // Primera llamada inmediata
+    updateAllPrices();
+
+    // Luego cada 30 segundos
+    const timer = setInterval(updateAllPrices, 30_000);
     return () => clearInterval(timer);
-  }, [selectedAsset?.symbol]);
+  }, []);
 
   if (!selectedAsset) {
     return (
@@ -80,7 +93,7 @@ export default function Home() {
   const isPositive = selectedAsset.changePercent >= 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950" suppressHydrationWarning>
       <Toaster
         position="top-right"
         toastOptions={{
@@ -95,7 +108,14 @@ export default function Home() {
 
       <Header onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} />
 
-      <div className="flex h-[calc(100vh-80px)]">
+      <NavBar
+        selectedType={selectedType}
+        onTypeChange={setSelectedType}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+      />
+
+      <div className="flex h-[calc(100vh-240px)]">
         {/* Sidebar */}
         <aside
           className={`fixed lg:relative w-72 bg-gradient-to-b from-slate-900 to-slate-950 border-r border-cyan-500/20 transition-all duration-300 z-40 lg:z-0 ${
@@ -163,7 +183,14 @@ export default function Home() {
             <div>
               <h3 className="font-bold text-sm mb-3 uppercase text-cyan-400">📊 Activos</h3>
               <div className="space-y-2 max-h-96 overflow-y-auto">
-                {assets.map((asset) => (
+                {assets
+                  .filter(asset => {
+                    const matchesType = !selectedType || asset.type === selectedType;
+                    const matchesSearch = asset.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                         asset.name.toLowerCase().includes(searchQuery.toLowerCase());
+                    return matchesType && matchesSearch;
+                  })
+                  .map((asset) => (
                   <button
                     key={asset.id}
                     onClick={() => {
@@ -248,7 +275,9 @@ export default function Home() {
                     interval={selectedTimeframe}
                     showVolume={true}
                     showRSI={true}
+                    showBollinger={showBollinger}
                     isFallback={isFallback}
+                    onIndicatorsUpdate={setIndicators}
                   />
                 ) : (
                   <div className="h-96 bg-gradient-to-br from-slate-800/50 to-slate-900/50 rounded-xl border border-cyan-500/20 flex items-center justify-center">
@@ -265,6 +294,102 @@ export default function Home() {
               </div>
 
               <div className="space-y-6">
+                {/* Tarjeta de Indicadores Técnicos */}
+                <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 rounded-xl border border-cyan-500/20 overflow-hidden p-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-widest text-cyan-400 mb-3">Indicadores</h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between p-2 bg-slate-900/40 rounded">
+                      <Tooltip content="Media Móvil Simple (20 períodos). Promedio de precios. Indica tendencia general.">
+                        <span className="text-xs text-slate-400">SMA(20)</span>
+                      </Tooltip>
+                      <span className="text-sm font-mono font-bold text-white">
+                        {indicators.sma !== null ? indicators.sma.toFixed(2) : '—'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between p-2 bg-slate-900/40 rounded">
+                      <Tooltip content="Media Móvil Exponencial (20 períodos). Da más peso a precios recientes. Más reactiva que SMA.">
+                        <span className="text-xs text-slate-400">EMA(20)</span>
+                      </Tooltip>
+                      <span className="text-sm font-mono font-bold text-white">
+                        {indicators.ema !== null ? indicators.ema.toFixed(2) : '—'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between p-2 bg-slate-900/40 rounded">
+                      <Tooltip content="Índice de Fuerza Relativa (14 períodos). Mide momentum. 🟢 Verde <30 (sobreventa), 🔵 Azul 30-70 (neutral), 🔴 Rojo >70 (sobrecompra).">
+                        <span className="text-xs text-slate-400">RSI(14)</span>
+                      </Tooltip>
+                      <span className="text-sm font-mono font-bold" style={{
+                        color: indicators.rsi === null ? '#9ca3af'
+                          : indicators.rsi >= 70 ? '#ef5350'
+                          : indicators.rsi <= 30 ? '#26a69a'
+                          : '#818cf8'
+                      }}>
+                        {indicators.rsi !== null ? indicators.rsi.toFixed(2) : '—'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between p-2 bg-slate-900/40 rounded">
+                      <Tooltip content="Índice Direccional Promedio (14 períodos). Mide fuerza de tendencia (0-100). 🔘 Gris <20 (sin), 🔵 Azul 20-25 (débil), 🟡 Amarillo 25-40 (fuerte), 🔴 Rojo >40 (muy fuerte).">
+                        <span className="text-xs text-slate-400">ADX(14)</span>
+                      </Tooltip>
+                      <span className="text-sm font-mono font-bold" style={{
+                        color: indicators.adx === null ? '#9ca3af'
+                          : indicators.adx >= 40 ? '#ef5350'
+                          : indicators.adx >= 25 ? '#fbbf24'
+                          : indicators.adx >= 20 ? '#60a5fa'
+                          : '#9ca3af'
+                      }}>
+                        {indicators.adx !== null ? indicators.adx.toFixed(2) : '—'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between p-2 bg-slate-900/40 rounded">
+                      <Tooltip content="Estocástico Rápido (%K). Línea sensible que reacciona rápido. 🟢 Verde <20 (sobreventa), 🔴 Rojo >80 (sobrecompra). Busca cruces con %D.">
+                        <span className="text-xs text-slate-400">Stoch %K</span>
+                      </Tooltip>
+                      <span className="text-sm font-mono font-bold" style={{
+                        color: indicators.stochasticK === null ? '#9ca3af'
+                          : indicators.stochasticK >= 80 ? '#ef5350'
+                          : indicators.stochasticK <= 20 ? '#26a69a'
+                          : '#818cf8'
+                      }}>
+                        {indicators.stochasticK !== null ? indicators.stochasticK.toFixed(2) : '—'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between p-2 bg-slate-900/40 rounded">
+                      <Tooltip content="Estocástico Lento (%D). Media móvil de %K. Confirma señales. Busca cruces: %K arriba = compra, %K abajo = venta.">
+                        <span className="text-xs text-slate-400">Stoch %D</span>
+                      </Tooltip>
+                      <span className="text-sm font-mono font-bold" style={{
+                        color: indicators.stochasticD === null ? '#9ca3af'
+                          : indicators.stochasticD >= 80 ? '#ef5350'
+                          : indicators.stochasticD <= 20 ? '#26a69a'
+                          : '#818cf8'
+                      }}>
+                        {indicators.stochasticD !== null ? indicators.stochasticD.toFixed(2) : '—'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between p-2 bg-slate-900/40 rounded">
+                      <Tooltip content="Bandas de Bollinger (20, 2). Muestra volatilidad en el gráfico. Precio en banda superior = sobrecompra, en banda inferior = sobreventa.">
+                        <button 
+                          onClick={() => setShowBollinger(!showBollinger)}
+                          className={`text-xs px-2 py-1 rounded transition-colors ${
+                            showBollinger 
+                              ? 'bg-cyan-500/30 text-cyan-300 border border-cyan-500/50'
+                              : 'bg-slate-700/50 text-slate-400 hover:bg-slate-700'
+                          }`}
+                        >
+                          {showBollinger ? <Eye className="w-3 h-3 inline mr-1" /> : <EyeOff className="w-3 h-3 inline mr-1" />}
+                          Bollinger
+                        </button>
+                      </Tooltip>
+                      <span className="text-sm font-mono font-bold text-cyan-300">
+                        {showBollinger ? '✓' : '◯'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <IndicatorLegend isOpen={false} />
+
                 <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 rounded-xl border border-cyan-500/20 overflow-hidden">
                   <ChatPanel
                     symbol={selectedAsset.symbol}

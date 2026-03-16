@@ -1,0 +1,203 @@
+import { CandleData, TimeFrame } from '@/lib/types';
+
+/**
+ * Servicio para obtener datos históricos de Binance API
+ * Proporciona velas con excelente resolución y sin rate limiting restrictivo
+ */
+
+export interface BinanceKline {
+  openTime: number;
+  open: string;
+  high: string;
+  low: string;
+  close: string;
+  volume: string;
+  closeTime: number;
+  quoteAssetVolume: string;
+  numberOfTrades: number;
+  takerBuyBaseAssetVolume: string;
+  takerBuyQuoteAssetVolume: string;
+}
+
+class BinanceService {
+  private baseUrl = 'https://api.binance.com/api/v3';
+  private cache = new Map<string, { data: any; timestamp: number }>();
+  private readonly cacheTTL = 60000; // 1 minuto
+
+  /**
+   * Mapeo de TimeFrame a Binance interval
+   */
+  private getInterval(timeframe: TimeFrame): string {
+    const map: Record<TimeFrame, string> = {
+      '1m': '1m',
+      '5m': '5m',
+      '15m': '15m',
+      '1h': '1h',
+      '4h': '4h',
+      '1d': '1d',
+      '1w': '1w',
+    };
+    return map[timeframe] || '1d';
+  }
+
+  /**
+   * Convierte símbolo (BTCUSD) a símbolo Binance (BTCUSDT)
+   */
+  private normalizePair(symbol: string): string {
+    // BTCUSD → BTCUSDT, ETHUSD → ETHUSDT, etc.
+    if (symbol.endsWith('USD')) {
+      return symbol.replace('USD', 'USDT');
+    }
+    // Si ya es USDT, mantenerlo
+    if (symbol.includes('USDT')) {
+      return symbol;
+    }
+    // Default: agregar USDT
+    return symbol + 'USDT';
+  }
+
+  /**
+   * Obtiene el número de velas límite según el timeframe
+   */
+  private getLimit(timeframe: TimeFrame): number {
+    // Binance límite es 1000 por defecto, pero podemos pedir menos
+    const limits: Record<TimeFrame, number> = {
+      '1m': 1000,   // ~16 horas
+      '5m': 1000,   // ~3.5 días
+      '15m': 1000,  // ~10 días
+      '1h': 500,    // ~20 días
+      '4h': 500,    // ~83 días
+      '1d': 365,    // ~1 año
+      '1w': 200,    // ~4 años
+    };
+    return limits[timeframe] || 500;
+  }
+
+  /**
+   * Obtiene datos históricos de Binance
+   */
+  async getHistoricalCandles(
+    symbol: string,
+    interval: TimeFrame
+  ): Promise<CandleData[]> {
+    const cacheKey = `binance:${symbol}:${interval}`;
+    const cached = this.cache.get(cacheKey);
+
+    if (cached && Date.now() - cached.timestamp < this.cacheTTL) {
+      return cached.data;
+    }
+
+    try {
+      const pair = this.normalizePair(symbol);
+      const binanceInterval = this.getInterval(interval);
+      const limit = this.getLimit(interval);
+
+      const url = `${this.baseUrl}/klines?symbol=${pair}&interval=${binanceInterval}&limit=${limit}`;
+
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Trading IA)',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Binance API error: ${response.status}`);
+      }
+
+      const klines: any[][] = await response.json();
+
+      if (!Array.isArray(klines) || klines.length === 0) {
+        throw new Error('No kline data received');
+      }
+
+      // Convertir formato Binance a nuestro formato CandleData
+      const candles: CandleData[] = klines.map((kline) => ({
+        time: kline[0], // openTime en ms
+        open: parseFloat(kline[1]),
+        high: parseFloat(kline[2]),
+        low: parseFloat(kline[3]),
+        close: parseFloat(kline[4]),
+        volume: parseFloat(kline[7]), // quoteAssetVolume (volumen en USD)
+      }));
+
+      // Validar datos
+      const validCandles = candles.filter(
+        (c) =>
+          !isNaN(c.open) &&
+          !isNaN(c.high) &&
+          !isNaN(c.low) &&
+          !isNaN(c.close) &&
+          c.high >= c.low &&
+          c.high >= c.open &&
+          c.high >= c.close &&
+          c.low <= c.open &&
+          c.low <= c.close
+      );
+
+      // Cachear resultado
+      this.cache.set(cacheKey, {
+        data: validCandles,
+        timestamp: Date.now(),
+      });
+
+      return validCandles;
+    } catch (error) {
+      console.error(`[BinanceService] Error fetching ${symbol}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtiene precio actual desde Binance
+   */
+  async getCurrentPrice(symbol: string): Promise<number> {
+    try {
+      const pair = this.normalizePair(symbol);
+      const url = `${this.baseUrl}/ticker/price?symbol=${pair}`;
+
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error(`Binance ticker error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return parseFloat(data.price);
+    } catch (error) {
+      console.error(`[BinanceService] Error fetching price for ${symbol}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Limpia la caché (útil para cambios de símbolo)
+   */
+  clearCache(): void {
+    this.cache.clear();
+  }
+
+  /**
+   * Obtiene información de 24h (cambio, volumen, etc.)
+   */
+  async get24hData(symbol: string): Promise<any> {
+    try {
+      const pair = this.normalizePair(symbol);
+      const url = `${this.baseUrl}/ticker/24hr?symbol=${pair}`;
+
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error(`Binance 24h stats error: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`[BinanceService] Error fetching 24h data for ${symbol}:`, error);
+      throw error;
+    }
+  }
+}
+
+// Exportar instancia singleton
+export const binanceService = new BinanceService();
+

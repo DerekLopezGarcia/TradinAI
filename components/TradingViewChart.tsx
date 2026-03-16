@@ -15,7 +15,7 @@ import {
   IPriceLine,
 } from 'lightweight-charts';
 import { CandleData } from '@/lib/types';
-import { calculateRSI } from '@/lib/indicators';
+import { calculateRSI, calculateSMA, calculateEMA, calculateADX, calculateStochastic, calculateBollingerBands } from '@/lib/indicators';
 
 interface TradingViewChartProps {
   data: CandleData[];
@@ -23,7 +23,9 @@ interface TradingViewChartProps {
   interval?: string;
   showVolume?: boolean;
   showRSI?: boolean;
+  showBollinger?: boolean;
   isFallback?: boolean;
+  onIndicatorsUpdate?: (indicators: { sma: number | null; ema: number | null; rsi: number | null; adx: number | null; stochasticK: number | null; stochasticD: number | null }) => void;
 }
 
 export function TradingViewChart({
@@ -32,35 +34,37 @@ export function TradingViewChart({
   interval = '1h',
   showVolume = true,
   showRSI = true,
+  showBollinger = false,
   isFallback = false,
+  onIndicatorsUpdate,
 }: TradingViewChartProps) {
-  // ── Refs chart principal ──────────────────────────────────────────
   const containerRef    = useRef<HTMLDivElement>(null);
   const chartRef        = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
+  const bollingerUpperRef = useRef<ISeriesApi<'Line'> | null>(null);
+  const bollingerLowerRef = useRef<ISeriesApi<'Line'> | null>(null);
+  const bollingerMiddleRef = useRef<ISeriesApi<'Line'> | null>(null);
 
-  // ── Refs panel RSI ────────────────────────────────────────────────
   const rsiContainerRef = useRef<HTMLDivElement>(null);
   const rsiChartRef     = useRef<IChartApi | null>(null);
   const rsiSeriesRef    = useRef<ISeriesApi<'Line'> | null>(null);
-  // PriceLines para 70 / 50 / 30 — se dibujan en todo el ancho del chart siempre
-  const pl70Ref = useRef<IPriceLine | null>(null);
-  const pl50Ref = useRef<IPriceLine | null>(null);
-  const pl30Ref = useRef<IPriceLine | null>(null);
 
-  // Control de sincronización y estado anterior
   const syncingRef      = useRef<boolean>(false);
   const prevDataLenRef  = useRef<number>(0);
   const prevLastTimeRef = useRef<number>(0);
   const initialZoomDone = useRef<boolean>(false);
+  const userInteractedRef = useRef<boolean>(false);
 
   const [chartReady, setChartReady] = useState(false);
   const [rsiReady,   setRsiReady]   = useState(false);
   const [rsiValue,   setRsiValue]   = useState<number | null>(null);
-  const [isCalcRSI,  setIsCalcRSI]  = useState(false);
+  const [smaValue,   setSmaValue]   = useState<number | null>(null);
+  const [emaValue,   setEmaValue]   = useState<number | null>(null);
+  const [adxValue,   setAdxValue]   = useState<number | null>(null);
+  const [stochasticK, setStochasticK] = useState<number | null>(null);
+  const [stochasticD, setStochasticD] = useState<number | null>(null);
 
-  // ── helpers ───────────────────────────────────────────────────────
   const toUTC = useCallback((ms: number): UTCTimestamp =>
     Math.floor(ms / 1000) as UTCTimestamp, []);
 
@@ -86,7 +90,61 @@ export function TradingViewChart({
     [toUTC]
   );
 
-  // ── Calcular RSI (Wilder, período 14) ────────────────────────────
+  const syncRsiToMainRange = useCallback(() => {
+    const main = chartRef.current;
+    const rsi = rsiChartRef.current;
+    if (!main || !rsi || !rsiReady) return;
+
+    const timeRange = main.timeScale().getVisibleRange();
+    if (!timeRange) return;
+
+    syncingRef.current = true;
+    try {
+      rsi.timeScale().setVisibleRange(timeRange);
+    } catch {
+      /* ignorar */
+    }
+    syncingRef.current = false;
+  }, [rsiReady]);
+
+  const applyInitialVisibleRange = useCallback((candles: CandlestickData[]) => {
+    const main = chartRef.current;
+    if (!main || candles.length === 0) return;
+
+    const total = candles.length;
+    const visibleBars = Math.min(Math.max(total >= 50 ? 50 : 30, 30), 50, total);
+
+    if (total <= visibleBars) {
+      try {
+        main.timeScale().fitContent();
+      } catch {
+        /* ignorar */
+      }
+      requestAnimationFrame(() => {
+        syncRsiToMainRange();
+      });
+      return;
+    }
+
+    const fromCandle = candles[Math.max(0, total - visibleBars)];
+    const toCandle = candles[total - 1];
+    const range = { from: fromCandle.time as UTCTimestamp, to: toCandle.time as UTCTimestamp };
+
+    syncingRef.current = true;
+    try {
+      main.timeScale().setVisibleRange(range);
+      rsiChartRef.current?.timeScale().setVisibleRange(range);
+    } catch {
+      /* ignorar */
+    }
+    syncingRef.current = false;
+  }, [syncRsiToMainRange]);
+
+  const restoreVisibleRange = useCallback(() => {
+    const main = chartRef.current;
+    if (!main) return;
+  }, []);
+
   const rsiData: LineData[] = useMemo(() => {
     if (!data || data.length < 15) return [];
     const closes  = data.map(d => +d.close);
@@ -98,7 +156,7 @@ export function TradingViewChart({
       .sort((a, b) => (a.time as number) - (b.time as number)) as LineData[];
   }, [data, toUTC]);
 
-  // ── Inicializar chart principal ──────────────────────────────────
+  // ...existing code...
   useEffect(() => {
     if (!containerRef.current || chartRef.current) return;
 
@@ -146,6 +204,25 @@ export function TradingViewChart({
       priceLineVisible: true, lastValueVisible: true,
     });
 
+    // Agregar series para Bollinger Bands
+    if (showBollinger) {
+      bollingerUpperRef.current = chart.addLineSeries({
+        color: '#818cf8',
+        lineWidth: 1,
+        lineStyle: LineStyle.Dashed,
+      });
+      bollingerMiddleRef.current = chart.addLineSeries({
+        color: '#64748b',
+        lineWidth: 1,
+        lineStyle: LineStyle.Dotted,
+      });
+      bollingerLowerRef.current = chart.addLineSeries({
+        color: '#818cf8',
+        lineWidth: 1,
+        lineStyle: LineStyle.Dashed,
+      });
+    }
+
     if (showVolume) {
       const volumeSeries = chart.addHistogramSeries({
         priceFormat: { type: 'volume' },
@@ -175,144 +252,111 @@ export function TradingViewChart({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showVolume]);
 
-  // ── Inicializar chart RSI ─────────────────────────────────────────
+  // LIMPIAR RSI CHART CUANDO CAMBIA INTERVALO
+  useEffect(() => {
+    if (rsiChartRef.current) {
+      try {
+        rsiChartRef.current.remove();
+      } catch {
+        /* ignorar */
+      }
+      rsiChartRef.current = null;
+      rsiSeriesRef.current = null;
+      setRsiReady(false);
+    }
+  }, [symbol, interval]);
+
+  // INICIALIZAR NUEVO RSI CHART DE CERO
   useEffect(() => {
     if (!showRSI || !rsiContainerRef.current || rsiChartRef.current) return;
 
-    const rsiChart = createChart(rsiContainerRef.current, {
-      layout: {
-        background: { type: ColorType.Solid, color: '#0d1117' },
-        textColor: '#9ca3af',
-        fontFamily: "'Inter', system-ui, sans-serif",
-        fontSize: 11,
-      },
-      grid: {
-        vertLines: { color: '#1f2937', style: LineStyle.Solid },
-        horzLines: { color: '#1a2332', style: LineStyle.Dotted },
-      },
-      crosshair: {
-        mode: CrosshairMode.Normal,
-        vertLine: { color: '#475569', labelBackgroundColor: '#1e293b' },
-        horzLine: { color: '#475569', labelBackgroundColor: '#1e293b' },
-      },
-      rightPriceScale: {
-        borderColor: '#1f2937',
-        textColor: '#9ca3af',
-        scaleMargins: { top: 0.05, bottom: 0.05 },
-        autoScale: false,
-        // Fijar siempre la escala entre 0 y 100
-        minimumWidth: 60,
-      },
-      timeScale: {
-        borderColor: '#1f2937',
-        timeVisible: true,
-        secondsVisible: false,
-        rightOffset: 5,
-        barSpacing: 12,
-        minBarSpacing: 2,
-        visible: true,
-      },
-      handleScroll: { mouseWheel: true, pressedMouseMove: true },
-      handleScale: { mouseWheel: true, pinch: true },
-      width:  rsiContainerRef.current.clientWidth,
-      height: 130,
-    });
-    rsiChartRef.current = rsiChart;
+    const initRsi = () => {
+      if (!rsiContainerRef.current) return;
 
-    // Serie RSI principal
-    const rsiSeries = rsiChart.addLineSeries({
-      color: '#818cf8',
-      lineWidth: 2,
-      priceLineVisible: false,
-      lastValueVisible: true,
-      title: 'RSI 14',
-    });
-    rsiSeriesRef.current = rsiSeries;
+      const w = rsiContainerRef.current.clientWidth;
+      if (w <= 0) {
+        requestAnimationFrame(initRsi);
+        return;
+      }
 
-    // ── PriceLines — se dibujan en TODO el ancho del gráfico siempre ──
-    pl70Ref.current = rsiSeries.createPriceLine({
-      price: 70,
-      color: 'rgba(239,83,80,0.7)',
-      lineWidth: 1,
-      lineStyle: LineStyle.Dashed,
-      axisLabelVisible: true,
-      title: '',
-    });
-    pl50Ref.current = rsiSeries.createPriceLine({
-      price: 50,
-      color: 'rgba(100,116,139,0.5)',
-      lineWidth: 1,
-      lineStyle: LineStyle.Dotted,
-      axisLabelVisible: false,
-      title: '',
-    });
-    pl30Ref.current = rsiSeries.createPriceLine({
-      price: 30,
-      color: 'rgba(38,166,154,0.7)',
-      lineWidth: 1,
-      lineStyle: LineStyle.Dashed,
-      axisLabelVisible: true,
-      title: '',
-    });
+      try {
+        // Crear chart RSI nuevo
+        const rsiChart = createChart(rsiContainerRef.current, {
+          layout: { background: { type: ColorType.Solid, color: '#0d1117' }, textColor: '#9ca3af' },
+          grid: { vertLines: { color: '#1f2937' }, horzLines: { color: '#1f2937' } },
+          rightPriceScale: { borderColor: '#1f2937', autoScale: true, scaleMargins: { top: 0.2, bottom: 0.2 } },
+          timeScale: { 
+            borderColor: '#1f2937', 
+            timeVisible: true,
+            secondsVisible: true,
+          },
+          width: w,
+          height: 130,
+        });
 
-    const ro = new ResizeObserver(() => {
-      if (rsiContainerRef.current && rsiChartRef.current)
-        rsiChartRef.current.applyOptions({ width: rsiContainerRef.current.clientWidth });
-    });
-    ro.observe(rsiContainerRef.current);
+        rsiChartRef.current = rsiChart;
 
-    setRsiReady(true);
-    return () => {
-      ro.disconnect();
-      rsiChart.remove();
-      rsiChartRef.current = null;
-      rsiSeriesRef.current = null;
-      pl70Ref.current = null;
-      pl50Ref.current = null;
-      pl30Ref.current = null;
-      setRsiReady(false);
+        // Agregar línea del RSI
+        const rsiLine = rsiChart.addLineSeries({ color: '#818cf8', lineWidth: 2 });
+        rsiSeriesRef.current = rsiLine;
+
+        // Líneas de referencia
+        rsiLine.createPriceLine({ price: 70, color: '#ef5350', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true });
+        rsiLine.createPriceLine({ price: 30, color: '#26a69a', lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true });
+        rsiLine.createPriceLine({ price: 50, color: '#64748b', lineWidth: 1, lineStyle: LineStyle.Dotted, axisLabelVisible: false });
+
+        // Observer para resize
+        const ro = new ResizeObserver(() => {
+          if (rsiContainerRef.current && rsiChartRef.current) {
+            rsiChartRef.current.applyOptions({ width: rsiContainerRef.current.clientWidth });
+          }
+        });
+        ro.observe(rsiContainerRef.current);
+
+        setRsiReady(true);
+
+        return () => {
+          ro.disconnect();
+        };
+      } catch (err) {
+        console.error('Error init RSI:', err);
+      }
     };
-  }, [showRSI]);
 
-  // ── Sincronizar timeScale bidireccionalmente ──────────────────────
+    initRsi();
+  }, [showRSI, symbol, interval]);
+
+  // SINCRONIZAR TIMERANGE ENTRE CHARTS
   useEffect(() => {
     const main = chartRef.current;
-    const rsi  = rsiChartRef.current;
+    const rsi = rsiChartRef.current;
     if (!main || !rsi) return;
 
-    const syncMainToRsi = () => {
-      if (syncingRef.current) return;
+    const syncTimeRange = () => {
       const range = main.timeScale().getVisibleRange();
-      if (!range) return;
-      syncingRef.current = true;
-      try { rsi.timeScale().setVisibleRange(range); } catch { /* ignorar */ }
-      syncingRef.current = false;
-    };
-    const syncRsiToMain = () => {
-      if (syncingRef.current) return;
-      const range = rsi.timeScale().getVisibleRange();
-      if (!range) return;
-      syncingRef.current = true;
-      try { main.timeScale().setVisibleRange(range); } catch { /* ignorar */ }
-      syncingRef.current = false;
+      if (range) {
+        try {
+          rsi.timeScale().setVisibleRange(range);
+        } catch {
+          /* ignorar */
+        }
+      }
     };
 
-    main.timeScale().subscribeVisibleTimeRangeChange(syncMainToRsi);
-    rsi.timeScale().subscribeVisibleTimeRangeChange(syncRsiToMain);
+    main.timeScale().subscribeVisibleTimeRangeChange(syncTimeRange);
     return () => {
-      main.timeScale().unsubscribeVisibleTimeRangeChange(syncMainToRsi);
-      rsi.timeScale().unsubscribeVisibleTimeRangeChange(syncRsiToMain);
+      main.timeScale().unsubscribeVisibleTimeRangeChange(syncTimeRange);
     };
   }, [chartReady, rsiReady]);
 
-  // ── Reset zoom cuando cambia símbolo o intervalo ─────────────────
   useEffect(() => {
     initialZoomDone.current = false;
     prevDataLenRef.current  = 0;
     prevLastTimeRef.current = 0;
+    userInteractedRef.current = false;
   }, [symbol, interval]);
 
-  // ── Actualizar datos del chart principal ──────────────────────────
+  // ...existing code...
   useEffect(() => {
     if (!chartReady || !candleSeriesRef.current) return;
     if (!data || data.length === 0) return;
@@ -327,96 +371,175 @@ export function TradingViewChart({
       const sameLast   = lastTime     === prevLastTimeRef.current;
 
       if (sameLen && sameLast) {
-        // Actualización incremental de precio live
         candleSeriesRef.current.update(lastCandle);
         if (volumeSeriesRef.current) {
           const vd = buildVolumeData(data);
           volumeSeriesRef.current.update(vd[vd.length - 1]);
         }
-      } else {
-        // Carga completa
-        candleSeriesRef.current.setData(candles);
-        if (volumeSeriesRef.current)
-          volumeSeriesRef.current.setData(buildVolumeData(data));
+       } else {
+         candleSeriesRef.current.setData(candles);
+         if (volumeSeriesRef.current)
+           volumeSeriesRef.current.setData(buildVolumeData(data));
 
-        // Zoom inicial: mostrar las últimas 40 velas
         if (!initialZoomDone.current) {
-          const VISIBLE = 40;
-          const total   = candles.length;
-
-          if (total <= VISIBLE) {
-            chartRef.current?.timeScale().fitContent();
-            setTimeout(() => {
-              const r = chartRef.current?.timeScale().getVisibleRange();
-              if (r) {
-                try { rsiChartRef.current?.timeScale().setVisibleRange(r); } catch { /* ignorar */ }
-              }
-            }, 60);
-          } else {
-            const barMs    = (candles[1].time as number) - (candles[0].time as number);
-            const fromTime = candles[total - VISIBLE].time as UTCTimestamp;
-            const toTime   = (candles[total - 1].time as number + barMs * 5) as UTCTimestamp;
-            const range    = { from: fromTime, to: toTime };
-
-            syncingRef.current = true;
-            try {
-              chartRef.current?.timeScale().setVisibleRange(range);
-              rsiChartRef.current?.timeScale().setVisibleRange(range);
-            } catch { /* ignorar */ }
-            syncingRef.current = false;
+            applyInitialVisibleRange(candles);
+            initialZoomDone.current = true;
+          } else if (userInteractedRef.current) {
+            restoreVisibleRange();
           }
-          initialZoomDone.current = true;
         }
-      }
 
-      prevDataLenRef.current  = data.length;
-      prevLastTimeRef.current = lastTime;
-    } catch (err) {
-      console.error('[TradingViewChart] candles error:', err);
-    }
-  }, [chartReady, data, buildCandleData, buildVolumeData]);
+       prevDataLenRef.current  = data.length;
+       prevLastTimeRef.current = lastTime;
+     } catch (err) {
+       console.error('[TradingViewChart] candles error:', err);
+     }
+   }, [chartReady, rsiReady, data, buildCandleData, buildVolumeData, applyInitialVisibleRange, restoreVisibleRange]);
 
-  // ── Actualizar panel RSI ──────────────────────────────────────────
+  // ACTUALIZAR DATOS DEL RSI
   useEffect(() => {
     if (!rsiReady || !rsiSeriesRef.current) return;
-
-    if (rsiData.length === 0) {
-      try { rsiSeriesRef.current.setData([]); } catch { /* ignorar */ }
+    if (!rsiData || rsiData.length === 0) {
       setRsiValue(null);
-      setIsCalcRSI(data.length > 0 && data.length < 15);
       return;
     }
 
     try {
-      setIsCalcRSI(false);
-
-      // Forzar escala fija 0-100 en la serie RSI
-      rsiSeriesRef.current.applyOptions({
-        baseLineVisible: false,
-        priceFormat: { type: 'price', precision: 2, minMove: 0.01 },
-      });
-      rsiChartRef.current?.priceScale('right').applyOptions({
-        autoScale: false,
-        scaleMargins: { top: 0.05, bottom: 0.05 },
-      });
-
       rsiSeriesRef.current.setData(rsiData);
+      const lastRsi = rsiData[rsiData.length - 1]?.value as number;
+      setRsiValue(isNaN(lastRsi) ? null : lastRsi);
+    } catch (err) {
+      console.error('Error updating RSI:', err);
+    }
+  }, [rsiReady, rsiData]);
 
-      // Sincronizar rango de tiempo con el chart principal
-      const mainRange = chartRef.current?.timeScale().getVisibleRange();
-      if (mainRange && rsiChartRef.current) {
-        syncingRef.current = true;
-        try { rsiChartRef.current.timeScale().setVisibleRange(mainRange); } catch { /* ignorar */ }
-        syncingRef.current = false;
+
+  useEffect(() => {
+    if (!data || data.length < 20) {
+      setSmaValue(null);
+      setEmaValue(null);
+      setAdxValue(null);
+      setStochasticK(null);
+      setStochasticD(null);
+      return;
+    }
+
+    try {
+      const closes = data.map(d => +d.close);
+      const smaValues = calculateSMA(closes, 20);
+      const emaValues = calculateEMA(closes, 20);
+      const adxValues = calculateADX(data as Array<{ high: number; low: number; close: number }>, 14);
+      const stochasticData = calculateStochastic(data as Array<{ high: number; low: number; close: number }>, 14, 3, 3);
+
+      const lastSma = smaValues[smaValues.length - 1];
+      const lastEma = emaValues[emaValues.length - 1];
+      const lastAdx = adxValues[adxValues.length - 1];
+
+      setSmaValue(lastSma > 0 ? lastSma : null);
+      setEmaValue(lastEma > 0 ? lastEma : null);
+      setAdxValue(!isNaN(lastAdx) && isFinite(lastAdx) ? lastAdx : null);
+      setStochasticK(stochasticData.currentK !== undefined && !isNaN(stochasticData.currentK) ? stochasticData.currentK : null);
+      setStochasticD(stochasticData.currentD !== undefined && !isNaN(stochasticData.currentD) ? stochasticData.currentD : null);
+    } catch (err) {
+      console.error('[TradingViewChart] SMA/EMA/ADX/Stochastic error:', err);
+      setSmaValue(null);
+      setEmaValue(null);
+      setAdxValue(null);
+      setStochasticK(null);
+      setStochasticD(null);
+    }
+  }, [data]);
+
+  useEffect(() => {
+    onIndicatorsUpdate?.({ sma: smaValue, ema: emaValue, rsi: rsiValue, adx: adxValue, stochasticK, stochasticD });
+  }, [smaValue, emaValue, rsiValue, adxValue, stochasticK, stochasticD, onIndicatorsUpdate]);
+
+  // ACTUALIZAR BANDAS DE BOLLINGER
+  useEffect(() => {
+    if (!chartReady) return;
+    
+    // Si no queremos mostrar Bollinger, limpiar las series
+    if (!showBollinger) {
+      if (bollingerUpperRef.current && chartRef.current) {
+        try {
+          if (bollingerUpperRef.current) chartRef.current.removeSeries(bollingerUpperRef.current);
+          if (bollingerLowerRef.current) chartRef.current.removeSeries(bollingerLowerRef.current);
+          if (bollingerMiddleRef.current) chartRef.current.removeSeries(bollingerMiddleRef.current);
+        } catch (e) {
+          // ignorar
+        }
+      }
+      bollingerUpperRef.current = null;
+      bollingerLowerRef.current = null;
+      bollingerMiddleRef.current = null;
+      return;
+    }
+
+    if (!data || data.length < 20 || !chartRef.current) return;
+
+    try {
+      const closes = data.map(d => +d.close);
+      const bands = calculateBollingerBands(closes, 20, 2);
+      
+      // Crear series si no existen
+      if (!bollingerUpperRef.current) {
+        bollingerUpperRef.current = chartRef.current.addLineSeries({
+          color: '#818cf8',
+          lineWidth: 1,
+          lineStyle: LineStyle.Dashed,
+        });
+      }
+      if (!bollingerMiddleRef.current) {
+        bollingerMiddleRef.current = chartRef.current.addLineSeries({
+          color: '#64748b',
+          lineWidth: 1,
+          lineStyle: LineStyle.Dotted,
+        });
+      }
+      if (!bollingerLowerRef.current) {
+        bollingerLowerRef.current = chartRef.current.addLineSeries({
+          color: '#818cf8',
+          lineWidth: 1,
+          lineStyle: LineStyle.Dashed,
+        });
       }
 
-      setRsiValue(rsiData[rsiData.length - 1].value as number);
-    } catch (err) {
-      console.error('[TradingViewChart] RSI error:', err);
-    }
-  }, [rsiReady, rsiData, data.length]);
+      // Convertir datos a formato de línea
+      const upperData: LineData[] = [];
+      const middleData: LineData[] = [];
+      const lowerData: LineData[] = [];
 
-  // ── Estadísticas cabecera ──────────────────────────────────────────
+      for (let i = 0; i < data.length; i++) {
+        const upper = bands.upper[i];
+        const middle = bands.middle[i];
+        const lower = bands.lower[i];
+
+        if (upper > 0 && isFinite(upper)) {
+          upperData.push({ time: toUTC(data[i].time), value: upper });
+        }
+        if (middle > 0 && isFinite(middle)) {
+          middleData.push({ time: toUTC(data[i].time), value: middle });
+        }
+        if (lower > 0 && isFinite(lower)) {
+          lowerData.push({ time: toUTC(data[i].time), value: lower });
+        }
+      }
+
+      // Actualizar series
+      if (upperData.length > 0 && bollingerUpperRef.current) {
+        bollingerUpperRef.current.setData(upperData);
+      }
+      if (middleData.length > 0 && bollingerMiddleRef.current) {
+        bollingerMiddleRef.current.setData(middleData);
+      }
+      if (lowerData.length > 0 && bollingerLowerRef.current) {
+        bollingerLowerRef.current.setData(lowerData);
+      }
+    } catch (err) {
+      console.error('[TradingViewChart] Bollinger Bands error:', err);
+    }
+  }, [chartReady, showBollinger, data, toUTC]);
+
   const hasData     = data && data.length > 0;
   const lastCandle  = hasData ? data[data.length - 1] : null;
   const firstCandle = hasData ? data[0] : null;
@@ -427,7 +550,6 @@ export function TradingViewChart({
   const periodLow   = hasData ? Math.min(...data.map(d => d.low))  : 0;
   const totalVol    = hasData ? data.reduce((s, d) => s + (d.volume || 0), 0) : 0;
 
-  // Color e indicación del RSI
   const rsiColor = rsiValue === null ? '#9ca3af'
     : rsiValue >= 70 ? '#ef5350'
     : rsiValue <= 30 ? '#26a69a'
@@ -439,8 +561,7 @@ export function TradingViewChart({
     : ' · Bajista';
 
   return (
-    <div className="bg-[#0d1117] rounded-xl border border-slate-800 overflow-hidden">
-      {/* Badge datos simulados */}
+    <div className="bg-[#0d1117] rounded-xl border border-slate-800 overflow-hidden" suppressHydrationWarning>
       {isFallback && (
         <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 border-b border-amber-500/30 text-[11px] text-amber-400">
           <span>⚠️</span>
@@ -448,7 +569,6 @@ export function TradingViewChart({
         </div>
       )}
 
-      {/* Barra superior con OHLC */}
       <div className="flex flex-wrap items-center gap-3 px-4 py-3 border-b border-slate-800 text-xs select-none">
         <span className="text-white font-bold text-sm tracking-widest">{symbol}</span>
 
@@ -480,7 +600,6 @@ export function TradingViewChart({
         {!hasData && <span className="text-slate-500 text-[11px] ml-2">Cargando datos…</span>}
       </div>
 
-      {/* Chart principal */}
       <div className="relative">
         <div ref={containerRef} className="w-full" style={{ height: '450px' }} />
         {!hasData && (
@@ -493,7 +612,6 @@ export function TradingViewChart({
         )}
       </div>
 
-      {/* Panel RSI — siempre en DOM */}
       {showRSI && (
         <div className="border-t border-slate-800">
           <div className="flex items-center gap-3 px-4 py-1.5 text-[11px] select-none bg-[#0d1117]">
@@ -505,7 +623,7 @@ export function TradingViewChart({
             ) : (
               <span className="flex items-center gap-1.5 text-slate-500">
                 <span className="w-3 h-3 border border-slate-500 border-t-transparent rounded-full animate-spin inline-block" />
-                {isCalcRSI ? 'Insuficientes datos (min. 15 velas)' : 'Calculando RSI…'}
+                Calculando RSI…
               </span>
             )}
             <div className="ml-auto flex items-center gap-3 text-slate-600">
@@ -520,8 +638,8 @@ export function TradingViewChart({
             </div>
           </div>
 
-          <div className="relative">
-            <div ref={rsiContainerRef} className="w-full" style={{ height: '130px' }} />
+          <div className="relative w-full" style={{ height: '130px', minHeight: '130px' }}>
+            <div ref={rsiContainerRef} style={{ width: '100%', height: '100%' }} />
             {rsiData.length === 0 && hasData && (
               <div className="absolute inset-0 flex items-center justify-center bg-[#0d1117]/90">
                 <div className="flex items-center gap-2 text-slate-500 text-[11px]">
@@ -534,7 +652,6 @@ export function TradingViewChart({
         </div>
       )}
 
-      {/* Leyenda inferior */}
       <div className="flex items-center gap-4 px-4 py-2 border-t border-slate-800 text-[11px] text-slate-500">
         <div className="flex items-center gap-1.5">
           <span className="w-3 h-3 rounded-sm bg-[#26a69a] inline-block" />Alcista
@@ -551,3 +668,4 @@ export function TradingViewChart({
     </div>
   );
 }
+

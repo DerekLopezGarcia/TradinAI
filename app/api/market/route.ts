@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { marketService } from '@/lib/services/marketService';
 import { newsService } from '@/lib/services/newsService';
+import { binanceService } from '@/lib/services/binanceService';
 import { TimeFrame, CandleData } from '@/lib/types';
 
 /**
@@ -107,18 +108,34 @@ function getDaysByInterval(interval: TimeFrame): number {
 
 /**
  * Obtiene datos históricos reales (candlesticks). Sin fallback simulado.
- * Si la API no responde lanza un error para que el cliente lo maneje.
+ * Para criptos usa Binance (mejor calidad de datos y sin rate limits restrictivos)
+ * Para stocks usa Finnhub
  */
 async function getHistoryData(symbol: string, interval: TimeFrame) {
   const days = getDaysByInterval(interval);
 
   if (isCrypto(symbol)) {
-    const coinId = COINGECKO_IDS[symbol] || 'bitcoin';
-    const data = await marketService.getCoinHistory(coinId, days, interval);
-    if (!data || data.length === 0) {
-      throw new Error(`No hay datos históricos para ${symbol}`);
+    try {
+      // Proveedor principal: Binance (excelente calidad de velas)
+      const data = await binanceService.getHistoricalCandles(symbol, interval);
+      if (!data || data.length === 0) {
+        throw new Error(`No hay datos en Binance para ${symbol}`);
+      }
+      return { symbol, interval, data, source: 'Binance', isFallback: false, timestamp: Date.now() };
+    } catch (binanceErr) {
+      console.warn(`Binance failed for ${symbol}, trying CoinGecko:`, binanceErr);
+      // Fallback: CoinGecko
+      try {
+        const coinId = COINGECKO_IDS[symbol] || 'bitcoin';
+        const data = await marketService.getCoinHistory(coinId, days, interval);
+        if (!data || data.length === 0) {
+          throw new Error(`No hay datos históricos para ${symbol}`);
+        }
+        return { symbol, interval, data, source: 'CoinGecko', isFallback: false, timestamp: Date.now() };
+      } catch (coingeckoErr) {
+        throw new Error(`No hay datos históricos disponibles para ${symbol}`);
+      }
     }
-    return { symbol, interval, data, source: 'CoinGecko', isFallback: false, timestamp: Date.now() };
   } else {
     const data = await marketService.getStockHistory(symbol, interval, days);
     if (!data || data.length === 0) {
@@ -156,27 +173,49 @@ async function getNewsData(symbol: string) {
 
 /**
  * Obtiene el precio actual del activo.
- * Crypto → CoinGecko
- * Todo lo demás → Yahoo Finance (sin API key, funciona en plan gratuito)
- *                con fallback a Finnhub si Yahoo falla.
+ * Crypto → Binance (mejor liquidez y datos en tiempo real)
+ * Todo lo demás → Yahoo Finance con fallback a Finnhub
  */
 async function getPriceData(symbol: string) {
   const assetType = getAssetType(symbol);
 
   if (assetType === 'crypto') {
-    const coinId = COINGECKO_IDS[symbol] || 'bitcoin';
-    const coinPrice = await marketService.getCoinPrice(coinId);
-    return {
-      symbol,
-      price: coinPrice.price,
-      change: (coinPrice.price * coinPrice.priceChangePercentage24h) / 100,
-      changePercent: coinPrice.priceChangePercentage24h,
-      marketCap: coinPrice.marketCap,
-      volume24h: coinPrice.volume24h,
-      source: 'CoinGecko',
-      type: 'crypto',
-      timestamp: coinPrice.lastUpdated,
-    };
+    try {
+      // Proveedor principal: Binance
+      const price = await binanceService.getCurrentPrice(symbol);
+      const data24h = await binanceService.get24hData(symbol);
+      return {
+        symbol,
+        price,
+        change: parseFloat(data24h.priceChange || 0),
+        changePercent: parseFloat(data24h.priceChangePercent || 0),
+        marketCap: data24h.quoteAssetVolume ? parseFloat(data24h.quoteAssetVolume) : 0,
+        volume24h: data24h.volume ? parseFloat(data24h.volume) : 0,
+        source: 'Binance',
+        type: 'crypto',
+        timestamp: Date.now(),
+      };
+    } catch (binanceErr) {
+      console.warn(`Binance price failed for ${symbol}, trying CoinGecko:`, binanceErr);
+      // Fallback: CoinGecko
+      try {
+        const coinId = COINGECKO_IDS[symbol] || 'bitcoin';
+        const coinPrice = await marketService.getCoinPrice(coinId);
+        return {
+          symbol,
+          price: coinPrice.price,
+          change: (coinPrice.price * coinPrice.priceChangePercentage24h) / 100,
+          changePercent: coinPrice.priceChangePercentage24h,
+          marketCap: coinPrice.marketCap,
+          volume24h: coinPrice.volume24h,
+          source: 'CoinGecko',
+          type: 'crypto',
+          timestamp: coinPrice.lastUpdated,
+        };
+      } catch (coingeckoErr) {
+        throw new Error(`No se puede obtener precio para ${symbol}`);
+      }
+    }
   }
 
   // Stocks, índices, forex, commodities → Yahoo Finance primero

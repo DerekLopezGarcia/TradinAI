@@ -44,8 +44,8 @@ export function Header({ onMenuClick }: HeaderProps) {
   const isPositive = selectedAsset.changePercent >= 0;
 
   return (
-    <header className="glass sticky top-0 z-50 backdrop-blur-xl">
-      <div className="px-6 py-4">
+    <header className="glass sticky top-0 z-50 backdrop-blur-xl" suppressHydrationWarning>
+      <div className="px-6 py-4" suppressHydrationWarning>
         {/* Primera línea: Logo y controles */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-4">
