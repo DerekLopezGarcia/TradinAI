@@ -402,22 +402,18 @@ interface MarketStore {
   assets: Asset[];
   selectedAsset: Asset | null;
   selectedTimeframe: TimeFrame;
-  darkMode: boolean;
   favorites: string[];
   chatMessages: ChatMessage[];
   alerts: Alert[];
 
-  // Actions
   setSelectedAsset: (asset: Asset) => void;
   setSelectedTimeframe: (timeframe: TimeFrame) => void;
-  setDarkMode: (dark: boolean) => void;
   toggleFavorite: (symbol: string) => void;
   updateAssetPrice: (symbol: string, price: number, change: number, changePercent: number) => void;
   addChatMessage: (message: ChatMessage) => void;
   clearChatMessages: () => void;
   addAlert: (alert: Alert) => void;
   removeAlert: (alertId: string) => void;
-  updateAlert: (alertId: string, triggered: boolean) => void;
   addAsset: (data: { symbol: string; name: string; type: string }) => void;
 }
 
@@ -427,16 +423,13 @@ export const useMarketStore = create<MarketStore>()(
       assets: MOCK_ASSETS,
       selectedAsset: MOCK_ASSETS[0],
       selectedTimeframe: '1h',
-      darkMode: true,
-      favorites: ['BTCUSD', 'ETHUSD', 'AAPL', 'TSLA'],
+      favorites: ['BTCUSD', 'ETHUSD', 'AAPL', 'TSLA', 'SPX'],
       chatMessages: [],
       alerts: [],
 
       setSelectedAsset: (asset) => set({ selectedAsset: asset }),
 
       setSelectedTimeframe: (timeframe) => set({ selectedTimeframe: timeframe }),
-
-      setDarkMode: (dark) => set({ darkMode: dark }),
 
       toggleFavorite: (symbol) =>
         set((state) => {
@@ -483,15 +476,6 @@ export const useMarketStore = create<MarketStore>()(
           alerts: state.alerts.filter((a) => a.id !== alertId),
         })),
 
-      updateAlert: (alertId, triggered) =>
-        set((state) => ({
-          alerts: state.alerts.map((a) =>
-            a.id === alertId
-              ? { ...a, triggeredAt: triggered ? Date.now() : undefined }
-              : a
-          ),
-        })),
-
       addAsset: (data) =>
         set((state) => {
           const newAsset: Asset = {
@@ -512,7 +496,6 @@ export const useMarketStore = create<MarketStore>()(
     {
       name: 'trading-ia-store',
       partialize: (state) => ({
-        darkMode: state.darkMode,
         favorites: state.favorites,
         selectedTimeframe: state.selectedTimeframe,
         alerts: state.alerts,

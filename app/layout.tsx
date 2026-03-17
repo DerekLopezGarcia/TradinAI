@@ -1,9 +1,11 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { ThemeProvider } from '@/components/theme-provider';
+import { Toaster } from 'react-hot-toast';
 
 export const metadata: Metadata = {
-  title: 'TradingIA - Análisis de Mercado con IA',
-  description: 'Plataforma completa de análisis de mercado financiero con inteligencia artificial',
+  title: 'TradinAI - Análisis de Mercado con IA',
+  description: 'Plataforma de análisis de mercado financiero con inteligencia artificial',
   keywords: ['trading', 'análisis técnico', 'mercado financiero', 'crypto', 'stocks'],
 };
 
@@ -18,8 +20,26 @@ export default function RootLayout({
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
-      <body>
-        {children}
+      <body className="antialiased bg-background text-foreground">
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem={false}
+          disableTransitionOnChange={false}
+        >
+          {children}
+          <Toaster
+            position="bottom-right"
+            toastOptions={{
+              duration: 4000,
+              style: {
+                background: 'hsl(var(--card))',
+                color: 'hsl(var(--foreground))',
+                border: '1px solid hsl(var(--border))',
+              },
+            }}
+          />
+        </ThemeProvider>
       </body>
     </html>
   );

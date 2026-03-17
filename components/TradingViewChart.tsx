@@ -16,6 +16,7 @@ import {
 } from 'lightweight-charts';
 import { CandleData } from '@/lib/types';
 import { calculateRSI, calculateSMA, calculateEMA, calculateADX, calculateStochastic, calculateBollingerBands } from '@/lib/indicators';
+import { useTheme } from 'next-themes';
 
 interface TradingViewChartProps {
   data: CandleData[];
@@ -56,6 +57,9 @@ export function TradingViewChart({
   const initialZoomDone = useRef<boolean>(false);
   const userInteractedRef = useRef<boolean>(false);
 
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
+
   const [chartReady, setChartReady] = useState(false);
   const [rsiReady,   setRsiReady]   = useState(false);
   const [rsiValue,   setRsiValue]   = useState<number | null>(null);
@@ -64,6 +68,17 @@ export function TradingViewChart({
   const [adxValue,   setAdxValue]   = useState<number | null>(null);
   const [stochasticK, setStochasticK] = useState<number | null>(null);
   const [stochasticD, setStochasticD] = useState<number | null>(null);
+
+  // Theme-aware colors
+  const colors = useMemo(() => ({
+    background: isDark ? '#0f172a' : '#ffffff',
+    text: isDark ? '#94a3b8' : '#475569',
+    grid: isDark ? '#1e293b' : '#e2e8f0',
+    border: isDark ? '#334155' : '#cbd5e1',
+    upColor: '#22c55e',
+    downColor: '#ef4444',
+    rsiColor: '#8b5cf6',
+  }), [isDark]);
 
   const toUTC = useCallback((ms: number): UTCTimestamp =>
     Math.floor(ms / 1000) as UTCTimestamp, []);
@@ -156,33 +171,79 @@ export function TradingViewChart({
       .sort((a, b) => (a.time as number) - (b.time as number)) as LineData[];
   }, [data, toUTC]);
 
+  // Actualizar colores cuando cambia el tema
+  useEffect(() => {
+    if (!chartRef.current) return;
+
+    chartRef.current.applyOptions({
+      layout: {
+        background: { type: ColorType.Solid, color: colors.background },
+        textColor: colors.text,
+      },
+      grid: {
+        vertLines: { color: colors.grid, style: LineStyle.Solid },
+        horzLines: { color: colors.grid, style: LineStyle.Solid },
+      },
+      crosshair: {
+        vertLine: { color: '#64748b', labelBackgroundColor: colors.border },
+        horzLine: { color: '#64748b', labelBackgroundColor: colors.border },
+      },
+      rightPriceScale: {
+        borderColor: colors.border,
+        textColor: colors.text,
+      },
+      timeScale: {
+        borderColor: colors.border,
+      },
+    });
+
+    if (rsiChartRef.current) {
+      rsiChartRef.current.applyOptions({
+        layout: {
+          background: { type: ColorType.Solid, color: colors.background },
+          textColor: colors.text,
+        },
+        grid: {
+          vertLines: { color: colors.grid },
+          horzLines: { color: colors.grid },
+        },
+        rightPriceScale: {
+          borderColor: colors.border,
+        },
+        timeScale: {
+          borderColor: colors.border,
+        },
+      });
+    }
+  }, [colors]);
+
   // ...existing code...
   useEffect(() => {
     if (!containerRef.current || chartRef.current) return;
 
     const chart = createChart(containerRef.current, {
       layout: {
-        background: { type: ColorType.Solid, color: '#0d1117' },
-        textColor: '#9ca3af',
+        background: { type: ColorType.Solid, color: colors.background },
+        textColor: colors.text,
         fontFamily: "'Inter', system-ui, sans-serif",
         fontSize: 12,
       },
       grid: {
-        vertLines: { color: '#1f2937', style: LineStyle.Solid },
-        horzLines: { color: '#1f2937', style: LineStyle.Solid },
+        vertLines: { color: colors.grid, style: LineStyle.Solid },
+        horzLines: { color: colors.grid, style: LineStyle.Solid },
       },
       crosshair: {
         mode: CrosshairMode.Normal,
-        vertLine: { color: '#475569', labelBackgroundColor: '#1e293b' },
-        horzLine: { color: '#475569', labelBackgroundColor: '#1e293b' },
+        vertLine: { color: '#64748b', labelBackgroundColor: colors.border },
+        horzLine: { color: '#64748b', labelBackgroundColor: colors.border },
       },
       rightPriceScale: {
-        borderColor: '#1f2937',
-        textColor: '#9ca3af',
+        borderColor: colors.border,
+        textColor: colors.text,
         scaleMargins: { top: 0.06, bottom: showVolume ? 0.24 : 0.06 },
       },
       timeScale: {
-        borderColor: '#1f2937',
+        borderColor: colors.border,
         timeVisible: true,
         secondsVisible: false,
         rightOffset: 5,
@@ -282,11 +343,11 @@ export function TradingViewChart({
       try {
         // Crear chart RSI nuevo
         const rsiChart = createChart(rsiContainerRef.current, {
-          layout: { background: { type: ColorType.Solid, color: '#0d1117' }, textColor: '#9ca3af' },
-          grid: { vertLines: { color: '#1f2937' }, horzLines: { color: '#1f2937' } },
-          rightPriceScale: { borderColor: '#1f2937', autoScale: true, scaleMargins: { top: 0.2, bottom: 0.2 } },
-          timeScale: { 
-            borderColor: '#1f2937', 
+          layout: { background: { type: ColorType.Solid, color: colors.background }, textColor: colors.text },
+          grid: { vertLines: { color: colors.grid }, horzLines: { color: colors.grid } },
+          rightPriceScale: { borderColor: colors.border, autoScale: true, scaleMargins: { top: 0.2, bottom: 0.2 } },
+          timeScale: {
+            borderColor: colors.border,
             timeVisible: true,
             secondsVisible: true,
           },
@@ -297,7 +358,7 @@ export function TradingViewChart({
         rsiChartRef.current = rsiChart;
 
         // Agregar línea del RSI
-        const rsiLine = rsiChart.addLineSeries({ color: '#818cf8', lineWidth: 2 });
+        const rsiLine = rsiChart.addLineSeries({ color: colors.rsiColor, lineWidth: 2 });
         rsiSeriesRef.current = rsiLine;
 
         // Líneas de referencia
