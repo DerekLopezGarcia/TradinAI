@@ -37,7 +37,8 @@ export class DataCacheManager extends BaseService {
     stock: 10 * 60 * 1000,        // 10 minutos - menos volátil
     forex: 1 * 60 * 1000,         // 1 minuto - muy volátil
     index: 10 * 60 * 1000,        // 10 minutos
-    commodity: 15 * 60 * 1000     // 15 minutos - muy estable
+    commodity: 15 * 60 * 1000,    // 15 minutos - muy estable
+    futures: 2 * 60 * 1000        // 2 minutos - muy volátil como forex
   };
 
   constructor(logger?: Logger) {
