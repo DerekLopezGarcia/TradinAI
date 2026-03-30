@@ -12,15 +12,34 @@ import {
   providerManager,
   DataProviderResult
 } from '@/lib/services/dataProviderFactory';
-import { registerDefaultProviders } from '@/lib/services/dataProviders';
+import {
+  BinanceProvider,
+  TwelveDataProvider,
+  YahooFinanceProvider,
+  QuandlProvider,
+  CoinGeckoProvider
+} from '@/lib/services/dataProviders';
 
-// Registrar proveedores al iniciar
+// Registrar proveedores al iniciar - DIRECTO SIN REQUIRE
 let providersInitialized = false;
 
 function initializeProviders() {
   if (!providersInitialized) {
-    registerDefaultProviders();
-    providersInitialized = true;
+    try {
+      // Registrar cada proveedor directamente
+      providerManager.register(new BinanceProvider());
+      providerManager.register(new TwelveDataProvider());
+      providerManager.register(new YahooFinanceProvider());
+      providerManager.register(new QuandlProvider());
+      providerManager.register(new CoinGeckoProvider());
+      
+      console.log('✅ Providers initialized successfully');
+      providersInitialized = true;
+    } catch (error) {
+      console.error('❌ Error initializing providers:', error);
+      providersInitialized = false;
+      throw error;
+    }
   }
 }
 
@@ -32,6 +51,7 @@ export async function GET(request: NextRequest) {
 
     // Validar entrada
     if (!validateSymbol(symbol)) {
+      console.warn(`❌ Invalid symbol: ${symbol}`);
       return NextResponse.json(
         { error: 'Invalid symbol', symbol },
         { status: 400 }
@@ -40,6 +60,7 @@ export async function GET(request: NextRequest) {
 
     const validIntervals: TimeFrame[] = ['1m', '5m', '15m', '1h', '4h', '1d', '1w'];
     if (!validIntervals.includes(interval)) {
+      console.warn(`❌ Invalid interval: ${interval}`);
       return NextResponse.json(
         { error: 'Invalid interval', interval },
         { status: 400 }
@@ -52,13 +73,23 @@ export async function GET(request: NextRequest) {
     console.log(`📊 /api/market/candles: ${symbol} (${assetType}) [${interval}]`);
 
     // Inicializar proveedores
-    initializeProviders();
+    try {
+      initializeProviders();
+    } catch (initError) {
+      console.error('❌ Failed to initialize providers:', initError);
+      return NextResponse.json(
+        { error: 'Provider initialization failed', details: String(initError) },
+        { status: 500 }
+      );
+    }
+
+    console.log(`✅ Providers initialized, attempting to fetch data...`);
 
     // Intentar obtener datos de los proveedores disponibles
     const result = await providerManager.fetchFromProviders(symbol, assetType, interval);
 
     if (!result) {
-      console.warn(`❌ No data available for ${symbol}`);
+      console.warn(`❌ No data available for ${symbol} after trying all providers`);
       return NextResponse.json(
         { error: `No data available for ${symbol}`, symbol, type: assetType },
         { status: 404 }

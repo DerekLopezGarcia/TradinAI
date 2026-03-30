@@ -216,15 +216,27 @@ export class QuandlProvider implements IDataProvider {
 // ============================================================================
 
 export function registerDefaultProviders() {
-  const { providerManager } = require('./dataProviderFactory');
+  // Importar aquí para evitar circular dependency
+  const { providerManager } = require('./dataProviderFactory') as any;
   
-  providerManager.register(new BinanceProvider());
-  providerManager.register(new TwelveDataProvider());
-  providerManager.register(new YahooFinanceProvider());
-  providerManager.register(new QuandlProvider());
-  providerManager.register(new CoinGeckoProvider());
+  // Verificar que providerManager existe
+  if (!providerManager) {
+    console.error('❌ ERROR: providerManager no está disponible. Circular dependency?');
+    throw new Error('Cannot register providers: providerManager is undefined');
+  }
+  
+  try {
+    providerManager.register(new BinanceProvider());
+    providerManager.register(new TwelveDataProvider());
+    providerManager.register(new YahooFinanceProvider());
+    providerManager.register(new QuandlProvider());
+    providerManager.register(new CoinGeckoProvider());
 
-  console.log('✅ Data providers registered');
+    console.log('✅ Data providers registered successfully');
+  } catch (error) {
+    console.error('❌ Error registering providers:', error);
+    throw error;
+  }
 }
 
 

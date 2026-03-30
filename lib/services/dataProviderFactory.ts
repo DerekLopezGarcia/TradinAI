@@ -170,32 +170,42 @@ export class DataProviderManager {
   ): Promise<DataProviderResult | null> {
     const providers = this.getProviders(symbol, type);
     
+    console.log(`🔍 Found ${providers.length} providers for ${symbol} (${type}): ${providers.map(p => p.name).join(', ')}`);
+    
     if (providers.length === 0) {
-      console.warn(`❌ No providers available for ${symbol} (${type})`);
+      console.warn(`❌ CRITICAL: No providers available for ${symbol} (${type})`);
       return null;
     }
 
     for (const provider of providers) {
+      let startTime = 0;
       try {
-        console.log(`🔄 Attempting ${provider.name} for ${symbol}...`);
+        console.log(`  🔄 Attempting ${provider.name} for ${symbol}/${interval}...`);
+        startTime = Date.now();
+        
         const candles = await Promise.race([
           provider.fetch(symbol, interval),
           new Promise<CandleData[]>((_, reject) =>
-            setTimeout(() => reject(new Error('Timeout')), 10000)
+            setTimeout(() => reject(new Error(`Timeout after 5s`)), 5000)
           )
         ]);
 
+        const elapsed = Date.now() - startTime;
+        
         if (candles && candles.length > 0) {
-          console.log(`✅ ${provider.name}: ${candles.length} candles for ${symbol}`);
+          console.log(`  ✅ ${provider.name}: ${candles.length} candles in ${elapsed}ms`);
           return {
             candles,
             source: provider.name,
             isFallback: provider !== providers[0],
             timestamp: Date.now()
           };
+        } else {
+          console.log(`  ⚠️ ${provider.name}: returned empty data (${elapsed}ms)`);
         }
       } catch (error) {
-        console.warn(`⚠️ ${provider.name} failed: ${error}`);
+        const elapsed = startTime > 0 ? Date.now() - startTime : 0;
+        console.warn(`  ❌ ${provider.name} failed (${elapsed}ms): ${error instanceof Error ? error.message : String(error)}`);
         continue;
       }
     }
