@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "next lint",
     "security-check": "node scripts/security-check.js",
-    "pre-push": "npm run security-check && npm run lint"
+    "validate-no-mocks": "node scripts/validate-no-mocks.js",
+    "pre-push": "npm run security-check && npm run validate-no-mocks && npm run lint"
   },
   "dependencies": {
     "@types/react": "^19.0.0",
