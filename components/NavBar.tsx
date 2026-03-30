@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Plus, X, Heart, ChevronDown, Loader2 } from 'lucide-react';
+import { Search, Plus, X, Heart, ChevronDown, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useMarketStore } from '@/lib/store';
 import { getCategories, getAssetsByCategory, getAssetDescription } from '@/lib/scannerAssets';
 import { priceCache } from '@/lib/services/priceCache';
@@ -78,6 +78,8 @@ export function NavBar({ selectedType, searchQuery, onSearchChange }: NavBarProp
 
   // Estado para rastrear cuáles símbolos fallaron en la carga
   const [failedSymbols, setFailedSymbols] = useState<Set<string>>(new Set());
+  // T1.2: Estado para paginación por tipo
+  const [pagination, setPagination] = useState<Record<string, number>>({});
   const failedSymbolsRef = useRef<Map<string, Set<string>>>(new Map());
 
   // Cargar precios de los activos de un tipo cuando se abre su dropdown
@@ -261,6 +263,8 @@ export function NavBar({ selectedType, searchQuery, onSearchChange }: NavBarProp
       setOpenDropdown(null);
     } else {
       setOpenDropdown(type);
+      // T1.2: Resetear paginación al abrir dropdown
+      setPagination(prev => ({ ...prev, [type]: 0 }));
       fetchPricesForType(type);
     }
   };
@@ -389,7 +393,7 @@ export function NavBar({ selectedType, searchQuery, onSearchChange }: NavBarProp
                   </button>
 
                   {isOpen && (
-                    <div className="absolute top-full left-0 mt-1 w-56 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden">
+                    <div className="absolute top-full left-0 mt-1 w-56 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden flex flex-col">
                       {/* Spinner mientras carga */}
                       {isLoading && !hasData ? (
                         <div className="flex items-center justify-center py-6 gap-2 text-muted-foreground text-sm">
@@ -397,46 +401,89 @@ export function NavBar({ selectedType, searchQuery, onSearchChange }: NavBarProp
                           Cargando precios...
                         </div>
                       ) : (
-                        <div className="max-h-64 overflow-y-auto py-1">
-                          {filteredList.length === 0 ? (
-                            <p className="text-xs text-muted-foreground px-3 py-3">Sin resultados</p>
-                          ) : (
-                            filteredList.map((asset) => {
-                              const isFailed = failedSymbolsRef.current.get(type.value)?.has(asset.symbol) ?? false;
-                              return (
-                                <div key={asset.id} className="flex items-center justify-between px-3 py-2 hover:bg-muted/50 cursor-pointer transition-colors group"
-                                  onClick={() => !isFailed && handleSelectAsset(asset.id)}>
-                                  <div className="flex-1">
-                                    <p className="text-sm font-semibold text-foreground">{asset.symbol}</p>
-                                    <p className="text-xs text-muted-foreground">{asset.name}</p>
-                                  </div>
-                                  <div className="flex items-center gap-2 ml-2">
-                                    <div className="text-right">
-                                      {isFailed ? (
-                                        <p className="text-xs text-destructive font-medium">No cargó</p>
-                                      ) : asset.price > 0 ? (
-                                        <>
-                                          <p className="text-xs font-mono font-bold text-foreground">${asset.price.toFixed(2)}</p>
-                                          <p className={`text-xs font-bold ${asset.changePercent >= 0 ? 'price-up' : 'price-down'}`}>
-                                            {asset.changePercent >= 0 ? '+' : ''}{asset.changePercent.toFixed(2)}%
-                                          </p>
-                                        </>
-                                      ) : (
-                                        <p className="text-xs text-muted-foreground">--</p>
-                                      )}
-                                    </div>
-                                    {type.value === 'favorites' && (
-                                      <button onClick={(e) => { e.stopPropagation(); toggleFavorite(asset.symbol); }}
-                                        className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-muted transition-all">
-                                        <Heart className="w-3 h-3 fill-red-500 text-red-500" />
-                                      </button>
-                                    )}
-                                  </div>
+                        <>
+                          {/* T1.2: Paginación - 20 items por página */}
+                          {(() => {
+                            const ITEMS_PER_PAGE = 20;
+                            const currentPage = pagination[type.value] || 0;
+                            const startIdx = currentPage * ITEMS_PER_PAGE;
+                            const endIdx = startIdx + ITEMS_PER_PAGE;
+                            const paginatedList = filteredList.slice(startIdx, endIdx);
+                            const totalPages = Math.ceil(filteredList.length / ITEMS_PER_PAGE);
+                            const hasNextPage = currentPage < totalPages - 1;
+                            const hasPrevPage = currentPage > 0;
+
+                            return (
+                              <>
+                                <div className="max-h-64 overflow-y-auto py-1">
+                                  {filteredList.length === 0 ? (
+                                    <p className="text-xs text-muted-foreground px-3 py-3">Sin resultados</p>
+                                  ) : (
+                                    paginatedList.map((asset) => {
+                                      const isFailed = failedSymbolsRef.current.get(type.value)?.has(asset.symbol) ?? false;
+                                      return (
+                                        <div key={asset.id} className="flex items-center justify-between px-3 py-2 hover:bg-muted/50 cursor-pointer transition-colors group"
+                                          onClick={() => !isFailed && handleSelectAsset(asset.id)}>
+                                          <div className="flex-1">
+                                            <p className="text-sm font-semibold text-foreground">{asset.symbol}</p>
+                                            <p className="text-xs text-muted-foreground">{asset.name}</p>
+                                          </div>
+                                          <div className="flex items-center gap-2 ml-2">
+                                            <div className="text-right">
+                                              {isFailed ? (
+                                                <p className="text-xs text-destructive font-medium">No cargó</p>
+                                              ) : asset.price > 0 ? (
+                                                <>
+                                                  <p className="text-xs font-mono font-bold text-foreground">${asset.price.toFixed(2)}</p>
+                                                  <p className={`text-xs font-bold ${asset.changePercent >= 0 ? 'price-up' : 'price-down'}`}>
+                                                    {asset.changePercent >= 0 ? '+' : ''}{asset.changePercent.toFixed(2)}%
+                                                  </p>
+                                                </>
+                                              ) : (
+                                                <p className="text-xs text-muted-foreground">--</p>
+                                              )}
+                                            </div>
+                                            {type.value === 'favorites' && (
+                                              <button onClick={(e) => { e.stopPropagation(); toggleFavorite(asset.symbol); }}
+                                                className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-muted transition-all">
+                                                <Heart className="w-3 h-3 fill-red-500 text-red-500" />
+                                              </button>
+                                            )}
+                                          </div>
+                                        </div>
+                                      );
+                                    })
+                                  )}
                                 </div>
-                              );
-                            })
-                          )}
-                        </div>
+
+                                {/* T1.2: Controles de paginación */}
+                                {filteredList.length > ITEMS_PER_PAGE && (
+                                  <div className="flex items-center justify-between px-3 py-2 border-t border-border bg-muted/20">
+                                    <button
+                                      onClick={() => setPagination(prev => ({ ...prev, [type.value]: Math.max(0, (prev[type.value] || 0) - 1) }))}
+                                      disabled={!hasPrevPage}
+                                      className="p-1 rounded hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                      title="Página anterior"
+                                    >
+                                      <ChevronLeft className="w-3 h-3" />
+                                    </button>
+                                    <span className="text-xs text-muted-foreground">
+                                      {currentPage + 1} / {totalPages}
+                                    </span>
+                                    <button
+                                      onClick={() => setPagination(prev => ({ ...prev, [type.value]: Math.min(totalPages - 1, (prev[type.value] || 0) + 1) }))}
+                                      disabled={!hasNextPage}
+                                      className="p-1 rounded hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                      title="Próxima página"
+                                    >
+                                      <ChevronRight className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </>
                       )}
                     </div>
                   )}
