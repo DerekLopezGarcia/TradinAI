@@ -2,8 +2,14 @@ import { NewsItem, Sentiment } from '@/lib/types';
 
 /**
  * Servicio centralizado para obtener y gestionar noticias
- * Soporta: Finnhub para acciones, NewsAPI para criptomonedas y búsquedas generales
+ * Soporta: Finnhub para acciones, NewsAPI deshabilitado (401 error)
+ * 
+ * ⚠️ NewsAPI deshabilitado hasta tener key válida
  */
+
+// Control de qué APIs usar
+const USE_FINNHUB = true;
+const USE_NEWS_API = false;  // ← Deshabilitado: retorna 401
 
 class NewsService {
   private finnhubApiKey: string;
@@ -16,6 +22,10 @@ class NewsService {
     // Si no están disponibles (client-side), usar vacías (forzar server-side API call)
     this.finnhubApiKey = process.env.FINNHUB_KEY || '';
     this.newsApiKey = process.env.NEWS_API_KEY || '';
+    
+    if (USE_NEWS_API && !this.newsApiKey) {
+      console.warn('⚠️ NewsAPI deshabilitado: Sin key válida (401 error)');
+    }
   }
 
   /**
@@ -170,11 +180,18 @@ class NewsService {
 
   /**
    * Obtiene noticias de criptomonedas usando NewsAPI
+   * ⚠️ DESHABILITADO: NewsAPI retorna 401 (key inválida)
    * @param coin - Nombre o símbolo de la criptomoneda (ej: bitcoin, ethereum)
    * @param limit - Número máximo de artículos (default: 10)
-   * @returns Array de NewsItem
+   * @returns Array vacío (deshabilitado)
    */
   async getCryptoNews(coin: string, limit: number = 10): Promise<NewsItem[]> {
+    // ⚠️ NewsAPI deshabilitado hasta tener key válida
+    if (!USE_NEWS_API) {
+      console.log(`⚠️ getCryptoNews deshabilitado para ${coin} (NewsAPI: 401 error)`);
+      return [];
+    }
+
     const cacheKey = `crypto_news_${coin}_${limit}`;
     const cached = this.getFromCache(cacheKey);
     if (cached) return cached;
