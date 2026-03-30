@@ -291,11 +291,31 @@ async function getHistoryData(symbol: string, interval: TimeFrame) {
       yahooSymbol = COMMODITIES_SYMBOL_MAP[symbol] || symbol;
     }
     
-    const data = await marketService.getStockHistory(yahooSymbol, interval, days);
-    if (!data || data.length === 0) {
-      throw new Error(`No hay datos históricos para ${symbol} (${yahooSymbol})`);
+    try {
+      const data = await marketService.getStockHistory(yahooSymbol, interval, days);
+      if (!data || data.length === 0) {
+        throw new Error(`No hay datos históricos para ${symbol} (${yahooSymbol})`);
+      }
+      return { symbol, interval, data, source: 'Finnhub/Yahoo', isFallback: false, timestamp: Date.now() };
+    } catch (mappedErr) {
+      // Si el mapeo falla, intentar con el símbolo directo
+      if (['DXY', 'MIB'].includes(symbol)) {
+        console.log(`📊 Index ${symbol}: mapping falló, intentando símbolo directo`);
+      }
+      
+      try {
+        const data = await marketService.getStockHistory(symbol, interval, days);
+        if (!data || data.length === 0) {
+          throw new Error(`No hay datos históricos para ${symbol}`);
+        }
+        if (['DXY', 'MIB'].includes(symbol)) {
+          console.log(`✅ Obtuvo ${data.length} candles para ${symbol}`);
+        }
+        return { symbol, interval, data, source: 'Finnhub/Yahoo', isFallback: false, timestamp: Date.now() };
+      } catch (directErr) {
+        throw new Error(`No hay datos históricos para ${symbol} (intent ambos: ${yahooSymbol} y ${symbol})`);
+      }
     }
-    return { symbol, interval, data, source: 'Finnhub/Yahoo', isFallback: false, timestamp: Date.now() };
   }
 }
 
@@ -409,24 +429,47 @@ async function getPriceData(symbol: string) {
       console.log(`💰 getPriceData: ${symbol} → Yahoo: ${yahooSymbol}`);
     }
     
-    const yp = await marketService.getYahooPrice(yahooSymbol);
-    
-    if (['DXY', 'MIB'].includes(symbol)) {
-      console.log(`✅ Yahoo price para ${symbol}: ${yp.price}`);
+    try {
+      const yp = await marketService.getYahooPrice(yahooSymbol);
+      
+      if (['DXY', 'MIB'].includes(symbol)) {
+        console.log(`✅ Yahoo price para ${symbol}: ${yp.price}`);
+      }
+      
+      return {
+        symbol,
+        price: yp.price,
+        change: yp.change,
+        changePercent: yp.changePercent,
+        source: 'Yahoo Finance',
+        type: assetType,
+        timestamp: Date.now(),
+      };
+    } catch (yahooPrimaryErr) {
+      // Si el mapeo falla, intentar con el símbolo directo
+      if (['DXY', 'MIB'].includes(symbol)) {
+        console.log(`⚠️ Yahoo mapping falló para ${yahooSymbol}, intentando con símbolo directo: ${symbol}`);
+      }
+      
+      const yp = await marketService.getYahooPrice(symbol);
+      
+      if (['DXY', 'MIB'].includes(symbol)) {
+        console.log(`✅ Yahoo price (directo) para ${symbol}: ${yp.price}`);
+      }
+      
+      return {
+        symbol,
+        price: yp.price,
+        change: yp.change,
+        changePercent: yp.changePercent,
+        source: 'Yahoo Finance',
+        type: assetType,
+        timestamp: Date.now(),
+      };
     }
-    
-    return {
-      symbol,
-      price: yp.price,
-      change: yp.change,
-      changePercent: yp.changePercent,
-      source: 'Yahoo Finance',
-      type: assetType,
-      timestamp: Date.now(),
-    };
   } catch (yahooErr) {
     if (['DXY', 'MIB'].includes(symbol)) {
-      console.warn(`⚠️ Yahoo price failed para ${symbol}: ${yahooErr}, trying Finnhub`);
+      console.warn(`⚠️ Yahoo completamente falló para ${symbol}: ${yahooErr}, trying Finnhub`);
     } else {
       console.warn(`Yahoo price failed for ${symbol}, trying Finnhub:`, yahooErr);
     }
