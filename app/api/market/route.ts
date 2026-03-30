@@ -163,8 +163,28 @@ const CRYPTO_SYMBOLS = Object.keys(COINGECKO_IDS);
 
 /** Símbolos de acciones */
 const STOCK_SYMBOLS = new Set([
-  'AAPL', 'GOOGL', 'TSLA', 'MSFT', 'AMZN', 'META', 'NVDA',
-  'JPM', 'BAC', 'GS', 'BA', 'CAT', 'MMM'
+  // Tecnología
+  'AAPL', 'GOOGL', 'GOOG', 'MSFT', 'AMZN', 'META', 'NVDA', 'TSLA', 'NFLX', 'ADBE',
+  'INTC', 'AMD', 'QCOM', 'CSCO', 'ORCL', 'IBM', 'CRM', 'SHOP', 'SQ', 'PYPL',
+  
+  // Bancos & Finanzas
+  'JPM', 'BAC', 'WFC', 'GS', 'MS', 'BLK', 'PNC', 'USB', 'KEY', 'SPG',
+  
+  // Consumo & Retail
+  'MCD', 'SBUX', 'WMT', 'TGT', 'KR', 'CVS', 'HD', 'LOW', 'PG', 'KO',
+  'PEP', 'MDLZ', 'GIS', 'COST', 'CLX', 'NKE', 'LULU', 'DECK',
+  
+  // Salud
+  'JNJ', 'PFE', 'MRNA', 'BNTX', 'NVAX', 'REGN', 'BIIB', 'AMGN', 'GILD',
+  
+  // Energía
+  'XOM', 'CVX', 'OKE', 'KMI', 'ENB',
+  
+  // Industriales & Materials
+  'BA', 'RTX', 'LMT', 'GE', 'HON', 'CAT', 'DE', 'ARCH', 'WRK',
+  
+  // Más commodities relacionados
+  'FCX', 'NEM', 'AA', 'RS'
 ]);
 
 /** Símbolos de índices */
@@ -190,7 +210,21 @@ const FOREX_SYMBOLS = new Set([
 
 /** Símbolos de commodities */
 const COMMODITY_SYMBOLS = new Set([
-  'XAUUSD', 'XAGUSD', 'XPTUSD', 'XPDUSD', 'COPPER', 'CRUDE', 'NATGAS'
+  // Metales Preciosos
+  'XAUUSD', 'GOLD', 'XAGUSD', 'SILVER',
+  
+  // Metales Industriales
+  'COPPER', 'XPTUSD', 'XPDUSD', 'NICKEL', 'ALUMINUM', 'ZINC', 'TIN', 'LEAD',
+  
+  // Energía
+  'CRUDE', 'CL', 'BRENT', 'BZ', 'NATGAS', 'NG', 'HEATING_OIL', 'COAL',
+  
+  // Agrícola
+  'WHEAT', 'ZW', 'CORN', 'ZC', 'SOYBEANS', 'ZS', 'SUGAR', 'SB', 'COFFEE', 'KC',
+  'COCOA', 'CC', 'COTTON', 'CT', 'ORANGE_JUICE', 'OJ',
+  
+  // Otros
+  'LUMBER', 'LBS', 'RUBBER'
 ]);
 
 // ==================== FUNCIONES AUXILIARES ====================
