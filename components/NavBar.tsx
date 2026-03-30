@@ -50,6 +50,11 @@ const ALL_ASSET_TYPES = [...ASSET_TYPES, ...SCANNER_CATEGORIES];
 
 // Fix: Función para determinar tipo de activo por símbolo
 function determinateAssetType(symbol: string): string {
+  // Futuros - símbolos cortos específicos
+  if (['CL', 'BZ', 'NG', 'ZW', 'ZC', 'ZS', 'SB', 'KC', 'CC', 'CT', 'LBS', 'ES'].includes(symbol)) {
+    return 'futures'; // Ej: CL, BZ, NG
+  }
+  
   // Criptos terminan con USD
   if (symbol.endsWith('USD') && symbol.length <= 8) {
     return 'crypto'; // Ej: BTCUSD, ETHUSD
@@ -69,7 +74,7 @@ function determinateAssetType(symbol: string): string {
   }
   
   // Commodities
-  if (['WTI', 'BRENT', 'NATGAS', 'COPPER', 'GOLD', 'SILVER'].includes(symbol)) {
+  if (['GOLD', 'SILVER', 'COPPER', 'PLATINUM', 'PALLADIUM', 'NICKEL', 'ALUMINUM', 'ZINC', 'FCX', 'NEM', 'SCCO', 'ALB', 'ARCH', 'WRK', 'IP', 'PKG'].includes(symbol)) {
     return 'commodity';
   }
   

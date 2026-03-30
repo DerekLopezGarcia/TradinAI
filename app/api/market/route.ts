@@ -90,6 +90,31 @@ const FOREX_SYMBOL_MAP: Record<string, string> = {
   'DKKUSD': 'DKK=X',
 };
 
+/** Mapeo de símbolos Futuros a formato Yahoo Finance (=F) */
+const FUTURES_SYMBOL_MAP: Record<string, string> = {
+  // Energía
+  'CL': 'CL=F',      // Petróleo WTI (NYMEX)
+  'BZ': 'BZ=F',      // Petróleo Brent (ICE)
+  'NG': 'NG=F',      // Gas Natural (NYMEX)
+  
+  // Granos (CBOT)
+  'ZW': 'ZWH=F',     // Trigo
+  'ZC': 'ZCZ=F',     // Maíz
+  'ZS': 'ZSZ=F',     // Soja
+  
+  // Suave (ICE)
+  'SB': 'SB=F',      // Azúcar
+  'KC': 'KC=F',      // Café
+  'CC': 'CC=F',      // Cacao
+  'CT': 'CT=F',      // Algodón
+  
+  // Madera (CBOT)
+  'LBS': 'LBS=F',    // Madera
+  
+  // Índices (CME)
+  'ES': 'ES=F',      // E-mini S&P 500
+};
+
 /** Símbolos de criptomonedas conocidas */
 const CRYPTO_SYMBOLS = Object.keys(COINGECKO_IDS);
 
@@ -285,10 +310,10 @@ async function getPriceData(symbol: string) {
     }
   }
 
-  // Stocks, índices, forex, commodities → Yahoo Finance primero
+  // Stocks, índices, forex, commodities, futuros → Yahoo Finance primero
   try {
-    // Fix: Mapear símbolos Forex a formato Yahoo Finance
-    const yahooSymbol = FOREX_SYMBOL_MAP[symbol] || symbol;
+    // Fix: Mapear símbolos Forex y Futuros a formato Yahoo Finance
+    const yahooSymbol = FOREX_SYMBOL_MAP[symbol] || FUTURES_SYMBOL_MAP[symbol] || symbol;
     const yp = await marketService.getYahooPrice(yahooSymbol);
     return {
       symbol,

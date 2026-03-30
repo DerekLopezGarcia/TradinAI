@@ -97,25 +97,13 @@ export const ASSETS_BY_CATEGORY = {
     { symbol: 'SET', name: 'SET', description: 'Índice tailandés' },
   ],
 
-  // === COMMODITIES & MATERIALES (27 - Removidos: TIN, RICE, GASOIL sin soporte) ===
+  // === COMMODITIES & MATERIALES (15 - Removidos futuros a nueva categoría) ===
   'Commodities': [
     { symbol: 'GOLD', name: 'Oro', description: 'Metal precioso' },
     { symbol: 'SILVER', name: 'Plata', description: 'Metal industrial y precioso' },
     { symbol: 'COPPER', name: 'Cobre', description: 'Metal industrial' },
     { symbol: 'PLATINUM', name: 'Platino', description: 'Metal precioso' },
     { symbol: 'PALLADIUM', name: 'Paladio', description: 'Metal catalítico' },
-    { symbol: 'OIL', name: 'Petróleo Crudo', description: 'Energía fósil' },
-    { symbol: 'NATGAS', name: 'Gas Natural', description: 'Combustible fósil' },
-    { symbol: 'BRENT', name: 'Brent', description: 'Petróleo Brent' },
-    { symbol: 'WTI', name: 'WTI', description: 'Crudo West Texas' },
-    { symbol: 'WHEAT', name: 'Trigo', description: 'Grano agrícola' },
-    { symbol: 'CORN', name: 'Maíz', description: 'Grano agrícola' },
-    { symbol: 'SOYBEANS', name: 'Soja', description: 'Legumbre agrícola' },
-    { symbol: 'SUGAR', name: 'Azúcar', description: 'Producto agrícola' },
-    { symbol: 'COFFEE', name: 'Café', description: 'Bebida agrícola' },
-    { symbol: 'COCOA', name: 'Cacao', description: 'Producto agrícola' },
-    { symbol: 'COTTON', name: 'Algodón', description: 'Fibra textil' },
-    { symbol: 'LUMBER', name: 'Madera', description: 'Material de construcción' },
     { symbol: 'NICKEL', name: 'Níquel', description: 'Metal industrial' },
     { symbol: 'ALUMINUM', name: 'Aluminio', description: 'Metal ligero' },
     { symbol: 'ZINC', name: 'Zinc', description: 'Metal industrial' },
@@ -127,6 +115,22 @@ export const ASSETS_BY_CATEGORY = {
     { symbol: 'WRK', name: 'Westrock', description: 'Papel y embalaje' },
     { symbol: 'IP', name: 'International Paper', description: 'Papel y embalaje' },
     { symbol: 'PKG', name: 'Packaging Corp', description: 'Embalaje corrugado' },
+  ],
+
+  // === FUTUROS (12 - Commodities futuros) ===
+  'Futuros': [
+    { symbol: 'CL', name: 'Petróleo Crudo WTI', description: 'Futuro de petróleo crudo (NYMEX)' },
+    { symbol: 'BZ', name: 'Petróleo Brent', description: 'Futuro de petróleo Brent (ICE)' },
+    { symbol: 'NG', name: 'Gas Natural', description: 'Futuro de gas natural (NYMEX)' },
+    { symbol: 'ZW', name: 'Trigo', description: 'Futuro de trigo (CBOT)' },
+    { symbol: 'ZC', name: 'Maíz', description: 'Futuro de maíz (CBOT)' },
+    { symbol: 'ZS', name: 'Soja', description: 'Futuro de soja (CBOT)' },
+    { symbol: 'SB', name: 'Azúcar', description: 'Futuro de azúcar (ICE)' },
+    { symbol: 'KC', name: 'Café', description: 'Futuro de café arábica (ICE)' },
+    { symbol: 'CC', name: 'Cacao', description: 'Futuro de cacao (ICE)' },
+    { symbol: 'CT', name: 'Algodón', description: 'Futuro de algodón (ICE)' },
+    { symbol: 'LBS', name: 'Madera', description: 'Futuro de madera (CBOT)' },
+    { symbol: 'ES', name: 'E-mini S&P 500', description: 'Futuro de índice S&P 500 (CME)' },
   ],
 
   // === TECNOLOGÍA (32 - Removidos: GOOG duplicado) ===
