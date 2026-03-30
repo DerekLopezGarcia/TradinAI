@@ -385,21 +385,25 @@ export function NavBar({ selectedType, searchQuery, onSearchChange }: NavBarProp
     const symbols = getAssetsByCategory(categoryName);
     const uniqueSymbols = Array.from(new Set(symbols));
     return uniqueSymbols.map((symbol: string, index: number) => {
+      // Buscar en el store - si existe, usar datos actualizados; si no, crear temporal
       const existingAsset = assets.find(a => a.symbol === symbol);
       const assetInfo = getAssetDescription(symbol);
+      const assetType = existingAsset?.type || determinateAssetType(symbol);
+      
       return {
-        id: `scanner_${categoryName.toLowerCase().replace(/\s+/g, '_')}_${index}_${symbol}`,
+        id: existingAsset?.id || `scanner_${categoryName.toLowerCase().replace(/\s+/g, '_')}_${index}_${symbol}`,
         symbol,
-        name: assetInfo?.name || symbol,
-        description: assetInfo?.description,
-        type: 'scanner',
+        name: assetInfo?.name || existingAsset?.name || symbol,
+        description: assetInfo?.description || existingAsset?.description,
+        type: assetType,
+        // Usar precios del store si existen, sino 0
         price: existingAsset?.price ?? 0,
         change: existingAsset?.change ?? 0,
         changePercent: existingAsset?.changePercent ?? 0,
         isFavorite: existingAsset?.isFavorite ?? false,
       };
     });
-  }, [assets]);
+  }, [assets]); // Añadir 'assets' como dependencia para que se actualice cuando cambien
 
   const handleAddAsset = () => {
     if (newSymbol.trim() && newName.trim()) {
