@@ -1,0 +1,72 @@
+# 🚀 QUICK START - 3 PASOS
+
+## Tu Problema
+```
+npm : El término 'npm' no se reconoce
+```
+✅ **RESUELTO** - Sigue estos 3 pasos simples
+
+---
+
+## PASO 1️⃣: Abre PowerShell
+```
+Click derecho en la carpeta TradingIA
+  ↓
+Selecciona "Abrir PowerShell aquí"
+```
+
+---
+
+## PASO 2️⃣: Ejecuta El Script (Copia y Pega)
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force; .\install-and-run.ps1
+```
+
+---
+
+## PASO 3️⃣: Espera (10-15 minutos)
+```
+El script hará todo:
+✅ Descarga Node.js (si no lo tienes)
+✅ Instala Node.js
+✅ Instala dependencias (200+ packages)
+✅ Compila el proyecto
+✅ Abre http://localhost:3000
+✅ Inicia el servidor
+```
+
+---
+
+## ✨ Resultado
+```
+Tu navegador abrirá automáticamente
+Verás Trading IA funcionando
+Puedes empezar a analizar activos
+```
+
+---
+
+## 🛑 Para Detener
+```powershell
+Ctrl + C
+```
+
+---
+
+## 🔄 Para Reiniciar
+```powershell
+npm run dev
+```
+
+---
+
+## 📚 Más Información
+- Detalles: `INSTALLATION.md`
+- Diagrama: `DIAGRAMA_FLUJO.md`
+- Rápido: `INICIO_RAPIDO.md`
+- Completo: `README.md`
+
+---
+
+**¡Ahora ejecuta el script!** 🎉
+
