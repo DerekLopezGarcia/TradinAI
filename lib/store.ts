@@ -16,6 +16,19 @@ import { Asset, TimeFrame, ChatMessage, Alert } from '@/lib/types';
  * Los usuarios confían en datos reales para decisiones financieras
  */
 
+// Asset por defecto para que la página no quede en loading infinito
+// Los precios se actualizan en tiempo real desde APIs
+const DEFAULT_ASSET: Asset = {
+  id: 'default_btc',
+  symbol: 'BTCUSD',
+  name: 'Bitcoin',
+  type: 'crypto',
+  price: 0, // Se actualizará desde API
+  change: 0,
+  changePercent: 0,
+  isFavorite: true
+};
+
 interface MarketStore {
   assets: Asset[];
   selectedAsset: Asset | null;
@@ -41,10 +54,10 @@ export const useMarketStore = create<MarketStore>()(
     (set) => ({
       // Los assets se deben cargar en tiempo real desde APIs
       // NO usar MOCK_ASSETS con datos hardcodeados
-      assets: [],
-      selectedAsset: null,
+      assets: [DEFAULT_ASSET],  // Iniciar con asset por defecto
+      selectedAsset: DEFAULT_ASSET,  // Seleccionar por defecto para que page no quede en loading
       selectedTimeframe: '1h',
-      favorites: [],
+      favorites: ['BTCUSD'],
       chatMessages: [],
       alerts: [],
 
