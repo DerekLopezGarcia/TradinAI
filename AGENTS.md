@@ -424,6 +424,38 @@ Edit `candleAnalysisService.ts`:
 - **Caching**: Automático via getCachedOrExecute(), no necesita implementar manualmente
 - **Retry**: Automático via executeWithRetry(), no necesita try-catch
 
+## ⚠️ INSTRUCCIÓN CRÍTICA: NO GENERAR MOCKS NI DATOS SIMULADOS
+
+**POR FAVOR LEER ESTO CUIDADOSAMENTE:**
+
+❌ **NUNCA generes datos simulados/mock**:
+- NO hardcodear precios ficticios
+- NO crear MOCK_ASSETS, mockData, ejemplos, datos de prueba
+- NO simular APIs
+- NO fabricar datos históricos
+- NO usar datos fake/test en producción
+
+✅ **SIEMPRE usa datos reales**:
+- Conecta a APIs reales: Binance, Twelve Data, Yahoo Finance, CoinGecko, Quandl
+- Si una API no responde → retorna null/error (no inventes datos)
+- Si necesitas testear → crea fixture files `.test.ts` (SEPARADOS de producción)
+- Los datos deben venir siempre de fuentes autorizadas
+
+**Excepción**: 
+- Archivos `*.test.ts` y `*.spec.ts` pueden usar mocks internos (para testing)
+- Variables marcadas con `FIXTURE_` o `TEST_` en archivos de testing
+- Nunca en archivos de `lib/`, `components/`, o `app/api/`
+
+**Razón**: 
+- Los usuarios confían en datos reales para decisiones financieras
+- Datos fake = pérdida de credibilidad + responsabilidad legal
+- La app debe decir "Sin datos disponibles" en lugar de inventarlos
+
+**Validación**:
+- Si ves `MOCK_`, `mock`, `fake`, `simulad`, `ejemplo` → reportar inmediatamente
+- Si ves precios hardcodeados → buscar datos reales de API
+- Si ves datos sin source API → refactorizar para conectar a API real
+
 ---
 
 ## 🎓 Architecture Decision: Why This Design?

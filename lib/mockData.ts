@@ -1,85 +1,28 @@
 import { CandleData, NewsItem } from '@/lib/types';
 
-// Mock de noticias financieras
-export const MOCK_NEWS: NewsItem[] = [
-  {
-    id: '1',
-    title: 'Bitcoin alcanza nuevo máximo histórico en 2024',
-    description: 'Bitcoin ha alcanzado su precio más alto del año, superando los $42,000 USD. Los analistas atribuyen esto a la anticipación de una aprobación de ETF de Bitcoin al contado.',
-    source: 'Bloomberg',
-    url: 'https://example.com/news/1',
-    timestamp: Date.now() - 3600000,
-    sentiment: 'positive',
-    relevantAssets: ['BTCUSD'],
-    imageUrl: 'https://via.placeholder.com/400x200?text=Bitcoin+News',
-  },
-  {
-    id: '2',
-    title: 'Apple reporta ganancias trimestrales que superan expectativas',
-    description: 'Apple ha reportado ganancias de $19.9 mil millones en el trimestre fiscal más reciente, superando las previsiones de los analistas.',
-    source: 'Reuters',
-    url: 'https://example.com/news/2',
-    timestamp: Date.now() - 7200000,
-    sentiment: 'positive',
-    relevantAssets: ['AAPL'],
-    imageUrl: 'https://via.placeholder.com/400x200?text=Apple+Earnings',
-  },
-  {
-    id: '3',
-    title: 'Ethereum experimenta volatilidad tras actualizaciones de red',
-    description: 'Ethereum ha visto una volatilidad significativa después de las últimas actualizaciones de protocolo. Los desarrolladores afirman que las mejoras de escalabilidad están funcionando como se esperaba.',
-    source: 'CoinDesk',
-    url: 'https://example.com/news/3',
-    timestamp: Date.now() - 10800000,
-    sentiment: 'neutral',
-    relevantAssets: ['ETHUSD'],
-    imageUrl: 'https://via.placeholder.com/400x200?text=Ethereum+Update',
-  },
-  {
-    id: '4',
-    title: 'Tesla anuncia expansión de gigafábrica en México',
-    description: 'Tesla ha anunciado planes para expandir su operación de manufactura en México, con inversiones estimadas en $2 mil millones.',
-    source: 'TechCrunch',
-    url: 'https://example.com/news/4',
-    timestamp: Date.now() - 14400000,
-    sentiment: 'positive',
-    relevantAssets: ['TSLA'],
-    imageUrl: 'https://via.placeholder.com/400x200?text=Tesla+Factory',
-  },
-  {
-    id: '5',
-    title: 'Banco Central mantiene tasas de interés sin cambios',
-    description: 'En su reunión más reciente, el Banco Central mantuvo las tasas de interés sin cambios, citando presiones inflacionarias persistentes.',
-    source: 'Financial Times',
-    url: 'https://example.com/news/5',
-    timestamp: Date.now() - 18000000,
-    sentiment: 'neutral',
-    relevantAssets: ['EURUSD', 'GBPUSD'],
-    imageUrl: 'https://via.placeholder.com/400x200?text=Central+Bank',
-  },
-  {
-    id: '6',
-    title: 'Mercados experimentan corrección de fin de trimestre',
-    description: 'Los mercados mundiales experimentan una corrección técnica al cierre del trimestre, con inversores tomando ganancias.',
-    source: 'MarketWatch',
-    url: 'https://example.com/news/6',
-    timestamp: Date.now() - 21600000,
-    sentiment: 'negative',
-    relevantAssets: ['AAPL', 'GOOGL', 'TSLA'],
-    imageUrl: 'https://via.placeholder.com/400x200?text=Market+Correction',
-  },
-];
+/**
+ * ARCHIVO DEPRECADO - NO USAR DATOS MOCK
+ * 
+ * Este archivo contenía noticias simuladas (MOCK_NEWS) que han sido removidas.
+ * 
+ * Las noticias DEBEN ser cargadas desde:
+ * - APIs reales de noticias financieras
+ * - Newsroom de empresas
+ * - Fuentes autorizadas
+ * 
+ * NO se deben usar datos simulados para decisiones financieras
+ */
 
-// Función para generar datos de velas japonesas - REMOVIDA
-// Solo se deben usar datos reales de las APIs
-export function generateMockCandleData(symbol: string, interval: string, days: number = 60): CandleData[] {
-  // Esta función ya no se utiliza - los datos se obtienen exclusivamente de APIs reales
-  return [];
-}
+// ❌ REMOVIDO: export const MOCK_NEWS = [...]
+// Los datos de noticias deben venir de APIs reales
 
-// Función para obtener noticias por activo
+/**
+ * Función para obtener noticias por activo
+ * @deprecated Usa newsService.ts en su lugar para obtener noticias reales
+ */
 export function getNewsByAsset(symbol: string): NewsItem[] {
-  return MOCK_NEWS.filter(news => news.relevantAssets.includes(symbol));
+  // Retorna array vacío - las noticias deben venir de APIs reales
+  return [];
 }
 
 // Función para calcular indicadores técnicos
