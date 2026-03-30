@@ -21,20 +21,19 @@ const COINGECKO_IDS: Record<string, string> = {
   // Criptos principales (originales)
   'BTCUSD': 'bitcoin',
   'ETHUSD': 'ethereum',
-  'SOLUSD': 'solana',
+  'SOLBUSD': 'solana',      // FIX: era SOLUSD
   'XRPUSD': 'ripple',
   'ADAUSD': 'cardano',
   'DOGEUSD': 'dogecoin',
-  'POLKAUSD': 'polkadot',
-  'LITEUSD': 'litecoin',
-  
+  'DOTUSD': 'polkadot',      // FIX: era POLKAUSD (Polkadot es DOT)
+  'LTCUSD': 'litecoin',      // FIX: era LITEUSD → LTCUSD
+
   // Criptos adicionales (T1.3+: Fix datos faltantes)
   'BNBUSD': 'binancecoin',
   'POLYUSD': 'polygon',
   'AVAXUSD': 'avalanche-2',
   'LINKUSD': 'chainlink',
   'MATICUSD': 'matic-network',
-  'DOTUSD': 'polkadot',
   'ETCUSD': 'ethereum-classic',
   'XMRUSD': 'monero',
   'DASHUSD': 'dash',
@@ -313,8 +312,14 @@ async function getPriceData(symbol: string) {
   if (assetType === 'crypto') {
     try {
       // Proveedor principal: Binance
+      if (symbol === 'LTCUSD') {
+        console.log(`💰 getPriceData: Intentando Binance para LTCUSD`);
+      }
       const price = await binanceService.getCurrentPrice(symbol);
       const data24h = await binanceService.get24hData(symbol);
+      if (symbol === 'LTCUSD') {
+        console.log(`✅ Binance price para LTCUSD: ${price}`);
+      }
       return {
         symbol,
         price,
@@ -327,7 +332,11 @@ async function getPriceData(symbol: string) {
         timestamp: Date.now(),
       };
     } catch (binanceErr) {
-      console.warn(`Binance price failed for ${symbol}, trying CoinGecko:`, binanceErr);
+      if (symbol === 'LTCUSD') {
+        console.warn(`⚠️ Binance price failed para LTCUSD: ${binanceErr}, trying CoinGecko`);
+      } else {
+        console.warn(`Binance price failed for ${symbol}, trying CoinGecko:`, binanceErr);
+      }
       // Fallback: CoinGecko
       try {
         // T1.3+: NO usar 'bitcoin' como default - rechazar si no está mapeado
@@ -336,7 +345,16 @@ async function getPriceData(symbol: string) {
           throw new Error(`No mapping in CoinGecko for ${symbol}`);
         }
         
+        if (symbol === 'LTCUSD') {
+          console.log(`🔄 CoinGecko: Intentando obtener price para LTCUSD (mapping: ${coinId})`);
+        }
+        
         const coinPrice = await marketService.getCoinPrice(coinId);
+        
+        if (symbol === 'LTCUSD') {
+          console.log(`✅ CoinGecko price para LTCUSD: ${coinPrice.price}`);
+        }
+        
         return {
           symbol,
           price: coinPrice.price,
