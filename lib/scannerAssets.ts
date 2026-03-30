@@ -65,7 +65,7 @@ export const ASSETS_BY_CATEGORY = {
     { symbol: 'SGDUSD', name: 'SGD/USD', description: 'Dólar singapurense vs Dólar' },
     { symbol: 'HKDUSD', name: 'HKD/USD', description: 'Dólar hongkonés vs Dólar' },
     { symbol: 'NOKUSD', name: 'NOK/USD', description: 'Corona noruega vs Dólar' },
-    { symbol: 'BRLRSD', name: 'BRL/USD', description: 'Real brasileño vs Dólar' },
+    { symbol: 'BRLUSD', name: 'BRL/USD', description: 'Real brasileño vs Dólar' },
     { symbol: 'INRUSD', name: 'INR/USD', description: 'Rupia india vs Dólar' },
     { symbol: 'ZARUSD', name: 'ZAR/USD', description: 'Rand sudafricano vs Dólar' },
     { symbol: 'MXNUSD', name: 'MXN/USD', description: 'Peso mexicano vs Dólar' },
@@ -73,7 +73,7 @@ export const ASSETS_BY_CATEGORY = {
     { symbol: 'DKKUSD', name: 'DKK/USD', description: 'Corona danesa vs Dólar' },
   ],
 
-  // === ÍNDICES (21) ===
+  // === ÍNDICES (20 - Removido: RUSINDEX sin datos por sanciones) ===
   'Índices': [
     { symbol: 'SPX', name: 'S&P 500', description: 'Índice de 500 empresas' },
     { symbol: 'NDX', name: 'NASDAQ 100', description: 'Índice de tecnología' },
@@ -91,14 +91,13 @@ export const ASSETS_BY_CATEGORY = {
     { symbol: 'SENSEX', name: 'Sensex 30', description: 'Índice indio' },
     { symbol: 'KOPSI', name: 'KOSPI', description: 'Índice surcoreano' },
     { symbol: 'SSETF', name: 'SSE Composite', description: 'Índice Shanghái' },
-    { symbol: 'RUSINDEX', name: 'RTS Index', description: 'Índice ruso' },
     { symbol: 'MEXBOL', name: 'IPC', description: 'Índice mexicano' },
     { symbol: 'BOVESPA', name: 'Bovespa', description: 'Índice brasileño' },
     { symbol: 'KLCI', name: 'KLCI', description: 'Índice malasio' },
     { symbol: 'SET', name: 'SET', description: 'Índice tailandés' },
   ],
 
-  // === COMMODITIES & MATERIALES (31) ===
+  // === COMMODITIES & MATERIALES (27 - Removidos: TIN, RICE, GASOIL sin soporte) ===
   'Commodities': [
     { symbol: 'GOLD', name: 'Oro', description: 'Metal precioso' },
     { symbol: 'SILVER', name: 'Plata', description: 'Metal industrial y precioso' },
@@ -106,7 +105,6 @@ export const ASSETS_BY_CATEGORY = {
     { symbol: 'PLATINUM', name: 'Platino', description: 'Metal precioso' },
     { symbol: 'PALLADIUM', name: 'Paladio', description: 'Metal catalítico' },
     { symbol: 'OIL', name: 'Petróleo Crudo', description: 'Energía fósil' },
-    { symbol: 'GASOIL', name: 'Gasóleo', description: 'Combustible destilado' },
     { symbol: 'NATGAS', name: 'Gas Natural', description: 'Combustible fósil' },
     { symbol: 'BRENT', name: 'Brent', description: 'Petróleo Brent' },
     { symbol: 'WTI', name: 'WTI', description: 'Crudo West Texas' },
@@ -121,24 +119,21 @@ export const ASSETS_BY_CATEGORY = {
     { symbol: 'NICKEL', name: 'Níquel', description: 'Metal industrial' },
     { symbol: 'ALUMINUM', name: 'Aluminio', description: 'Metal ligero' },
     { symbol: 'ZINC', name: 'Zinc', description: 'Metal industrial' },
-    { symbol: 'TIN', name: 'Estaño', description: 'Metal raro' },
-    { symbol: 'RICE', name: 'Arroz', description: 'Grano agrícola' },
     { symbol: 'FCX', name: 'Freeport-McMoran', description: 'Minería de cobre' },
     { symbol: 'NEM', name: 'Newmont Mining', description: 'Minería de oro' },
     { symbol: 'SCCO', name: 'Southern Copper', description: 'Productor de cobre' },
     { symbol: 'ALB', name: 'Albemarle', description: 'Litio y químicos' },
-    { symbol: 'ARCATHON', name: 'Arch Resources', description: 'Carbón y recursos' },
+    { symbol: 'ARCH', name: 'Arch Resources', description: 'Carbón y recursos' },
     { symbol: 'WRK', name: 'Westrock', description: 'Papel y embalaje' },
     { symbol: 'IP', name: 'International Paper', description: 'Papel y embalaje' },
     { symbol: 'PKG', name: 'Packaging Corp', description: 'Embalaje corrugado' },
   ],
 
-  // === TECNOLOGÍA (31) ===
+  // === TECNOLOGÍA (32 - Removidos: GOOG duplicado) ===
   'Tecnología': [
     { symbol: 'AAPL', name: 'Apple', description: 'Electrónica de consumo' },
     { symbol: 'MSFT', name: 'Microsoft', description: 'Software y computación' },
     { symbol: 'GOOGL', name: 'Alphabet', description: 'Búsqueda e IA' },
-    { symbol: 'GOOG', name: 'Google', description: 'Servicios digitales' },
     { symbol: 'AMZN', name: 'Amazon', description: 'E-commerce y nube' },
     { symbol: 'NVDA', name: 'NVIDIA', description: 'GPUs y chips' },
     { symbol: 'TSLA', name: 'Tesla', description: 'Vehículos eléctricos' },
@@ -267,16 +262,14 @@ export const ASSETS_BY_CATEGORY = {
     { symbol: 'XEL', name: 'Xcel Energy', description: 'Servicios de energía' },
   ],
 
-  // === TELECOMUNICACIONES (8) ===
+  // === TELECOMUNICACIONES (6 - Removidos: NTT ADR Tokyo, NETSCOUT→NTCT) ===
   'Telecomunicaciones': [
     { symbol: 'VZ', name: 'Verizon', description: 'Telecomunicaciones móviles' },
     { symbol: 'T', name: 'AT&T', description: 'Telecomunicaciones' },
     { symbol: 'TMUS', name: 'T-Mobile', description: 'Telecomunicaciones inalámbricas' },
     { symbol: 'CMCSA', name: 'Comcast', description: 'Cable y medios' },
     { symbol: 'CHTR', name: 'Charter Communications', description: 'Cable de banda ancha' },
-    { symbol: 'NTT', name: 'NTT Data', description: 'Servicios de TI' },
     { symbol: 'AKAM', name: 'Akamai', description: 'CDN y seguridad' },
-    { symbol: 'NETSCOUT', name: 'Netscout', description: 'Software de red' },
   ],
 
   // === INDUSTRIALES (10) ===
