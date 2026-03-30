@@ -280,6 +280,14 @@ async function getHistoryData(symbol: string, interval: TimeFrame) {
   } else {
     // Para índices, stocks, commodities, etc. - mapear a Yahoo Finance si es necesario
     const assetType = getAssetType(symbol);
+    
+    // ⚠️ DXY y MIB: Índices especiales sin datos fáciles de obtener
+    if (['DXY', 'MIB'].includes(symbol)) {
+      console.warn(`⚠️ ÍNDICE ESPECIAL: ${symbol} - Yahoo Finance no tiene datos para este símbolo`);
+      console.log(`   Opciones: Usar símbolo alternativo o mostrar "Sin datos"`);
+      throw new Error(`Índice ${symbol} no disponible en Yahoo Finance`);
+    }
+    
     let yahooSymbol = symbol;
     
     if (assetType === 'index') {
@@ -313,7 +321,7 @@ async function getHistoryData(symbol: string, interval: TimeFrame) {
         }
         return { symbol, interval, data, source: 'Finnhub/Yahoo', isFallback: false, timestamp: Date.now() };
       } catch (directErr) {
-        throw new Error(`No hay datos históricos para ${symbol} (intent ambos: ${yahooSymbol} y ${symbol})`);
+        throw new Error(`No hay datos históricos para ${symbol}`);
       }
     }
   }
@@ -417,6 +425,14 @@ async function getPriceData(symbol: string) {
   }
 
   // Stocks, índices, forex, commodities, futuros → Yahoo Finance primero
+  
+  // ⚠️ ÍNDICES ESPECIALES: DXY y MIB sin datos disponibles en Yahoo Finance
+  if (['DXY', 'MIB'].includes(symbol)) {
+    console.warn(`⚠️ ÍNDICE ESPECIAL: ${symbol} - Sin datos disponibles`);
+    console.log(`   Razón: Yahoo Finance no soporta este símbolo`);
+    throw new Error(`No data available for ${symbol}`);
+  }
+  
   try {
     // Fix: Mapear símbolos Forex, Índices, Commodities y Futuros a formato Yahoo Finance
     const yahooSymbol = FOREX_SYMBOL_MAP[symbol] || 
@@ -425,54 +441,19 @@ async function getPriceData(symbol: string) {
                         FUTURES_SYMBOL_MAP[symbol] || 
                         symbol;
     
-    if (['DXY', 'MIB'].includes(symbol)) {
-      console.log(`💰 getPriceData: ${symbol} → Yahoo: ${yahooSymbol}`);
-    }
+    const yp = await marketService.getYahooPrice(yahooSymbol);
     
-    try {
-      const yp = await marketService.getYahooPrice(yahooSymbol);
-      
-      if (['DXY', 'MIB'].includes(symbol)) {
-        console.log(`✅ Yahoo price para ${symbol}: ${yp.price}`);
-      }
-      
-      return {
-        symbol,
-        price: yp.price,
-        change: yp.change,
-        changePercent: yp.changePercent,
-        source: 'Yahoo Finance',
-        type: assetType,
-        timestamp: Date.now(),
-      };
-    } catch (yahooPrimaryErr) {
-      // Si el mapeo falla, intentar con el símbolo directo
-      if (['DXY', 'MIB'].includes(symbol)) {
-        console.log(`⚠️ Yahoo mapping falló para ${yahooSymbol}, intentando con símbolo directo: ${symbol}`);
-      }
-      
-      const yp = await marketService.getYahooPrice(symbol);
-      
-      if (['DXY', 'MIB'].includes(symbol)) {
-        console.log(`✅ Yahoo price (directo) para ${symbol}: ${yp.price}`);
-      }
-      
-      return {
-        symbol,
-        price: yp.price,
-        change: yp.change,
-        changePercent: yp.changePercent,
-        source: 'Yahoo Finance',
-        type: assetType,
-        timestamp: Date.now(),
-      };
-    }
+    return {
+      symbol,
+      price: yp.price,
+      change: yp.change,
+      changePercent: yp.changePercent,
+      source: 'Yahoo Finance',
+      type: assetType,
+      timestamp: Date.now(),
+    };
   } catch (yahooErr) {
-    if (['DXY', 'MIB'].includes(symbol)) {
-      console.warn(`⚠️ Yahoo completamente falló para ${symbol}: ${yahooErr}, trying Finnhub`);
-    } else {
-      console.warn(`Yahoo price failed for ${symbol}, trying Finnhub:`, yahooErr);
-    }
+    console.warn(`Yahoo price failed for ${symbol}, trying Finnhub:`, yahooErr);
   }
 
   // Fallback: Finnhub (puede dar 403 en plan gratuito para algunos símbolos)
