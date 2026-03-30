@@ -42,8 +42,20 @@ class BinanceService {
 
   /**
    * Convierte símbolo (BTCUSD) a símbolo Binance (BTCUSDT)
+   * Incluye mapeos especiales para símbolos que Binance no soporta con USDT
    */
   private normalizePair(symbol: string): string {
+    // Mapeos especiales para pares que no existen en USDT pero sí en otros
+    const specialMappings: Record<string, string> = {
+      'LTCUSD': 'LTCUSDT',    // Litecoin → LTCUSDT (si falla, usar LTCBTC)
+      'DOTUSD': 'DOTUSDT',    // Polkadot → DOTUSDT
+      'LTCBTC': 'LTCBTC',     // Litecoin vs Bitcoin (fallback)
+    };
+    
+    if (specialMappings[symbol]) {
+      return specialMappings[symbol];
+    }
+    
     // BTCUSD → BTCUSDT, ETHUSD → ETHUSDT, etc.
     if (symbol.endsWith('USD')) {
       return symbol.replace('USD', 'USDT');
@@ -93,6 +105,10 @@ class BinanceService {
       const limit = this.getLimit(interval);
 
       const url = `${this.baseUrl}/klines?symbol=${pair}&interval=${binanceInterval}&limit=${limit}`;
+      
+      if (symbol === 'LTCUSD') {
+        console.log(`🔄 Binance: Intentando obtener LTCUSD → ${pair}`);
+      }
 
       const response = await fetch(url, {
         headers: {
@@ -140,9 +156,19 @@ class BinanceService {
         timestamp: Date.now(),
       });
 
+      if (symbol === 'LTCUSD' && validCandles.length > 0) {
+        console.log(`✅ Binance: Obtuvo ${validCandles.length} candles para LTCUSD`);
+      }
+
       return validCandles;
     } catch (error) {
-      console.error(`[BinanceService] Error fetching ${symbol}:`, error);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      
+      if (symbol === 'LTCUSD') {
+        console.warn(`⚠️ Binance: Fallo para LTCUSD: ${errorMsg}`);
+        console.log(`   Razón probable: ${errorMsg.includes('401') ? 'No autorizado' : errorMsg.includes('404') ? 'Par no existe en Binance' : 'Timeout o conexión'}`);
+      }
+      
       throw error;
     }
   }

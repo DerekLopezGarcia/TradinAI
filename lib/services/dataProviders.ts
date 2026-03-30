@@ -48,25 +48,54 @@ export class CoinGeckoProvider implements IDataProvider {
 
   async fetch(symbol: string, _interval: string): Promise<CandleData[]> {
     const geckoId = getMappedSymbol(symbol, 'coinGecko');
-    if (!geckoId) return [];
+    if (!geckoId) {
+      if (symbol === 'LTCUSD') console.warn(`⚠️ CoinGecko: No mapping para ${symbol}`);
+      return [];
+    }
 
-    const response = await fetch(
-      `https://api.coingecko.com/api/v3/coins/${geckoId}/ohlc?vs_currency=usd&days=7`,
-      { headers: { Accept: 'application/json' } }
-    );
+    try {
+      if (symbol === 'LTCUSD') {
+        console.log(`🔄 CoinGecko: Intentando obtener LTCUSD (mapping: ${geckoId})`);
+      }
 
-    if (!response.ok) return [];
-    const data = await response.json();
-    if (!Array.isArray(data)) return [];
+      const response = await fetch(
+        `https://api.coingecko.com/api/v3/coins/${geckoId}/ohlc?vs_currency=usd&days=7`,
+        { headers: { Accept: 'application/json' } }
+      );
 
-    return data.map((candle: number[]) => ({
-      time: candle[0],
-      open: candle[1],
-      high: candle[2],
-      low: candle[3],
-      close: candle[4],
-      volume: 0,
-    })).filter((c: any) => !isNaN(c.open) && !isNaN(c.close));
+      if (!response.ok) {
+        if (symbol === 'LTCUSD') {
+          console.warn(`⚠️ CoinGecko: Status ${response.status} para LTCUSD`);
+        }
+        return [];
+      }
+      
+      const data = await response.json();
+      if (!Array.isArray(data)) {
+        if (symbol === 'LTCUSD') console.warn(`⚠️ CoinGecko: Respuesta no es array para LTCUSD`);
+        return [];
+      }
+
+      const candles = data.map((candle: number[]) => ({
+        time: candle[0],
+        open: candle[1],
+        high: candle[2],
+        low: candle[3],
+        close: candle[4],
+        volume: 0,
+      })).filter((c: any) => !isNaN(c.open) && !isNaN(c.close));
+
+      if (symbol === 'LTCUSD' && candles.length > 0) {
+        console.log(`✅ CoinGecko: Obtuvo ${candles.length} candles para LTCUSD`);
+      }
+
+      return candles;
+    } catch (error) {
+      if (symbol === 'LTCUSD') {
+        console.warn(`❌ CoinGecko error para LTCUSD: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      return [];
+    }
   }
 }
 
