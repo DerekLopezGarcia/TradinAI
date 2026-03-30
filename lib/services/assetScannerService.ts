@@ -1,15 +1,86 @@
 /**
  * Servicio de escaneo de activos
- * Analiza múltiples activos y encuentra los mejores con RI >= 10%
  */
 
-import { analyzeCandles, CandleAnalysisInput } from './candleAnalysisService';
-import { CandleData, TimeFrame } from '@/lib/types';
-import { binanceService } from './binanceService';
+import { analyzeCandles } from './candleAnalysisService';
+import { CandleData } from '@/lib/types';
+import { ASSETS_BY_CATEGORY } from '@/lib/scannerAssets';
 
-export interface AssetCategory {
-  name: string;
-  description: string;
+type AssetType = 'crypto' | 'stock' | 'forex' | 'index' | 'commodity';
+
+function detectAssetType(symbol: string): AssetType {
+  // Criptomonedas - completo
+  const cryptoSymbols = new Set([
+    'BTCUSD', 'ETHUSD', 'BNBUSD', 'XRPUSD', 'SOLBUSD', 'DOGEUSD', 'ADAUSD', 'POLYUSD',
+    'AVAXUSD', 'LINKUSD', 'MATICUSD', 'LTCUSD', 'DOTUSD', 'ETCUSD', 'XMRUSD', 'DASHUSD',
+    'ZECUSD', 'XLMUSD', 'XTZUSD', 'COSMUSD', 'FILUSD', 'WAVESUSD', 'NEARUSD', 'ATOMUSD',
+    'ALGOUSD', 'VETUSD', 'IOTAUSD', 'HBARUSD', 'CHZUSD', 'SANDUSD', 'SUIUSD', 'ARBUSD'
+  ]);
+
+  // Commodities - completo
+  const commodities = [
+    'GOLD', 'SILVER', 'COPPER', 'PLATINUM', 'PALLADIUM', 'OIL', 'GASOIL', 'NATGAS',
+    'BRENT', 'WTI', 'WHEAT', 'CORN', 'SOYBEANS', 'SUGAR', 'COFFEE', 'COCOA', 'COTTON',
+    'LUMBER', 'NICKEL', 'ALUMINUM', 'ZINC', 'TIN', 'RICE'
+  ];
+
+  // Índices - completo
+  const indices = [
+    'SPX', 'NDX', 'DXY', 'VIX', 'DAX', 'FTSE', 'CAC40', 'IBEX', 'MIB', 'ASX',
+    'NIKKEI', 'HANGSENG', 'SHANGHAI', 'SENSEX', 'KOPSI', 'SSETF', 'RUSINDEX',
+    'MEXBOL', 'BOVESPA', 'KLCI', 'SET'
+  ];
+
+  // Forex - completo
+  const forexPairs = [
+    'EURUSD', 'EURGBP', 'EURJPY', 'EURCHF', 'EURCAD', 'EURAUD', 'EURNZD',
+    'GBPUSD', 'GBPJPY', 'GBPCHF', 'GBPCAD', 'GBPAUD', 'GBPNZD',
+    'JPYUSD', 'CHFJPY', 'CADJPY', 'AUDJPY', 'NZDJPY',
+    'CHFUSD', 'CADUSD', 'AUDUSD', 'NZDUSD', 'SGDUSD', 'HKDUSD', 'NOKUSD',
+    'BRLRSD', 'INRUSD', 'ZARUSD', 'MXNUSD', 'SEKUSD', 'DKKUSD'
+  ];
+
+  // Acciones (stocks) - completo
+  const stocks = [
+    // Tecnología
+    'AAPL', 'MSFT', 'GOOGL', 'GOOG', 'AMZN', 'NVDA', 'TSLA', 'META',
+    'NFLX', 'ADBE', 'INTC', 'AMD', 'QCOM', 'CSCO', 'ORCL', 'IBM',
+    'CRM', 'SHOP', 'SQ', 'PYPL', 'TWLO', 'OKTA', 'DDOG',
+    'BROADCOM', 'MRVL', 'SNAP', 'PINS', 'TWTR', 'DISC', 'RBLX', 'ZM', 'DOCU',
+    'CRSR', 'LOGI',
+    // Bancos
+    'JPM', 'BAC', 'WFC', 'GS', 'MS', 'BLK', 'SPG', 'PNC', 'USB', 'KEY',
+    'HSBC', 'BARCLAYS', 'DBKR', 'BBVA', 'SAB',
+    // Consumo
+    'MCD', 'SBUX', 'WMT', 'TGT', 'KR', 'CVS', 'HD', 'LOW',
+    'PG', 'KO', 'PEP', 'MDLZ', 'GIS', 'COST', 'CLX',
+    'NKE', 'LULU', 'DECK', 'GXO',
+    // Salud
+    'JNJ', 'PFE', 'MRNA', 'BNTX', 'RHHBY', 'NVAX', 'REGN', 'BIIB',
+    'AMGN', 'GILD', 'VRTX', 'BMRN', 'EXEL', 'ABT', 'MDT', 'ISRG',
+    // Energía
+    'XOM', 'CVX', 'OKE', 'KMI', 'ENB', 'TC', 'MPC',
+    'PLUG', 'ICLN',
+    // Inmobiliario
+    'AMT', 'PLD', 'DLR', 'EQIX', 'ARE', 'WELL',
+    'PHM', 'LEN', 'TOL', 'NVR', 'KBH',
+    // Utilities
+    'NEE', 'DUK', 'SO', 'AEP', 'EXC', 'PCG', 'XEL',
+    // Telecomunicaciones
+    'VZ', 'T', 'TMUS', 'CMCSA', 'CHTR', 'NTT', 'AKAM', 'NETSCOUT',
+    // Industriales
+    'BA', 'RTX', 'LMT', 'GE', 'HON', 'ITW', 'CARR', 'CAT', 'PCAR', 'DE',
+    // Materiales
+    'FCX', 'NEM', 'SCCO', 'ALB', 'ARCATHON', 'WRK', 'IP', 'PKG'
+  ];
+
+  if (cryptoSymbols.has(symbol)) return 'crypto';
+  if (commodities.includes(symbol)) return 'commodity';
+  if (indices.includes(symbol)) return 'index';
+  if (forexPairs.includes(symbol)) return 'forex';
+  if (stocks.includes(symbol)) return 'stock';
+
+  return 'stock'; // default para símbolos desconocidos
 }
 
 export interface ScanResult {
@@ -20,8 +91,8 @@ export interface ScanResult {
     probability: number;
     targetPrice: number[];
   };
-  roi: number; // Retorno de Inversión esperado en %
-  confidence: number; // 0-100
+  roi: number;
+  confidence: number;
   riskReward: number;
   trend: 'alcista' | 'bajista' | 'lateral';
   category: string;
@@ -39,69 +110,45 @@ export interface DailyRecommendation {
   };
 }
 
-// Activos disponibles por categoría
-const ASSETS_BY_CATEGORY = {
-  'Criptomonedas': [
-    'BTCUSD', 'ETHUSD', 'BNBUSD', 'XRPUSD', 'DOGEUSD',
-    'ADAUSD', 'SOLUSD', 'POLYUSD', 'AVAXUSD', 'LINKUSD'
-  ],
-  'Forex Mayor': [
-    'EURUSD', 'GBPUSD', 'JPYUSD', 'CHFUSD', 'CADUSD',
-    'AUDUSD', 'NZDUSD', 'SGDUSD', 'HKDUSD', 'NOKUSD'
-  ],
-  'Indices': [
-    'SPX', 'NDX', 'DXY', 'VIX', 'DAX', 'FTSE'
-  ],
-  'Commodities': [
-    'GOLD', 'SILVER', 'COPPER', 'OIL', 'NATGAS',
-    'WHEAT', 'CORN', 'SOYBEANS', 'SUGAR', 'COFFEE'
-  ],
-  'Tecnología': [
-    'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA',
-    'TSLA', 'META', 'NFLX', 'ADBE', 'INTC'
-  ]
-};
-
-/**
- * Obtiene datos de velas de la semana para un activo
- */
 async function getWeeklyCandles(symbol: string): Promise<CandleData[]> {
   try {
-    // Obtener datos históricos de 1 semana con intervalo de 1 hora
-    const weekInMs = 7 * 24 * 60 * 60 * 1000;
-    const endTime = Date.now();
-    const startTime = endTime - weekInMs;
+    const assetType = detectAssetType(symbol);
+    const url = `/api/market/candles?symbol=${symbol}&interval=1h&type=${assetType}`;
+    
+    console.log(`  🔄 ${symbol} (${assetType})...`);
 
-    // Aquí iría la llamada real a Binance o tu API
-    // Por ahora retornamos datos simulados
-    const candles: CandleData[] = [];
-    let currentTime = startTime;
-    const hourInMs = 60 * 60 * 1000;
+    const response = await fetch(url);
 
-    // Simular velas de la semana (aproximadamente 168 velas)
-    while (currentTime < endTime) {
-      const basePrice = 40000 + Math.random() * 5000;
-      candles.push({
-        time: currentTime,
-        open: basePrice,
-        high: basePrice + Math.random() * 500,
-        low: basePrice - Math.random() * 500,
-        close: basePrice + (Math.random() - 0.5) * 1000,
-        volume: 1000 + Math.random() * 5000,
-      });
-      currentTime += hourInMs;
+    if (!response.ok) {
+      console.warn(`  ❌ ${symbol} (${assetType}): HTTP ${response.status}`);
+      return [];
     }
 
-    return candles;
+    const data = await response.json();
+
+    if (!data.candles || data.candles.length === 0) {
+      console.warn(`  ❌ ${symbol}: sin datos en respuesta`);
+      return [];
+    }
+
+    const weekInMs = 7 * 24 * 60 * 60 * 1000;
+    const cutoffTime = Date.now() - weekInMs;
+    const weeklyCandles = data.candles.filter((c: CandleData) => c.time >= cutoffTime);
+
+    if (weeklyCandles.length < 20) {
+      console.warn(`  ⚠️ ${symbol}: solo ${weeklyCandles.length} velas en la semana`);
+      return [];
+    }
+
+    console.log(`  ✅ ${symbol}: ${weeklyCandles.length} velas`);
+    return weeklyCandles;
   } catch (error) {
-    console.error(`Error obteniendo velas para ${symbol}:`, error);
+    const msg = error instanceof Error ? error.message : 'Error';
+    console.error(`  ❌ ${symbol}: ${msg}`);
     return [];
   }
 }
 
-/**
- * Calcula el ROI esperado basado en el análisis
- */
 function calculateROI(
   currentPrice: number,
   targetPrices: number[],
@@ -110,34 +157,26 @@ function calculateROI(
 ): number {
   if (targetPrices.length === 0) return 0;
 
-  // Usar el primer target como objetivo principal
   const mainTarget = targetPrices[0];
   const potentialGain = ((mainTarget - currentPrice) / currentPrice) * 100;
   const potentialLoss = ((currentPrice - stopLoss) / currentPrice) * 100;
 
-  // Ajustar por probabilidad
   const expectedReturn = (potentialGain * (probability / 100)) - (potentialLoss * ((100 - probability) / 100));
 
   return Math.max(expectedReturn, 0);
 }
 
-/**
- * Escanea un activo individual
- */
 async function scanAsset(
   symbol: string,
   category: string
 ): Promise<ScanResult | null> {
   try {
-    // Obtener velas de la semana
     const candles = await getWeeklyCandles(symbol);
 
     if (candles.length < 20) {
-      console.warn(`Insuficientes datos para ${symbol}`);
       return null;
     }
 
-    // Realizar análisis
     const analysis = analyzeCandles({
       symbol,
       timeframe: '1h',
@@ -154,18 +193,12 @@ async function scanAsset(
     const trend = analysis.summary.trend;
     const riskReward = prediction.riskReward || 1;
 
-    // Calcular ROI
     const roi = calculateROI(
       currentPrice,
       prediction.targetPrice,
       prediction.stopLoss,
       prediction.probability
     );
-
-    // Solo retornar si ROI >= 10%
-    if (roi < 10) {
-      return null;
-    }
 
     return {
       symbol,
@@ -188,26 +221,50 @@ async function scanAsset(
   }
 }
 
-/**
- * Escanea todos los activos y retorna recomendaciones
- */
-export async function scanAllAssets(): Promise<DailyRecommendation> {
+export type ProgressCallback = (progress: {
+  current: number;
+  total: number;
+  currentSymbol: string;
+  percentage: number;
+}) => void;
+
+export async function scanAllAssets(onProgress?: ProgressCallback): Promise<DailyRecommendation> {
   const startTime = Date.now();
   const scanStartDate = new Date(startTime);
-  scanStartDate.setDate(scanStartDate.getDate() - scanStartDate.getDay()); // Lunes
+  scanStartDate.setDate(scanStartDate.getDate() - scanStartDate.getDay());
   const weekStart = scanStartDate.getTime();
 
   const topRoi: ScanResult[] = [];
   const byCategory: { [key: string]: ScanResult[] } = {};
 
   let totalScanned = 0;
+  let successfulScans = 0;
+  let failedScans = 0;
 
-  // Escanear cada categoría
-  for (const [category, symbols] of Object.entries(ASSETS_BY_CATEGORY)) {
+  let totalAssets = 0;
+  for (const symbols of Object.values(ASSETS_BY_CATEGORY)) {
+    totalAssets += symbols.length;
+  }
+
+  let currentIndex = 0;
+
+  for (const [category, assets] of Object.entries(ASSETS_BY_CATEGORY)) {
+    const symbols = assets.map((a: any) => a.symbol); // Extraer símbolos del formato objeto
     byCategory[category] = [];
 
     for (const symbol of symbols) {
+      currentIndex++;
       totalScanned++;
+      const percentage = Math.round((currentIndex / totalAssets) * 100);
+
+      if (onProgress) {
+        onProgress({
+          current: currentIndex,
+          total: totalAssets,
+          currentSymbol: symbol,
+          percentage,
+        });
+      }
 
       try {
         const result = await scanAsset(symbol, category);
@@ -215,67 +272,83 @@ export async function scanAllAssets(): Promise<DailyRecommendation> {
         if (result) {
           byCategory[category].push(result);
           topRoi.push(result);
+          successfulScans++;
+        } else {
+          failedScans++;
         }
       } catch (error) {
-        console.error(`Error procesando ${symbol}:`, error);
+        console.error(`❌ ${symbol}:`, error);
+        failedScans++;
       }
 
-      // Pequeño delay para no sobrecargar
       await new Promise(resolve => setTimeout(resolve, 100));
     }
   }
 
-  // Ordenar por ROI dentro de cada categoría
   for (const category in byCategory) {
     byCategory[category].sort((a, b) => b.roi - a.roi);
-    // Mantener solo los top 3 por categoría
-    byCategory[category] = byCategory[category].slice(0, 3);
+    byCategory[category] = byCategory[category].slice(0, 10);
   }
 
-  // Ordenar globalmente por ROI
   topRoi.sort((a, b) => b.roi - a.roi);
 
   const scanDuration = Date.now() - startTime;
+
+  console.log(`✅ Escaneo: ${successfulScans} analizados, ${failedScans} sin datos`);
 
   return {
     timestamp: Date.now(),
     weekStart,
     scanDuration,
     totalScanned,
-    topRoi: topRoi.slice(0, 10), // Top 10 globales
+    topRoi: topRoi.slice(0, 50),
     byCategory,
   };
 }
 
-/**
- * Obtiene recomendaciones guardadas del día
- */
 export function getSavedRecommendations(): DailyRecommendation | null {
   if (typeof window === 'undefined') return null;
 
   const saved = localStorage.getItem('dailyRecommendations');
   if (!saved) return null;
 
-  const recommendation = JSON.parse(saved) as DailyRecommendation;
+  try {
+    const recommendation = JSON.parse(saved) as DailyRecommendation;
 
-  // Verificar si es del día de hoy
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const savedDate = new Date(recommendation.timestamp);
-  savedDate.setHours(0, 0, 0, 0);
+    const now = Date.now();
+    const age = now - recommendation.timestamp;
+    const maxAge = 4 * 60 * 60 * 1000;
 
-  if (today.getTime() === savedDate.getTime()) {
-    return recommendation;
+    if (age > maxAge) {
+      clearRecommendationsCache();
+      return null;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const savedDate = new Date(recommendation.timestamp);
+    savedDate.setHours(0, 0, 0, 0);
+
+    if (today.getTime() === savedDate.getTime()) {
+      return recommendation;
+    }
+
+    clearRecommendationsCache();
+    return null;
+  } catch (error) {
+    console.error('Error parsing saved recommendations:', error);
+    clearRecommendationsCache();
+    return null;
   }
-
-  return null;
 }
 
-/**
- * Guarda recomendaciones en localStorage
- */
 export function saveRecommendations(recommendation: DailyRecommendation): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem('dailyRecommendations', JSON.stringify(recommendation));
+}
+
+export function clearRecommendationsCache(): void {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem('dailyRecommendations');
 }
 

@@ -206,9 +206,11 @@ export class CandleAnalyzer {
       mainPrediction
     );
 
+    const trendValue: 'alcista' | 'bajista' | 'lateral' = trendAnalysis.direction === 'bullish' ? 'alcista' : 
+             trendAnalysis.direction === 'bearish' ? 'bajista' : 'lateral';
+
     const summary = {
-      trend: trendAnalysis.direction === 'bullish' ? 'alcista' : 
-             trendAnalysis.direction === 'bearish' ? 'bajista' : 'lateral' as const,
+      trend: trendValue,
       bias: `${mainPrediction.direction} (${mainPrediction.probability}% probabilidad)`,
       overallSentiment: this.getOverallSentiment(
         trendAnalysis,
@@ -714,11 +716,11 @@ export class CandleAnalyzer {
       probability = 20;
 
       if (direction === 'bullish') {
+        stopLoss = keyLevels.supports[0] * 0.95 || currentPrice * 0.95;
         targetPrice = [stopLoss * 1.01, stopLoss * 1.02];
-        stopLoss = keyLevels.supports[0] * 0.95;
       } else {
+        stopLoss = keyLevels.resistances[0] * 1.05 || currentPrice * 1.05;
         targetPrice = [stopLoss * 0.99, stopLoss * 0.98];
-        stopLoss = keyLevels.resistances[0] * 1.05;
       }
     }
 

@@ -8,17 +8,60 @@ import { ChatPanel } from '@/components/AIChat';
 import { NewsFeed } from '@/components/NewsFeed';
 import { AlertManager } from '@/components/AlertManager';
 import { Tooltip, IndicatorLegend } from '@/components/IndicatorTooltip';
+import { AutoAnalysisDisplay } from '@/components/AutoAnalysisDisplay';
 import { useMarketData } from '@/app/hooks/useMarketData';
+import { useScannerPriceRefresh } from '@/app/hooks/useScannerPriceRefresh';
 import { X, Zap, Eye, EyeOff } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
+
 export default function Home() {
-  const { selectedAsset, selectedTimeframe, setSelectedTimeframe } = useMarketStore();
+  // Actualizar precio del activo seleccionado constantemente cada 3 segundos
+  useScannerPriceRefresh();
+
+  const { selectedAsset, selectedTimeframe, setSelectedTimeframe, updateAssetPrice } = useMarketStore();
   const [error, setError] = useState<string | null>(null);
   const [indicators, setIndicators] = useState<{ sma: number | null; ema: number | null; rsi: number | null; adx: number | null; stochasticK: number | null; stochasticD: number | null }>({ sma: null, ema: null, rsi: null, adx: null, stochasticK: null, stochasticD: null });
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showBollinger, setShowBollinger] = useState(false);
   const { data, loading, error: dataError, isFallback } = useMarketData(selectedAsset?.symbol || 'BTCUSD', selectedTimeframe);
+
+  // Cargar precio real desde API cuando cambia el asset
+  useEffect(() => {
+    if (!selectedAsset || !selectedAsset.symbol) return;
+
+    const loadRealPrice = async () => {
+      try {
+        // Usar API endpoint para obtener precio
+        const params = new URLSearchParams({
+          symbol: selectedAsset.symbol,
+          type: 'price'
+        });
+        
+        const res = await fetch(`/api/market?${params.toString()}`);
+        if (!res.ok) {
+          console.warn(`No se pudo obtener precio para ${selectedAsset.symbol}`);
+          return;
+        }
+        
+        const data = await res.json();
+        if (data?.price && !isNaN(data.price)) {
+          const price = parseFloat(data.price);
+          const change = parseFloat(data.change ?? 0);
+          const changePercent = parseFloat(data.changePercent ?? 0);
+          
+          // Actualizar el precio en el store con datos reales
+          updateAssetPrice(selectedAsset.symbol, price, change, changePercent);
+        }
+      } catch (err) {
+        console.error('Error loading real price:', err);
+        // No mostrar error en toast, solo en consola
+      }
+    };
+
+    loadRealPrice();
+  }, [selectedAsset?.symbol, updateAssetPrice]);
+  
   useEffect(() => {
     if (dataError) { setError(dataError); setTimeout(() => toast.error(`Error: ${dataError}`), 100); }
   }, [dataError]);
@@ -70,7 +113,21 @@ export default function Home() {
                 <div className="text-center"><div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" /><p className="text-muted-foreground">Cargando...</p></div>
               </div>
             ) : data.length > 0 ? (
-              <TradingViewChart data={data} symbol={selectedAsset.symbol} interval={selectedTimeframe} showVolume={true} showRSI={true} showBollinger={showBollinger} isFallback={isFallback} onIndicatorsUpdate={setIndicators} />
+              <div className="space-y-3">
+                <TradingViewChart data={data} symbol={selectedAsset.symbol} interval={selectedTimeframe} showVolume={true} showRSI={true} showBollinger={showBollinger} isFallback={isFallback} onIndicatorsUpdate={setIndicators} />
+                
+
+                {/* Análisis Automático de Velas */}
+                {data.length >= 20 && (
+                  <div className="bg-card rounded-lg border border-border p-6">
+                    <AutoAnalysisDisplay
+                      symbol={selectedAsset.symbol}
+                      timeframe={selectedTimeframe}
+                      candleData={data}
+                    />
+                  </div>
+                )}
+              </div>
             ) : (
               <div className="h-96 bg-card rounded-xl border border-border flex items-center justify-center"><p className="text-muted-foreground">Sin datos</p></div>
             )}

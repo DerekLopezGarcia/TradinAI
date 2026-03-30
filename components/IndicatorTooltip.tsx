@@ -17,12 +17,12 @@ export function Tooltip({ content, children }: TooltipProps) {
     if (!isVisible || !iconRef.current) return;
 
     const rect = iconRef.current.getBoundingClientRect();
-    const tooltipHeight = 120; // Aproximadamente
-    const tooltipWidth = 224; // w-56 = 14rem = 224px
+    const tooltipHeight = 200; // Aumentado para más contenido
+    const tooltipWidth = 320; // Más ancho para mejor legibilidad
 
     setPosition({
-      top: rect.top - tooltipHeight - 8, // 8px de margen
-      left: rect.left - tooltipWidth / 2 + rect.width / 2, // Centrado respecto al icono
+      top: rect.top - tooltipHeight - 12, // 12px de margen
+      left: Math.max(12, rect.left - tooltipWidth / 2 + rect.width / 2), // Centrado y evitar salir de pantalla
     });
   }, [isVisible]);
 
@@ -46,8 +46,10 @@ export function Tooltip({ content, children }: TooltipProps) {
             left: `${position.left}px`,
           }}
         >
-          <div className="bg-slate-900 border border-cyan-500/50 rounded-lg p-3 w-56 text-xs text-slate-300 shadow-2xl">
-            {content}
+          <div className="bg-gradient-to-b from-slate-900 to-slate-950 border border-cyan-400/60 rounded-lg p-4 w-80 text-xs text-slate-200 shadow-2xl max-h-64 overflow-y-auto">
+            <div className="space-y-2 whitespace-pre-wrap leading-relaxed text-slate-100">
+              {content}
+            </div>
             <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
           </div>
         </div>
@@ -67,37 +69,43 @@ export function IndicatorLegend({ isOpen = false }: IndicatorLegendProps) {
     {
       name: 'SMA(20)',
       description: 'Media Móvil Simple',
-      details: 'Promedio de precios últimos 20 períodos. Indica tendencia general.',
+      details: 'Promedio aritmético de los últimos 20 períodos de cierre. Indicador de tendencia general. Valores altos = tendencia alcista, valores bajos = tendencia bajista. Reacciona lentamente a cambios de precio.',
       color: 'text-slate-400',
     },
     {
       name: 'EMA(20)',
       description: 'Media Móvil Exponencial',
-      details: 'Como SMA pero da más peso a precios recientes. Más reactiva.',
+      details: 'Similar a SMA pero da mayor peso a los precios más recientes. Más reactiva y sensible a cambios actuales. Ideal para identificar cambios de tendencia rápidamente. Suele estar más cercana al precio actual que SMA.',
       color: 'text-slate-400',
     },
     {
       name: 'RSI(14)',
       description: 'Índice de Fuerza Relativa',
-      details: 'Mide momentum. Verde <30 (sobreventa), Rojo >70 (sobrecompra), Azul neutral.',
+      details: '• Escala 0-100. Mide momentum y velocidad de cambio de precio.\n• <30: Sobreventa (posible rebote al alza)\n• 30-70: Zona neutral\n• >70: Sobrecompra (posible corrección a la baja)\n• Útil para identificar puntos de entrada/salida.',
       color: 'text-slate-400',
     },
     {
       name: 'ADX(14)',
       description: 'Índice Direccional Promedio',
-      details: 'Mide fuerza de tendencia 0-100. Gris <20 (sin tendencia), Azul 20-25 (débil), Amarillo 25-40 (moderada), Rojo >40 (fuerte).',
+      details: '• Mide la fuerza de una tendencia (no su dirección) en escala 0-100.\n• <20: Sin tendencia clara o débil (rango lateral)\n• 20-40: Tendencia moderada\n• >40: Tendencia fuerte y confiable\n• Útil para confirmar que el precio se mueve direccionalmente.',
       color: 'text-slate-400',
     },
     {
       name: 'Stoch %K',
       description: 'Estocástico Rápido',
-      details: 'Línea sensible del estocástico. Verde <20 (sobreventa), Rojo >80 (sobrecompra).',
+      details: 'Línea más sensible del oscilador estocástico (escala 0-100).\n• <20: Sobreventa (posible compra)\n• >80: Sobrecompra (posible venta)\n• Indica posición del precio vs rango reciente. Más volátil que %D.',
       color: 'text-slate-400',
     },
     {
       name: 'Stoch %D',
       description: 'Estocástico Lento',
-      details: 'Media móvil de %K. Confirmación de señales. Busca cruces %K vs %D.',
+      details: 'Media móvil suavizada de %K (escala 0-100). Más estable y confiable.\n• Busca cruces: %K arriba %D = señal alcista, %K abajo %D = señal bajista\n• Confirmación de señales del estocástico. Menos falsas señales que %K.',
+      color: 'text-slate-400',
+    },
+    {
+      name: 'Bollinger Bands',
+      description: 'Bandas de Bollinger',
+      details: '• Banda superior e inferior = desviación estándar del precio\n• Línea central = SMA(20)\n• Precio tocando banda superior = posible sobrecompra\n• Precio tocando banda inferior = posible sobreventa\n• Estrechamiento de bandas = baja volatilidad (posible ruptura próxima)',
       color: 'text-slate-400',
     },
   ];
@@ -119,14 +127,14 @@ export function IndicatorLegend({ isOpen = false }: IndicatorLegendProps) {
       </button>
 
       {expanded && (
-        <div className="px-4 py-3 space-y-3 border-t border-cyan-500/10">
+        <div className="px-4 py-4 space-y-4 border-t border-cyan-500/10">
           {indicators.map((indicator) => (
-            <div key={indicator.name} className="text-xs space-y-1">
-              <div className="flex items-start gap-2">
-                <span className="font-semibold text-cyan-400 flex-shrink-0">{indicator.name}</span>
+            <div key={indicator.name} className="text-xs space-y-2 pb-3 border-b border-slate-700/50 last:border-b-0">
+              <div className="flex items-start gap-3">
+                <span className="font-bold text-cyan-300 flex-shrink-0 min-w-fit">{indicator.name}</span>
                 <span className="text-slate-300">{indicator.description}</span>
               </div>
-              <p className="text-slate-500 ml-0 pl-0">{indicator.details}</p>
+              <p className="text-slate-400 ml-0 pl-0 leading-relaxed whitespace-pre-wrap">{indicator.details}</p>
             </div>
           ))}
         </div>

@@ -410,6 +410,7 @@ interface MarketStore {
   setSelectedTimeframe: (timeframe: TimeFrame) => void;
   toggleFavorite: (symbol: string) => void;
   updateAssetPrice: (symbol: string, price: number, change: number, changePercent: number) => void;
+  addOrUpdateAssetPrice: (symbol: string, name: string, price: number, change: number, changePercent: number, type?: string) => void;
   addChatMessage: (message: ChatMessage) => void;
   clearChatMessages: () => void;
   addAlert: (alert: Alert) => void;
@@ -458,6 +459,41 @@ export const useMarketStore = create<MarketStore>()(
               ? { ...state.selectedAsset, price, change, changePercent }
               : state.selectedAsset,
         })),
+
+      addOrUpdateAssetPrice: (symbol, name, price, change, changePercent, type = 'crypto' as any) =>
+        set((state) => {
+          const existingAsset = state.assets.find(a => a.symbol === symbol);
+          
+          if (existingAsset) {
+            // Actualizar existente
+            return {
+              assets: state.assets.map((asset) =>
+                asset.symbol === symbol
+                  ? { ...asset, price, change, changePercent }
+                  : asset
+              ),
+              selectedAsset:
+                state.selectedAsset?.symbol === symbol
+                  ? { ...state.selectedAsset, price, change, changePercent }
+                  : state.selectedAsset,
+            };
+          } else {
+            // Agregar nuevo
+            const newAsset: Asset = {
+              id: `scanner_${symbol}`,
+              symbol,
+              name,
+              type: (type || 'crypto') as any,
+              price,
+              change,
+              changePercent,
+              isFavorite: false,
+            };
+            return {
+              assets: [...state.assets, newAsset],
+            };
+          }
+        }),
 
       addChatMessage: (message) =>
         set((state) => ({

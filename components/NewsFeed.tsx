@@ -14,13 +14,24 @@ export function NewsFeed({ symbol }: NewsFeedProps) {
 
   useEffect(() => {
     const fetchNews = async () => {
+      if (!symbol) return; // Validación: símbolo requerido
+      
+      // Validar que el símbolo sea válido (alphanumérico, máximo 20 caracteres)
+      if (!/^[A-Z0-9]{1,20}$/.test(symbol)) {
+        console.warn('Invalid symbol format:', symbol);
+        return;
+      }
+
       setLoading(true);
       try {
-        const response = await fetch(`/api/market?symbol=${symbol || 'BTCUSD'}&type=news`);
-        if (response.ok) {
-          const data = await response.json();
-          setNews(data.news || []);
-        }
+        const params = new URLSearchParams();
+        params.set('symbol', symbol);
+        params.set('type', 'news');
+        
+        const response = await fetch(`/api/market?${params.toString()}`);
+        if (!response.ok) throw new Error(`API error: ${response.status}`);
+        const data = await response.json();
+        setNews(data.news || []);
       } catch (e) {
         console.error('Error fetching news:', e);
       } finally {

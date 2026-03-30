@@ -1,11 +1,11 @@
 /**
- * Hook para análisis automático de velas con explicaciones detalladas
- * Ejecuta el análisis cada vez que los datos de velas cambian
+ * Hook para análisis manual de velas con explicaciones detalladas
+ * Se ejecuta solo cuando se llama manualmente a través de runAnalysis()
  */
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { CandleData, TimeFrame } from '@/lib/types';
 import { analyzeCandles } from '@/lib/services/candleAnalysisService';
 
@@ -21,10 +21,11 @@ export interface AnalysisExplanation {
   };
   isLoading: boolean;
   error: string | null;
+  runAnalysis: (symbol: string, timeframe: TimeFrame, candleData: CandleData[], analysisDepth?: 'basic' | 'standard' | 'comprehensive') => Promise<void>;
 }
 
 /**
- * Hook que ejecuta automáticamente el análisis de velas
+ * Hook que permite ejecutar análisis manual de velas bajo demanda
  * y proporciona explicaciones detalladas
  */
 export function useAutoAnalysis(
@@ -94,9 +95,14 @@ export function useAutoAnalysis(
     }
   }, []);
 
-  // Ejecutar análisis automáticamente
-  useEffect(() => {
-    if (!candleData || candleData.length < 20) {
+  // Función para ejecutar análisis manualmente
+  const runAnalysis = useCallback(async (
+    sym: string,
+    tf: TimeFrame,
+    data: CandleData[],
+    depth: 'basic' | 'standard' | 'comprehensive' = 'standard'
+  ) => {
+    if (!data || data.length < 20) {
       setError('Se requieren al menos 20 velas para análisis');
       return;
     }
@@ -106,10 +112,10 @@ export function useAutoAnalysis(
 
     try {
       const result = analyzeCandles({
-        symbol,
-        timeframe,
-        candles: candleData,
-        analysisDepth
+        symbol: sym,
+        timeframe: tf,
+        candles: data,
+        analysisDepth: depth
       });
 
       setAnalysis(result);
@@ -120,13 +126,14 @@ export function useAutoAnalysis(
     } finally {
       setIsLoading(false);
     }
-  }, [symbol, timeframe, candleData, analysisDepth, generateExplanation]);
+  }, [generateExplanation]);
 
   return {
     analysis,
     explanation,
     isLoading,
-    error
+    error,
+    runAnalysis
   };
 }
 

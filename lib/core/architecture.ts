@@ -365,11 +365,11 @@ export function deepMerge<T extends Record<string, any>>(
 
   if (isObject(target) && isObject(source)) {
     for (const key in source) {
-      if (isObject(source[key])) {
-        if (!target[key]) Object.assign(target, { [key]: {} });
-        deepMerge(target[key], source[key]);
+      if (isObject((source as any)[key])) {
+        if (!(key in target)) Object.assign(target, { [key]: {} });
+        deepMerge((target as any)[key], (source as any)[key]);
       } else {
-        Object.assign(target, { [key]: source[key] });
+        Object.assign(target, { [key]: (source as any)[key] });
       }
     }
   }
@@ -441,4 +441,5 @@ export async function retryWithBackoff<T>(
   }
   throw lastError!;
 }
+
 

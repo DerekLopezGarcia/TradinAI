@@ -28,7 +28,7 @@ export function useAsync<T>(
   );
 
   const execute = useCallback(async () => {
-    setState(prev => updateAsyncState(prev, { loading: true }));
+    setState((prev: AsyncState<T>) => updateAsyncState(prev, { loading: true }));
 
     try {
       const data = await retryWithBackoff(asyncFunction, {
@@ -37,7 +37,7 @@ export function useAsync<T>(
         backoffMultiplier: 2
       });
 
-      setState(prev => updateAsyncState(prev, {
+      setState((prev: AsyncState<T>) => updateAsyncState(prev, {
         data,
         loading: false,
         error: null,
@@ -47,7 +47,7 @@ export function useAsync<T>(
       options.onSuccess?.(data);
     } catch (error) {
       const err = error as Error;
-      setState(prev => updateAsyncState(prev, {
+      setState((prev: AsyncState<T>) => updateAsyncState(prev, {
         error: err,
         loading: false,
         isSuccess: false
@@ -151,7 +151,7 @@ export function useThrottle<T extends (...args: any[]) => any>(
 // ============================================================================
 
 export function usePrevious<T>(value: T): T | undefined {
-  const ref = useRef<T>();
+  const ref = useRef<T | undefined>(undefined);
 
   useEffect(() => {
     ref.current = value;
@@ -220,7 +220,7 @@ export function useAsyncWithCache<T>(
   });
 
   const execute = useCallback(async () => {
-    setState(prev => updateAsyncState(prev, { loading: true }));
+    setState((prev: AsyncState<T>) => updateAsyncState(prev, { loading: true }));
 
     try {
       const data = await retryWithBackoff(asyncFunction, {
@@ -230,7 +230,7 @@ export function useAsyncWithCache<T>(
 
       globalCache.set(cacheKey, { data, timestamp: Date.now() });
 
-      setState(prev => updateAsyncState(prev, {
+      setState((prev: AsyncState<T>) => updateAsyncState(prev, {
         data,
         loading: false,
         error: null,
@@ -240,7 +240,7 @@ export function useAsyncWithCache<T>(
       options.onSuccess?.(data);
     } catch (error) {
       const err = error as Error;
-      setState(prev => updateAsyncState(prev, {
+      setState((prev: AsyncState<T>) => updateAsyncState(prev, {
         error: err,
         loading: false,
         isSuccess: false
@@ -326,19 +326,19 @@ export function useCancelableAsync<T>(
     createAsyncState(options.initialData)
   );
 
-  const abortControllerRef = useRef<AbortController>();
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const execute = useCallback(async () => {
     // Cancelar petición anterior si existe
     abortControllerRef.current?.abort();
     abortControllerRef.current = new AbortController();
 
-    setState(prev => updateAsyncState(prev, { loading: true }));
+    setState((prev: AsyncState<T>) => updateAsyncState(prev, { loading: true }));
 
     try {
       const data = await asyncFunction(abortControllerRef.current.signal);
 
-      setState(prev => updateAsyncState(prev, {
+      setState((prev: AsyncState<T>) => updateAsyncState(prev, {
         data,
         loading: false,
         error: null,
@@ -351,7 +351,7 @@ export function useCancelableAsync<T>(
       if ((error as any).name === 'AbortError') return;
 
       const err = error as Error;
-      setState(prev => updateAsyncState(prev, {
+      setState((prev: AsyncState<T>) => updateAsyncState(prev, {
         error: err,
         loading: false,
         isSuccess: false
@@ -363,7 +363,7 @@ export function useCancelableAsync<T>(
 
   const cancel = useCallback(() => {
     abortControllerRef.current?.abort();
-    setState(prev => updateAsyncState(prev, { loading: false }));
+    setState((prev: AsyncState<T>) => updateAsyncState(prev, { loading: false }));
   }, []);
 
   return { ...state, execute, cancel, refetch: execute };
@@ -373,7 +373,12 @@ export function useCancelableAsync<T>(
 // useAsync con paginación - Hook para datos paginados
 // ============================================================================
 
-interface PaginatedState<T> extends AsyncState<T[]> {
+interface PaginatedState<T> {
+  data: T[];
+  loading: boolean;
+  error: Error | null;
+  isSuccess: boolean;
+  timestamp: number;
   page: number;
   pageSize: number;
   total: number;
@@ -384,7 +389,7 @@ export function usePaginatedAsync<T>(
   asyncFunction: (page: number, pageSize: number) => Promise<{ data: T[]; total: number }>,
   initialPageSize: number = 20
 ) {
-  const [state, setState] = useState<PaginatedState<T>>({
+  const createInitialState = (): PaginatedState<T> => ({
     data: [],
     loading: false,
     error: null,
@@ -396,28 +401,38 @@ export function usePaginatedAsync<T>(
     hasMore: false
   });
 
+  const [state, setState] = useState<PaginatedState<T>>(createInitialState());
+
   const execute = useCallback(async (page: number = 1) => {
-    setState(prev => updateAsyncState(prev, { loading: true, page }) as any);
+    setState((prev: PaginatedState<T>) => ({
+      ...prev,
+      loading: true,
+      page
+    }));
 
     try {
       const { data, total } = await asyncFunction(page, state.pageSize);
       const hasMore = page * state.pageSize < total;
 
-      setState(prev => updateAsyncState(prev, {
-        data: page === 1 ? data : [...(prev.data || []), ...data],
+      setState((prev: PaginatedState<T>) => ({
+        ...prev,
+        data: page === 1 ? data : [...prev.data, ...data],
         loading: false,
         error: null,
         isSuccess: true,
         page,
         total,
-        hasMore
-      }) as any);
+        hasMore,
+        timestamp: Date.now()
+      }));
     } catch (error) {
-      setState(prev => updateAsyncState(prev, {
+      setState((prev: PaginatedState<T>) => ({
+        ...prev,
         error: error as Error,
         loading: false,
-        isSuccess: false
-      }) as any);
+        isSuccess: false,
+        timestamp: Date.now()
+      }));
     }
   }, [asyncFunction, state.pageSize]);
 
@@ -433,4 +448,12 @@ export function usePaginatedAsync<T>(
     goToPage
   };
 }
+
+
+
+
+
+
+
+
 

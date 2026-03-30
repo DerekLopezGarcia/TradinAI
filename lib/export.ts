@@ -138,7 +138,14 @@ export function printAnalysis(analysis: Analysis) {
   const content = generateTextReport(analysis);
   const printWindow = window.open('', '_blank');
   if (printWindow) {
-    printWindow.document.write(`<pre style="font-family: monospace;">${content}</pre>`);
+    // ✅ SEGURO: Usar textContent en lugar de document.write
+    printWindow.document.body.style.fontFamily = 'monospace';
+    printWindow.document.body.style.whiteSpace = 'pre-wrap';
+    // Crear elemento pre y usar textContent (no HTML injection)
+    const pre = printWindow.document.createElement('pre');
+    pre.textContent = content;
+    pre.style.margin = '20px';
+    printWindow.document.body.appendChild(pre);
     printWindow.document.close();
     printWindow.print();
   }

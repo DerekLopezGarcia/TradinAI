@@ -86,7 +86,7 @@ export class TwelveDataProvider implements IDataProvider {
   private apiKey = process.env.TWELVE_DATA_API_KEY;
 
   canHandle(symbol: string, type: AssetType): boolean {
-    return this.apiKey && (type === 'stock' || type === 'index') && this.supportsSymbols.has(symbol);
+    return !!(this.apiKey && (type === 'stock' || type === 'index') && this.supportsSymbols.has(symbol));
   }
 
   async fetch(symbol: string, _interval: string): Promise<CandleData[]> {
@@ -177,7 +177,7 @@ export class QuandlProvider implements IDataProvider {
   private apiKey = process.env.QUANDL_API_KEY;
 
   canHandle(symbol: string, type: AssetType): boolean {
-    return this.apiKey && type === 'commodity' && this.supportsSymbols.has(symbol);
+    return !!(this.apiKey && type === 'commodity' && this.supportsSymbols.has(symbol));
   }
 
   async fetch(symbol: string, _interval: string): Promise<CandleData[]> {
@@ -226,4 +226,6 @@ export function registerDefaultProviders() {
 
   console.log('✅ Data providers registered');
 }
+
+
 

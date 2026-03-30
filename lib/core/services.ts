@@ -21,6 +21,10 @@ import {
 } from './architecture';
 import { getModuleConfig, LOGGING_CONFIG } from './config';
 
+// Reexportar tipos de architecture
+export type { AsyncState, APIResponse };
+export { AppError, retryWithBackoff };
+
 // ============================================================================
 // LOGGER IMPLEMENTADO
 // ============================================================================
@@ -363,13 +367,13 @@ export function createAsyncState<T>(data?: T): AsyncState<T> {
 
 export function updateAsyncState<T>(
   state: AsyncState<T>,
-  updates: Partial<AsyncState<T>>
+  updates: Record<string, any>
 ): AsyncState<T> {
   return {
     ...state,
     ...updates,
     timestamp: Date.now()
-  };
+  } as AsyncState<T>;
 }
 
 // ============================================================================
@@ -378,8 +382,8 @@ export function updateAsyncState<T>(
 
 export class BaseValidator<T> implements Validator<T> {
   constructor(
-    private schema: Record<string, any>,
-    private transformer?: (value: any) => T
+    public schema: Record<string, any>,
+    public transformer?: (value: any) => T
   ) {}
 
   validate(value: any): { valid: boolean; errors: string[] } {
@@ -424,4 +428,6 @@ export class BaseValidator<T> implements Validator<T> {
     return value as T;
   }
 }
+
+
 

@@ -2,48 +2,105 @@
 
 import { useEffect } from 'react';
 import { useMarketStore } from '@/lib/store';
-import { getAssetsByCategory, getCategories } from '@/lib/scannerAssets';
+import { priceCache } from '@/lib/services/priceCache';
+import { validateSymbol, createSafeParams } from '@/lib/services/validationService';
 
 /**
- * Hook para actualizar automáticamente los precios de activos del scanner
- * Refresca cada 30 segundos
+ * Hook para actualizar constantemente el precio del activo seleccionado
+ * Se ejecuta cada 3 segundos para mantener el precio actualizado en tiempo real
+ * Solo actualiza el activo seleccionado, no hace carga pesada
  */
 export function useScannerPriceRefresh() {
-  const { addOrUpdateAssetPrice } = useMarketStore();
+  const { selectedAsset, addOrUpdateAssetPrice } = useMarketStore();
 
   useEffect(() => {
-    // Función para refrescar precios
-    const refreshPrices = async () => {
-      const allSymbols = new Set<string>();
-      
-      // Recopilar todos los símbolos únicos
-      for (const category of getCategories()) {
-        const symbols = getAssetsByCategory(category);
-        symbols.forEach(s => allSymbols.add(s));
-      }
+    if (!selectedAsset?.symbol || !validateSymbol(selectedAsset.symbol)) {
+      return;
+    }
 
-      // Actualizar precios
-      await Promise.allSettled(
-        Array.from(allSymbols).map(async (symbol) => {
-          try {
-            const res = await fetch(`/api/market?symbol=${symbol}&type=price`);
-            if (!res.ok) return;
-            const d = await res.json();
-            if (d.price && !isNaN(d.price)) {
-              addOrUpdateAssetPrice(symbol, symbol, d.price, d.change ?? 0, d.changePercent ?? 0, 'crypto');
-            }
-          } catch { /* ignorar */ }
-        })
-      );
+    let isMounted = true;
+    const abortController = new AbortController();
+
+    // Función para refrescar el precio del activo seleccionado
+    const refreshPrice = async () => {
+      if (!isMounted) return;
+      
+      const symbol = selectedAsset.symbol;
+      
+      try {
+        // Validar símbolo antes de usar
+        if (!validateSymbol(symbol)) {
+          console.warn('Invalid symbol:', symbol);
+          return;
+        }
+
+        const params = createSafeParams({
+          symbol,
+          type: 'price',
+          // Cache busting para forzar datos frescos
+          _: Date.now()
+        });
+
+        // Fetch con timeout y signal de cancelación
+        const res = await fetch(`/api/market?${params.toString()}`, {
+          cache: 'no-store',
+          signal: abortController.signal,
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        if (!res.ok) {
+          console.warn(`Price refresh failed: ${res.status}`);
+          return;
+        }
+
+        const d = await res.json();
+        
+        // Validar respuesta antes de usar
+        if (d.price && typeof d.price === 'number' && !isNaN(d.price)) {
+          // Guardar en caché para uso posterior
+          priceCache.set(
+            symbol,
+            d.price,
+            d.change ?? 0,
+            d.changePercent ?? 0
+          );
+          
+          // Actualizar en el store inmediatamente
+          addOrUpdateAssetPrice(
+            symbol,
+            symbol,
+            d.price,
+            d.change ?? 0,
+            d.changePercent ?? 0,
+            'crypto'
+          );
+        }
+      } catch (error) {
+        // No loguear errores de cancelación (son esperados al desmontar)
+        if (error instanceof Error && error.name !== 'AbortError') {
+          console.debug(`Price refresh error for ${selectedAsset.symbol}:`, error);
+        }
+      }
     };
 
-    // Ejecutar inmediatamente
-    refreshPrices();
+    // Ejecutar inmediatamente al cargar
+    refreshPrice();
 
-    // Luego cada 30 segundos
-    const interval = setInterval(refreshPrices, 30000);
+    // Actualizar cada 3 segundos
+    const interval = setInterval(() => {
+      if (isMounted) refreshPrice();
+    }, 3000);
 
-    return () => clearInterval(interval);
-  }, [addOrUpdateAssetPrice]);
+    return () => {
+      isMounted = false;
+      abortController.abort();
+      clearInterval(interval);
+    };
+  }, [selectedAsset?.symbol, addOrUpdateAssetPrice]);
 }
+
+
+
 

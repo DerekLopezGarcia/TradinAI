@@ -196,6 +196,75 @@ class BinanceService {
       throw error;
     }
   }
+
+  /**
+   * Obtiene el precio desde medianoche (00:00 UTC) del día actual
+   * Útil para criptos que operan 24/7
+   */
+  async getPriceSinceMidnight(symbol: string): Promise<{ currentPrice: number; priceAtMidnight: number; change: number; changePercent: number }> {
+    try {
+      const now = new Date();
+      const midnight = new Date(now);
+      midnight.setUTCHours(0, 0, 0, 0);
+
+      const pair = this.normalizePair(symbol);
+      
+      // Obtener precio actual
+      const currentPrice = await this.getCurrentPrice(symbol);
+      
+      // Obtener velas desde medianoche
+      const url = `${this.baseUrl}/klines?symbol=${pair}&interval=1h&startTime=${midnight.getTime()}&limit=24`;
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error(`Error fetching klines: ${response.status}`);
+      }
+
+      const klines: any[][] = await response.json();
+      const priceAtMidnight = klines.length > 0 ? parseFloat(klines[0][1]) : currentPrice; // open price del primer candle
+
+      const change = currentPrice - priceAtMidnight;
+      const changePercent = (change / priceAtMidnight) * 100;
+
+      return { currentPrice, priceAtMidnight, change, changePercent };
+    } catch (error) {
+      console.error(`[BinanceService] Error fetching midnight price for ${symbol}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Obtiene el precio desde una hora específica
+   */
+  async getPriceSinceHour(symbol: string, hourUTC: number): Promise<{ currentPrice: number; priceAtHour: number; change: number; changePercent: number }> {
+    try {
+      const now = new Date();
+      const targetHour = new Date(now);
+      targetHour.setUTCHours(hourUTC, 0, 0, 0);
+
+      const pair = this.normalizePair(symbol);
+      
+      const currentPrice = await this.getCurrentPrice(symbol);
+      
+      const url = `${this.baseUrl}/klines?symbol=${pair}&interval=1h&startTime=${targetHour.getTime()}&limit=24`;
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error(`Error fetching klines: ${response.status}`);
+      }
+
+      const klines: any[][] = await response.json();
+      const priceAtHour = klines.length > 0 ? parseFloat(klines[0][1]) : currentPrice;
+
+      const change = currentPrice - priceAtHour;
+      const changePercent = (change / priceAtHour) * 100;
+
+      return { currentPrice, priceAtHour, change, changePercent };
+    } catch (error) {
+      console.error(`[BinanceService] Error fetching price since hour for ${symbol}:`, error);
+      throw error;
+    }
+  }
 }
 
 // Exportar instancia singleton

@@ -1,15 +1,15 @@
 /**
- * Hook para obtener recomendaciones diarias de activos
- * Escanea todos los activos disponibles y encuentra los mejores con RI >= 10%
+ * Hook para obtener recomendaciones diarias
  */
 
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { 
-  scanAllAssets, 
+  scanAllAssets,
   getSavedRecommendations, 
   saveRecommendations,
+  clearRecommendationsCache,
   DailyRecommendation,
   ScanResult 
 } from '@/lib/services/assetScannerService';
@@ -18,47 +18,80 @@ export interface UseDailyRecommendationsReturn {
   recommendations: DailyRecommendation | null;
   isLoading: boolean;
   error: string | null;
-  fetchRecommendations: () => Promise<void>;
+  fetchRecommendations: (force?: boolean, timeframe?: string, minROI?: number) => Promise<void>;
   topRoi: ScanResult[];
   byCategory: { [key: string]: ScanResult[] };
   progress: {
     current: number;
     total: number;
     percentage: number;
+    currentSymbol: string;
   };
 }
 
 /**
  * Hook que maneja el escaneo y obtención de recomendaciones
+ * Intenta cargar desde caché primero, luego escanea si es necesario
  */
 export function useDailyRecommendations(): UseDailyRecommendationsReturn {
-  const [recommendations, setRecommendations] = useState<DailyRecommendation | null>(
-    () => getSavedRecommendations()
-  );
+  const [recommendations, setRecommendations] = useState<DailyRecommendation | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [progress, setProgress] = useState({ current: 0, total: 0, percentage: 0 });
+  const [progress, setProgress] = useState({ current: 0, total: 0, percentage: 0, currentSymbol: '' });
 
-  const fetchRecommendations = useCallback(async () => {
-    // Verificar si ya tenemos recomendaciones del día
-    const saved = getSavedRecommendations();
-    if (saved) {
-      setRecommendations(saved);
-      return;
+  // Cargar recomendaciones guardadas solo al montar el componente
+  useEffect(() => {
+    try {
+      const saved = getSavedRecommendations();
+      if (saved) {
+        setRecommendations(saved);
+      }
+    } catch (err) {
+      console.error('Error loading saved recommendations:', err);
+      // Continuar, el usuario puede hacer escaneo manual
+    }
+  }, []);
+
+  const fetchRecommendations = useCallback(async (force: boolean = false) => {
+    if (force) {
+      clearRecommendationsCache();
+      setRecommendations(null);
+    }
+
+    if (!force) {
+      const saved = getSavedRecommendations();
+      if (saved) {
+        setRecommendations(saved);
+        return;
+      }
     }
 
     setIsLoading(true);
     setError(null);
-    setProgress({ current: 0, total: 0, percentage: 0 });
+    setProgress({ current: 0, total: 0, percentage: 0, currentSymbol: '' });
 
     try {
-      const result = await scanAllAssets();
-      setRecommendations(result);
-      saveRecommendations(result);
+      const result = await scanAllAssets((progressUpdate) => {
+        setProgress(progressUpdate);
+      });
+      
+      if (result) {
+        setRecommendations(result);
+        saveRecommendations(result);
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error desconocido al escanear activos';
       setError(errorMessage);
       setRecommendations(null);
+      
+      // Intentar usar caché antiguo si está disponible
+      try {
+        const oldCache = getSavedRecommendations();
+        if (oldCache) {
+          setRecommendations(oldCache);
+          setError(errorMessage + ' (usando caché anterior)');
+        }
+      } catch { /* ignorar */ }
     } finally {
       setIsLoading(false);
     }

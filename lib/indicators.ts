@@ -155,30 +155,87 @@ export function calculateMACD(
 }
 
 /**
- * Calcula el ADX (Average Directional Index)
- * @param candles - Array de velas con OHLCV
+ * Calcula el ATR (Average True Range)
+ * @param highs - Array de precios máximos
+ * @param lows - Array de precios mínimos  
+ * @param closes - Array de precios de cierre
+ * @param period - Período del ATR (default: 14)
+ * @returns Array con los valores de ATR
+ */
+export function calculateATR(
+  highs: number[],
+  lows: number[],
+  closes: number[],
+  period: number = 14
+): number[] {
+  const result: number[] = new Array(highs.length).fill(NaN);
+  
+  if (highs.length < period) return result;
+
+  // Calcular True Range (TR) para cada período
+  const trueRanges: number[] = [];
+  
+  for (let i = 0; i < highs.length; i++) {
+    let tr: number;
+    
+    if (i === 0) {
+      tr = highs[i] - lows[i];
+    } else {
+      const hl = highs[i] - lows[i];
+      const hc = Math.abs(highs[i] - closes[i - 1]);
+      const lc = Math.abs(lows[i] - closes[i - 1]);
+      tr = Math.max(hl, hc, lc);
+    }
+    
+    trueRanges.push(tr);
+  }
+
+  // Primera ATR es SMA del primer período
+  let atr = trueRanges.slice(0, period).reduce((a, b) => a + b, 0) / period;
+  result[period - 1] = atr;
+
+  // Suavizamiento de Wilder para el resto
+  for (let i = period; i < trueRanges.length; i++) {
+    atr = (atr * (period - 1) + trueRanges[i]) / period;
+    result[i] = atr;
+  }
+
+  return result;
+}
+
+/**
+ * Calcula ADX (Average Directional Index) - versión mejorada
+ * @param highs - Array de precios máximos
+ * @param lows - Array de precios mínimos
+ * @param closes - Array de precios de cierre
  * @param period - Período del ADX (default: 14)
  * @returns Array con los valores de ADX (0-100)
  */
 export function calculateADX(
-  candles: Array<{ high: number; low: number; close: number }>,
+  highs: number[],
+  lows: number[],
+  closes: number[],
   period: number = 14
 ): number[] {
-  const result: number[] = new Array(candles.length).fill(NaN);
-  if (candles.length <= period) return result;
+  const result: number[] = new Array(highs.length).fill(NaN);
+  
+  if (highs.length <= period) return result;
 
   // Paso 1: Calcular el rango verdadero (True Range - TR)
   const trueRanges: number[] = [];
-  for (let i = 0; i < candles.length; i++) {
+  
+  for (let i = 0; i < highs.length; i++) {
     let tr: number;
+    
     if (i === 0) {
-      tr = candles[i].high - candles[i].low;
+      tr = highs[i] - lows[i];
     } else {
-      const hl = candles[i].high - candles[i].low;
-      const hc = Math.abs(candles[i].high - candles[i - 1].close);
-      const lc = Math.abs(candles[i].low - candles[i - 1].close);
+      const hl = highs[i] - lows[i];
+      const hc = Math.abs(highs[i] - closes[i - 1]);
+      const lc = Math.abs(lows[i] - closes[i - 1]);
       tr = Math.max(hl, hc, lc);
     }
+    
     trueRanges.push(tr);
   }
 
@@ -186,17 +243,18 @@ export function calculateADX(
   const plusDM: number[] = [];
   const minusDM: number[] = [];
 
-  for (let i = 0; i < candles.length; i++) {
+  for (let i = 0; i < highs.length; i++) {
     let pdm = 0;
     let mdm = 0;
 
     if (i > 0) {
-      const upMove = candles[i].high - candles[i - 1].high;
-      const downMove = candles[i - 1].low - candles[i].low;
+      const upMove = highs[i] - highs[i - 1];
+      const downMove = lows[i - 1] - lows[i];
 
       if (upMove > 0 && upMove > downMove) {
         pdm = upMove;
       }
+      
       if (downMove > 0 && downMove > upMove) {
         mdm = downMove;
       }
@@ -211,10 +269,10 @@ export function calculateADX(
   let smoothedPlusDM = plusDM.slice(0, period).reduce((a, b) => a + b, 0);
   let smoothedMinusDM = minusDM.slice(0, period).reduce((a, b) => a + b, 0);
 
-  // Paso 4: Calcular los indicadores direccionales (+DI y -DI)
-  const diArray: { plus: number; minus: number }[] = [];
+  // Paso 4: Calcular el ADX
+  const dxArray: number[] = [];
 
-  for (let i = period - 1; i < candles.length; i++) {
+  for (let i = period - 1; i < highs.length; i++) {
     if (i >= period) {
       smoothedTR = smoothedTR - smoothedTR / period + trueRanges[i];
       smoothedPlusDM = smoothedPlusDM - smoothedPlusDM / period + plusDM[i];
@@ -224,19 +282,13 @@ export function calculateADX(
     const plusDI = (smoothedPlusDM / smoothedTR) * 100;
     const minusDI = (smoothedMinusDM / smoothedTR) * 100;
 
-    diArray.push({ plus: plusDI, minus: minusDI });
-  }
-
-  // Paso 5: Calcular el índice direccional (DX)
-  const dxArray: number[] = [];
-  for (let i = 0; i < diArray.length; i++) {
-    const di = diArray[i];
-    const diSum = di.plus + di.minus;
-    const dx = diSum !== 0 ? ((Math.abs(di.plus - di.minus) / diSum) * 100) : 0;
+    const diSum = plusDI + minusDI;
+    const dx = diSum !== 0 ? ((Math.abs(plusDI - minusDI) / diSum) * 100) : 0;
+    
     dxArray.push(dx);
   }
 
-  // Paso 6: Suavizar el DX para obtener ADX
+  // Calcular ADX como EMA del DX
   if (dxArray.length >= period) {
     let adx = dxArray.slice(0, period).reduce((a, b) => a + b, 0) / period;
     result[period + period - 1] = adx;
@@ -251,91 +303,63 @@ export function calculateADX(
 }
 
 /**
- * Calcula el Indicador Estocástico (Stochastic Oscillator)
- * @param candles - Array de velas con precios OHLC
- * @param kPeriod - Período para %K (default: 14)
- * @param dPeriod - Período para %D media móvil (default: 3)
+ * Calcula el Estocástico (Stochastic Oscillator)
+ * @param highs - Array de precios máximos
+ * @param lows - Array de precios mínimos
+ * @param closes - Array de precios de cierre
+ * @param period - Período para %K (default: 14)
  * @param smoothK - Períodos de suavizado para %K (default: 3)
- * @returns Objeto con arrays de %K (línea rápida) y %D (línea lenta)
+ * @returns Objeto con arrays de %K y %D
  */
 export function calculateStochastic(
-  candles: Array<{ high: number; low: number; close: number }>,
-  kPeriod: number = 14,
-  dPeriod: number = 3,
+  highs: number[],
+  lows: number[],
+  closes: number[],
+  period: number = 14,
   smoothK: number = 3
-): { 
-  k: number[]; 
-  d: number[]; 
-  kFast?: number[];
-  currentK?: number;
-  currentD?: number;
-} {
-  const result: number[] = new Array(candles.length).fill(NaN);
+): { k: number[]; d: number[] } {
+  const result: number[] = new Array(highs.length).fill(NaN);
+  const dResult: number[] = new Array(highs.length).fill(NaN);
+
+  if (highs.length < period) {
+    return { k: result, d: dResult };
+  }
+
+  // Calcular %K rápido (raw stochastic)
   const kValues: number[] = [];
 
-  if (candles.length < kPeriod) {
-    return { k: result, d: result.slice(), kFast: result.slice() };
-  }
-
-  // Paso 1: Calcular %K rápido (raw stochastic)
-  // %K = (Close - Lowest Low) / (Highest High - Lowest Low) * 100
-  for (let i = kPeriod - 1; i < candles.length; i++) {
-    const slice = candles.slice(i - kPeriod + 1, i + 1);
-    const highest = Math.max(...slice.map(c => c.high));
-    const lowest = Math.min(...slice.map(c => c.low));
+  for (let i = period - 1; i < highs.length; i++) {
+    const slice = { 
+      highs: highs.slice(i - period + 1, i + 1),
+      lows: lows.slice(i - period + 1, i + 1)
+    };
+    
+    const highest = Math.max(...slice.highs);
+    const lowest = Math.min(...slice.lows);
     const range = highest - lowest;
 
-    if (range === 0) {
-      kValues.push(50); // Si no hay rango, usar 50
-    } else {
-      const stoch = ((candles[i].close - lowest) / range) * 100;
-      kValues.push(stoch);
-    }
+    const stoch = range === 0 ? 50 : ((closes[i] - lowest) / range) * 100;
+    kValues.push(stoch);
   }
 
-  // Paso 2: Suavizar %K (línea rápida)
-  const kSmoothed: number[] = calculateSMA(kValues, smoothK);
+  // Suavizar %K
+  const kSmoothed = calculateSMA(kValues, smoothK);
 
-  // Paso 3: Calcular %D (línea lenta) - Media móvil de %K suavizado
-  const dValues: number[] = calculateSMA(kSmoothed, dPeriod);
+  // Calcular %D (SMA de %K suavizado)
+  const dValues = calculateSMA(kSmoothed, 3);
 
-  // Llenar el resultado con NaN al inicio y luego con los valores calculados
-  const offset = kPeriod - 1;
+  // Llenar resultados
+  const offset = period - 1;
   for (let i = 0; i < kSmoothed.length; i++) {
     result[offset + i] = kSmoothed[i];
   }
 
-  const dResult: number[] = new Array(candles.length).fill(NaN);
-  const dOffset = offset + smoothK - 1 + dPeriod - 1;
+  const dOffset = offset + smoothK - 1 + 2;
   for (let i = 0; i < dValues.length; i++) {
     if (dOffset + i < dResult.length) {
       dResult[dOffset + i] = dValues[i];
     }
   }
 
-  // Obtener los valores actuales (últimos valores válidos)
-  let currentK: number | undefined;
-  let currentD: number | undefined;
-  
-  for (let i = result.length - 1; i >= 0; i--) {
-    if (!isNaN(result[i])) {
-      currentK = result[i];
-      break;
-    }
-  }
-  
-  for (let i = dResult.length - 1; i >= 0; i--) {
-    if (!isNaN(dResult[i])) {
-      currentD = dResult[i];
-      break;
-    }
-  }
-
-  return {
-    k: result,
-    d: dResult,
-    kFast: kValues, // %K sin suavizar (opcional)
-    currentK,
-    currentD,
-  };
+  return { k: result, d: dResult };
 }

@@ -1,8 +1,12 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Search, Plus, X, Heart, ChevronDown, Loader2 } from 'lucide-react';
 import { useMarketStore } from '@/lib/store';
+import { getCategories, getAssetsByCategory, getAssetDescription } from '@/lib/scannerAssets';
+import { priceCache } from '@/lib/services/priceCache';
+import { validateSymbol, createSafeParams } from '@/lib/services/validationService';
 
 interface NavBarProps {
   selectedType: string | null;
@@ -11,17 +15,42 @@ interface NavBarProps {
   onSearchChange: (query: string) => void;
 }
 
+const CATEGORY_ICONS: Record<string, string> = {
+  'Favoritos': '⭐',
+  'Criptomonedas': '₿',
+  'Acciones': '📈',
+  'Índices': '📊',
+  'Forex': '💱',
+  'Commodities': '🛢️',
+  'Tecnología': '💻',
+  'Bancos': '🏦',
+  'Consumo': '🛒',
+  'Salud': '⚕️',
+  'Energía': '⚡',
+  'Inmobiliario': '🏠',
+  'Utilities': '🔌',
+  'Telecomunicaciones': '📡',
+  'Industriales': '🏭',
+};
+
 const ASSET_TYPES = [
-  { value: 'favorites', label: 'Favoritos', emoji: '⭐' },
-  { value: 'crypto',    label: 'Criptos',   emoji: '🪙' },
-  { value: 'stock',     label: 'Acciones',  emoji: '📈' },
-  { value: 'index',     label: 'Índices',   emoji: '📊' },
-  { value: 'forex',     label: 'Forex',     emoji: '💱' },
-  { value: 'commodity', label: 'Commodities', emoji: '🛢️' },
+  { value: 'favorites', label: 'Favoritos', emoji: '⭐', isScanner: false },
 ];
 
+// Usar dinámicamente las categorías del scanner
+const SCANNER_CATEGORIES = getCategories()
+  .map(cat => ({
+    value: `scanner_${cat.toLowerCase().replace(/\s+/g, '_')}`,
+    label: cat,
+    emoji: CATEGORY_ICONS[cat] || '📊',
+    isScanner: true,
+  }));
+
+const ALL_ASSET_TYPES = [...ASSET_TYPES, ...SCANNER_CATEGORIES];
+
 export function NavBar({ selectedType, searchQuery, onSearchChange }: NavBarProps) {
-  const { assets, addAsset, toggleFavorite, setSelectedAsset, updateAssetPrice } = useMarketStore();
+  const router = useRouter();
+  const { assets, addAsset, toggleFavorite, setSelectedAsset, updateAssetPrice, addOrUpdateAssetPrice } = useMarketStore();
   const [showAddModal, setShowAddModal] = useState(false);
   const [newSymbol, setNewSymbol]       = useState('');
   const [newName, setNewName]           = useState('');
@@ -46,27 +75,185 @@ export function NavBar({ selectedType, searchQuery, onSearchChange }: NavBarProp
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+
+  // Estado para rastrear cuáles símbolos fallaron en la carga
+  const [failedSymbols, setFailedSymbols] = useState<Set<string>>(new Set());
+  const failedSymbolsRef = useRef<Map<string, Set<string>>>(new Map());
+
   // Cargar precios de los activos de un tipo cuando se abre su dropdown
   const fetchPricesForType = useCallback(async (type: string) => {
     if (loadedTypes.current.has(type)) return; // ya cargado, no refetch
     setLoadingType(type);
     const store = useMarketStore.getState();
-    const list = type === 'favorites'
-      ? store.assets.filter(a => a.isFavorite)
-      : store.assets.filter(a => a.type === type);
+    
+    // Timeout de 18 segundos para la carga
+    const timeoutId = setTimeout(() => {
+      console.warn(`⏱️ Timeout en carga de ${type}`);
+      setLoadingType(null);
+      loadedTypes.current.add(type);
+    }, 18000);
 
-    await Promise.allSettled(list.map(async (asset) => {
-      try {
-        const res = await fetch(`/api/market?symbol=${asset.symbol}&type=price`);
-        if (!res.ok) return;
-        const d = await res.json();
-        if (!d.price || isNaN(d.price)) return;
-        updateAssetPrice(asset.symbol, d.price, d.change ?? 0, d.changePercent ?? 0);
-      } catch { /* ignorar */ }
-    }));
+    try {
+      const currentFailed = new Set<string>();
+      failedSymbolsRef.current.set(type, currentFailed);
 
-    loadedTypes.current.add(type);
-    setLoadingType(null);
+      if (type === 'favorites') {
+        const list = store.assets.filter(a => a.isFavorite);
+        await Promise.allSettled(list.map(async (asset) => {
+          try {
+            if (!validateSymbol(asset.symbol)) {
+              currentFailed.add(asset.symbol);
+              return;
+            }
+            
+            const params = createSafeParams({
+              symbol: asset.symbol.toUpperCase(),
+              type: 'price'
+            });
+            
+            const res = await fetch(`/api/market?${params.toString()}`);
+            if (!res.ok) {
+              currentFailed.add(asset.symbol);
+              return;
+            }
+            const d = await res.json();
+            
+            // Validar que tenemos precio válido - más permisivo
+            if (d?.price !== undefined && d?.price !== null && d?.price !== '') {
+              const price = parseFloat(String(d.price));
+              if (!isNaN(price)) {
+                const change = parseFloat(String(d.change ?? 0));
+                const changePercent = parseFloat(String(d.changePercent ?? 0));
+                updateAssetPrice(asset.symbol, price, isNaN(change) ? 0 : change, isNaN(changePercent) ? 0 : changePercent);
+              } else {
+                currentFailed.add(asset.symbol);
+              }
+            } else {
+              currentFailed.add(asset.symbol);
+            }
+          } catch { 
+            currentFailed.add(asset.symbol);
+          }
+        }));
+      } else if (type.startsWith('scanner_')) {
+        // Es una categoría del scanner, cargar precios para esos símbolos con batching y caché
+        const categoryName = ALL_ASSET_TYPES.find(t => t.value === type)?.label || '';
+        const symbols = getAssetsByCategory(categoryName);
+        
+        // Separar en símbolos con caché y sin caché
+        const symbolsToFetch: string[] = [];
+        const cachedSymbols: [string, any][] = [];
+        
+        for (const symbol of symbols) {
+          if (!validateSymbol(symbol)) {
+            currentFailed.add(symbol);
+            continue;
+          }
+          const cached = priceCache.get(symbol);
+          if (cached) {
+            cachedSymbols.push([symbol, cached]);
+          } else {
+            symbolsToFetch.push(symbol);
+          }
+        }
+        
+        // Actualizar los símbolos en caché primero
+        for (const [symbol, data] of cachedSymbols) {
+          addOrUpdateAssetPrice(symbol, symbol, data.price, data.change, data.changePercent, 'crypto');
+        }
+        
+        // Cargar en lotes de 5 para evitar rate limiting
+        const batchSize = 5;
+        for (let i = 0; i < symbolsToFetch.length; i += batchSize) {
+          const batch = symbolsToFetch.slice(i, i + batchSize);
+          
+          await Promise.allSettled(batch.map(async (symbol: string) => {
+            try {
+              const params = createSafeParams({
+                symbol: symbol.toUpperCase(),
+                type: 'price'
+              });
+              
+              const res = await fetch(`/api/market?${params.toString()}`);
+              if (!res.ok) {
+                currentFailed.add(symbol);
+                return;
+              }
+              const d = await res.json();
+              
+              // Validar que tenemos precio válido - más permisivo
+              if (d?.price !== undefined && d?.price !== null && d?.price !== '') {
+                const price = parseFloat(String(d.price));
+                if (!isNaN(price)) {
+                  const change = parseFloat(String(d.change ?? 0));
+                  const changePercent = parseFloat(String(d.changePercent ?? 0));
+                  
+                  // Guardar en caché
+                  priceCache.set(symbol, price, isNaN(change) ? 0 : change, isNaN(changePercent) ? 0 : changePercent);
+                  addOrUpdateAssetPrice(symbol, symbol, price, isNaN(change) ? 0 : change, isNaN(changePercent) ? 0 : changePercent, 'crypto');
+                } else {
+                  currentFailed.add(symbol);
+                }
+              } else {
+                currentFailed.add(symbol);
+              }
+            } catch { 
+              currentFailed.add(symbol);
+            }
+          }));
+          
+          // Delay entre lotes
+          if (i + batchSize < symbolsToFetch.length) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        }
+      } else {
+        const list = store.assets.filter(a => a.type === type);
+        
+        await Promise.allSettled(list.map(async (asset) => {
+          try {
+            if (!validateSymbol(asset.symbol)) {
+              currentFailed.add(asset.symbol);
+              return;
+            }
+            
+            const params = createSafeParams({
+              symbol: asset.symbol.toUpperCase(),
+              type: 'price'
+            });
+            
+            const res = await fetch(`/api/market?${params.toString()}`);
+            if (!res.ok) {
+              currentFailed.add(asset.symbol);
+              return;
+            }
+            const d = await res.json();
+            
+            // Validar que tenemos precio válido - más permisivo
+            if (d?.price !== undefined && d?.price !== null && d?.price !== '') {
+              const price = parseFloat(String(d.price));
+              if (!isNaN(price)) {
+                const change = parseFloat(String(d.change ?? 0));
+                const changePercent = parseFloat(String(d.changePercent ?? 0));
+                updateAssetPrice(asset.symbol, price, isNaN(change) ? 0 : change, isNaN(changePercent) ? 0 : changePercent);
+              } else {
+                currentFailed.add(asset.symbol);
+              }
+            } else {
+              currentFailed.add(asset.symbol);
+            }
+          } catch { 
+            currentFailed.add(asset.symbol);
+          }
+        }));
+      }
+
+      setFailedSymbols(currentFailed);
+      loadedTypes.current.add(type);
+      setLoadingType(null);
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }, [updateAssetPrice]);
 
   const handleToggleDropdown = (type: string) => {
@@ -79,9 +266,63 @@ export function NavBar({ selectedType, searchQuery, onSearchChange }: NavBarProp
   };
 
   const handleSelectAsset = (assetId: string) => {
-    const asset = assets.find(a => a.id === assetId);
-    if (asset) { setSelectedAsset(asset); setOpenDropdown(null); }
+    // Buscar primero en el store
+    let asset = assets.find(a => a.id === assetId);
+    
+    // Si no existe (es un activo del scanner), crearlo
+    if (!asset) {
+      // Extraer símbolo del ID (formato: scanner_CategoryName_SYMBOL)
+      const parts = assetId.split('_');
+      const symbol = parts[parts.length - 1]; // Último elemento es el símbolo
+      
+      if (symbol) {
+        // Crear un asset temporal con los datos disponibles
+        const existingAsset = assets.find(a => a.symbol === symbol);
+        asset = {
+          id: assetId,
+          symbol,
+          name: symbol,
+          type: 'crypto', // tipo por defecto para activos del scanner
+          price: existingAsset?.price ?? 0,
+          change: existingAsset?.change ?? 0,
+          changePercent: existingAsset?.changePercent ?? 0,
+          isFavorite: existingAsset?.isFavorite ?? false,
+        };
+      }
+    }
+    
+    if (asset) {
+      setSelectedAsset(asset);
+      setOpenDropdown(null);
+      
+      // Si estamos en otra página (como /recommendations), navegar a home
+      const currentPath = window.location.pathname;
+      if (currentPath !== '/') {
+        router.push('/');
+      }
+    }
   };
+
+  // Obtener activos del scanner para una categoría
+  const getScannerAssets = useCallback((categoryName: string) => {
+    const symbols = getAssetsByCategory(categoryName);
+    const uniqueSymbols = Array.from(new Set(symbols));
+    return uniqueSymbols.map((symbol: string, index: number) => {
+      const existingAsset = assets.find(a => a.symbol === symbol);
+      const assetInfo = getAssetDescription(symbol);
+      return {
+        id: `scanner_${categoryName.toLowerCase().replace(/\s+/g, '_')}_${index}_${symbol}`,
+        symbol,
+        name: assetInfo?.name || symbol,
+        description: assetInfo?.description,
+        type: 'scanner',
+        price: existingAsset?.price ?? 0,
+        change: existingAsset?.change ?? 0,
+        changePercent: existingAsset?.changePercent ?? 0,
+        isFavorite: existingAsset?.isFavorite ?? false,
+      };
+    });
+  }, [assets]);
 
   const handleAddAsset = () => {
     if (newSymbol.trim() && newName.trim()) {
@@ -93,6 +334,7 @@ export function NavBar({ selectedType, searchQuery, onSearchChange }: NavBarProp
   return (
     <>
       <div className="border-b border-border bg-card/50 px-4 py-2 transition-colors duration-300">
+
         <div className="flex items-center gap-3 flex-wrap">
 
           {/* Buscador */}
@@ -109,9 +351,11 @@ export function NavBar({ selectedType, searchQuery, onSearchChange }: NavBarProp
 
           {/* Dropdowns por tipo */}
           <div ref={dropdownRef} className="flex items-center gap-1.5 flex-wrap relative">
-            {ASSET_TYPES.map((type) => {
+            {ALL_ASSET_TYPES.map((type) => {
               const list = type.value === 'favorites'
                 ? assets.filter(a => a.isFavorite)
+                : type.isScanner
+                ? getScannerAssets(type.label)
                 : assets.filter(a => a.type === type.value);
 
               const filteredList = searchQuery
@@ -138,7 +382,7 @@ export function NavBar({ selectedType, searchQuery, onSearchChange }: NavBarProp
                     <span>{type.emoji}</span>
                     <span>{type.label}</span>
                     <span className="text-xs opacity-70">({list.length})</span>
-                    {isLoading
+                    {isLoading && !type.isScanner
                       ? <Loader2 className="w-3 h-3 animate-spin ml-0.5" />
                       : <ChevronDown className={`w-3 h-3 ml-0.5 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
                     }
@@ -157,29 +401,40 @@ export function NavBar({ selectedType, searchQuery, onSearchChange }: NavBarProp
                           {filteredList.length === 0 ? (
                             <p className="text-xs text-muted-foreground px-3 py-3">Sin resultados</p>
                           ) : (
-                            filteredList.map((asset) => (
-                              <div key={asset.id} className="flex items-center justify-between px-3 py-2 hover:bg-muted/50 cursor-pointer transition-colors group"
-                                onClick={() => handleSelectAsset(asset.id)}>
-                                <div>
-                                  <p className="text-sm font-semibold text-foreground">{asset.symbol}</p>
-                                  <p className="text-xs text-muted-foreground truncate max-w-[100px]">{asset.name}</p>
-                                </div>
-                                <div className="flex items-center gap-2 ml-2">
-                                  <div className="text-right">
-                                    <p className="text-xs font-mono font-bold text-foreground">${asset.price.toFixed(2)}</p>
-                                    <p className={`text-xs font-bold ${asset.changePercent >= 0 ? 'price-up' : 'price-down'}`}>
-                                      {asset.changePercent >= 0 ? '+' : ''}{asset.changePercent.toFixed(2)}%
-                                    </p>
+                            filteredList.map((asset) => {
+                              const isFailed = failedSymbolsRef.current.get(type.value)?.has(asset.symbol) ?? false;
+                              return (
+                                <div key={asset.id} className="flex items-center justify-between px-3 py-2 hover:bg-muted/50 cursor-pointer transition-colors group"
+                                  onClick={() => !isFailed && handleSelectAsset(asset.id)}>
+                                  <div className="flex-1">
+                                    <p className="text-sm font-semibold text-foreground">{asset.symbol}</p>
+                                    <p className="text-xs text-muted-foreground">{asset.name}</p>
                                   </div>
-                                  {type.value === 'favorites' && (
-                                    <button onClick={(e) => { e.stopPropagation(); toggleFavorite(asset.symbol); }}
-                                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-muted transition-all">
-                                      <Heart className="w-3 h-3 fill-red-500 text-red-500" />
-                                    </button>
-                                  )}
+                                  <div className="flex items-center gap-2 ml-2">
+                                    <div className="text-right">
+                                      {isFailed ? (
+                                        <p className="text-xs text-destructive font-medium">No cargó</p>
+                                      ) : asset.price > 0 ? (
+                                        <>
+                                          <p className="text-xs font-mono font-bold text-foreground">${asset.price.toFixed(2)}</p>
+                                          <p className={`text-xs font-bold ${asset.changePercent >= 0 ? 'price-up' : 'price-down'}`}>
+                                            {asset.changePercent >= 0 ? '+' : ''}{asset.changePercent.toFixed(2)}%
+                                          </p>
+                                        </>
+                                      ) : (
+                                        <p className="text-xs text-muted-foreground">--</p>
+                                      )}
+                                    </div>
+                                    {type.value === 'favorites' && (
+                                      <button onClick={(e) => { e.stopPropagation(); toggleFavorite(asset.symbol); }}
+                                        className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-muted transition-all">
+                                        <Heart className="w-3 h-3 fill-red-500 text-red-500" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            ))
+                              );
+                            })
                           )}
                         </div>
                       )}
@@ -227,9 +482,11 @@ export function NavBar({ selectedType, searchQuery, onSearchChange }: NavBarProp
                 <label className="block text-sm font-medium text-foreground mb-1">Tipo</label>
                 <select value={newType} onChange={(e) => setNewType(e.target.value)}
                   className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40">
-                  {ASSET_TYPES.filter(t => t.value !== 'favorites').map((type) => (
-                    <option key={type.value} value={type.value}>{type.emoji} {type.label}</option>
-                  ))}
+                  <option value="crypto">🪙 Criptomonedas</option>
+                  <option value="stock">📈 Acciones</option>
+                  <option value="forex">💱 Forex</option>
+                  <option value="index">📊 Índices</option>
+                  <option value="commodity">🛢️ Commodities</option>
                 </select>
               </div>
               <div className="flex gap-2 pt-2">

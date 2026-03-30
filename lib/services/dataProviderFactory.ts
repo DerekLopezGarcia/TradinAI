@@ -4,6 +4,8 @@
  * Permite agregar/remover/modificar proveedores sin cambiar el código de routing
  */
 
+import { getDataCacheManager } from './dataCacheManager';
+
 export type AssetType = 'crypto' | 'stock' | 'forex' | 'index' | 'commodity';
 
 export interface CandleData {
@@ -144,6 +146,27 @@ export class DataProviderManager {
     type: AssetType,
     interval: string,
     maxRetries: number = 3
+  ): Promise<DataProviderResult | null> {
+    const cacheManager = getDataCacheManager();
+    const cacheKey = `${symbol}:${interval}:${type}`;
+
+    // Intentar obtener del caché primero
+    const cached = await cacheManager.fetchWithCache<DataProviderResult | null>(
+      cacheKey,
+      type,
+      async () => {
+        // Si no está en caché, obtener de proveedores
+        return await this.fetchFromProvidersInternal(symbol, type, interval);
+      }
+    );
+
+    return cached;
+  }
+
+  private async fetchFromProvidersInternal(
+    symbol: string,
+    type: AssetType,
+    interval: string
   ): Promise<DataProviderResult | null> {
     const providers = this.getProviders(symbol, type);
     

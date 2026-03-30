@@ -9,6 +9,7 @@ export interface Asset {
   id: string;
   symbol: string;
   name: string;
+  description?: string;
   type: AssetType;
   price: number;
   change: number;

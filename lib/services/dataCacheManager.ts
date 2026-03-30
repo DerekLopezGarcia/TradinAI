@@ -6,8 +6,9 @@
  */
 
 import { CandleData, AssetType } from '@/lib/types';
-import { BaseService, MemoryCacheService } from '@/lib/core/services';
-import { Logger, ConsoleLogger } from '@/lib/core/services';
+import { BaseService } from '@/lib/core/services';
+import { ConsoleLogger } from '@/lib/core/services';
+import { Logger } from '@/lib/core/architecture';
 
 export interface CacheEntry<T = any> {
   data: T;
@@ -24,7 +25,7 @@ export interface CacheStats {
 }
 
 export class DataCacheManager extends BaseService {
-  private cache = new Map<string, CacheEntry>();
+  private dataCache: Map<string, CacheEntry>;
   private stats = {
     hits: 0,
     misses: 0
@@ -41,6 +42,7 @@ export class DataCacheManager extends BaseService {
 
   constructor(logger?: Logger) {
     super('dataCache', logger);
+    this.dataCache = new Map<string, CacheEntry>();
     this.logger.info('DataCacheManager initialized', {
       ttls: this.cacheTTL
     });
@@ -64,7 +66,7 @@ export class DataCacheManager extends BaseService {
       this.stats.hits++;
       this.logger.debug(`Cache HIT for ${key}`, {
         type,
-        age: Date.now() - (this.cache.get(key)?.timestamp || 0)
+        age: Date.now() - (this.dataCache.get(key)?.timestamp || 0)
       });
       return cached;
     }
@@ -90,7 +92,7 @@ export class DataCacheManager extends BaseService {
    * Obtener datos del caché
    */
   private getFromCache<T = any>(key: string): T | null {
-    const entry = this.cache.get(key);
+    const entry = this.dataCache.get(key);
     
     if (!entry) {
       return null;
@@ -99,7 +101,7 @@ export class DataCacheManager extends BaseService {
     // Verificar si expiró
     const age = Date.now() - entry.timestamp;
     if (age > entry.ttl) {
-      this.cache.delete(key);
+      this.dataCache.delete(key);
       this.logger.debug(`Cache EXPIRED for ${key}`, {
         age,
         ttl: entry.ttl
@@ -120,7 +122,7 @@ export class DataCacheManager extends BaseService {
   ): void {
     const ttl = this.cacheTTL[type];
     
-    this.cache.set(key, {
+    this.dataCache.set(key, {
       data,
       timestamp: Date.now(),
       ttl,
@@ -130,7 +132,7 @@ export class DataCacheManager extends BaseService {
     this.logger.debug(`Cache SET for ${key}`, {
       type,
       ttl,
-      totalEntries: this.cache.size
+      totalEntries: this.dataCache.size
     });
   }
 
@@ -138,8 +140,8 @@ export class DataCacheManager extends BaseService {
    * Limpiar caché completamente
    */
   clear(): void {
-    const size = this.cache.size;
-    this.cache.clear();
+    const size = this.dataCache.size;
+    this.dataCache.clear();
     this.stats.hits = 0;
     this.stats.misses = 0;
     
@@ -150,16 +152,16 @@ export class DataCacheManager extends BaseService {
    * Limpiar caché expirada
    */
   private cleanupExpired(): void {
-    const before = this.cache.size;
+    const before = this.dataCache.size;
     const now = Date.now();
     
-    for (const [key, entry] of this.cache.entries()) {
+    for (const [key, entry] of this.dataCache.entries()) {
       if (now - entry.timestamp > entry.ttl) {
-        this.cache.delete(key);
+        this.dataCache.delete(key);
       }
     }
 
-    const after = this.cache.size;
+    const after = this.dataCache.size;
     if (before !== after) {
       this.logger.debug(`Cache cleanup`, {
         removed: before - after,
@@ -188,7 +190,7 @@ export class DataCacheManager extends BaseService {
       hits: this.stats.hits,
       misses: this.stats.misses,
       hitRate: Math.round(hitRate * 100) / 100,
-      totalEntries: this.cache.size
+      totalEntries: this.dataCache.size
     };
   }
 
@@ -201,7 +203,7 @@ export class DataCacheManager extends BaseService {
     remaining: number;
     type: AssetType;
   } | null {
-    const entry = this.cache.get(key);
+    const entry = this.dataCache.get(key);
     if (!entry) return null;
 
     const age = Date.now() - entry.timestamp;
@@ -227,7 +229,7 @@ export class DataCacheManager extends BaseService {
     const now = Date.now();
     const entries = [];
 
-    for (const [key, entry] of this.cache.entries()) {
+    for (const [key, entry] of this.dataCache.entries()) {
       const age = now - entry.timestamp;
       const remaining = Math.max(0, entry.ttl - age);
 
@@ -252,4 +254,8 @@ export function getDataCacheManager(): DataCacheManager {
   }
   return instance;
 }
+
+
+
+
 

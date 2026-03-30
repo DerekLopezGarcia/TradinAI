@@ -6,10 +6,17 @@ import { NewsItem, Sentiment } from '@/lib/types';
  */
 
 class NewsService {
-  private finnhubApiKey = process.env.NEXT_PUBLIC_FINNHUB_KEY || '';
-  private newsApiKey = process.env.NEXT_PUBLIC_NEWS_API_KEY || '';
+  private finnhubApiKey: string;
+  private newsApiKey: string;
   private cache = new Map<string, { data: NewsItem[]; timestamp: number }>();
   private readonly CACHE_TTL = 300000; // 5 minutos
+
+  constructor() {
+    // Usar variables de servidor (no NEXT_PUBLIC) para secrets
+    // Si no están disponibles (client-side), usar vacías (forzar server-side API call)
+    this.finnhubApiKey = process.env.FINNHUB_KEY || '';
+    this.newsApiKey = process.env.NEWS_API_KEY || '';
+  }
 
   /**
    * Analiza el sentimiento de un texto

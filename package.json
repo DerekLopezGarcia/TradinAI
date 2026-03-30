@@ -7,7 +7,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "security-check": "node scripts/security-check.js",
+    "pre-push": "npm run security-check && npm run lint"
   },
   "dependencies": {
     "@types/react": "^19.0.0",
@@ -19,7 +21,7 @@
     "date-fns": "^2.30.0",
     "lightweight-charts": "^4.2.3",
     "lucide-react": "^0.294.0",
-    "next": "^15.0.0",
+    "next": "^16.1.7",
     "next-themes": "^0.4.6",
     "postcss": "^8.4.31",
     "react": "^19.0.0",

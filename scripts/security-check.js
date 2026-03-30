@@ -48,7 +48,10 @@ function checkGitignore() {
 }
 
 function checkEnvFiles() {
-  log('\n📁 Verificando archivos .env...', 'cyan');
+  log('\n📁 Verificando que .env.local está PROTEGIDO...', 'cyan');
+  
+  const gitignorePath = path.join(process.cwd(), '.gitignore');
+  const gitignoreContent = fs.readFileSync(gitignorePath, 'utf8');
   
   const envFiles = [
     '.env.local',
@@ -56,21 +59,25 @@ function checkEnvFiles() {
     '.env.development.local',
   ];
   
-  let found = false;
+  let allProtected = true;
+  
   for (const file of envFiles) {
     const filePath = path.join(process.cwd(), file);
+    const isInGitignore = gitignoreContent.includes(file);
+    
     if (fs.existsSync(filePath)) {
-      log(`⚠️  Encontrado: ${file} (¡No debe estar en Git!)`, 'yellow');
-      found = true;
+      if (isInGitignore) {
+        log(`✅ ${file} existe localmente y está protegido en .gitignore`, 'green');
+      } else {
+        log(`❌ ${file} existe pero NO está en .gitignore (¡PELIGRO!)`, 'red');
+        allProtected = false;
+      }
+    } else {
+      log(`ℹ️  ${file} no existe (necesitarás crearlo con tus claves)`, 'cyan');
     }
   }
   
-  if (!found) {
-    log('✅ No hay archivos .env locales expuestos', 'green');
-    return true;
-  }
-  
-  return false;
+  return allProtected;
 }
 
 function checkGitHistory() {
@@ -114,7 +121,6 @@ function checkSourceFiles() {
   log('\n📝 Verificando archivos fuente...', 'cyan');
   
   const extensions = ['.ts', '.tsx', '.js', '.jsx', '.json'];
-  const srcDir = path.join(process.cwd(), 'app', 'lib', 'components');
   
   const forbidden = [
     /apiKey\s*[:=]\s*['"][^'"]{20,}['"]/,
@@ -122,6 +128,8 @@ function checkSourceFiles() {
     /sk_live_/,
     /pk_live_/,
   ];
+  
+  const excludeDirs = ['node_modules', 'scripts', '.next', 'dist', '.git'];
   
   let found = false;
   
@@ -131,6 +139,11 @@ function checkSourceFiles() {
     const files = fs.readdirSync(dir);
     for (const file of files) {
       const filePath = path.join(dir, file);
+      const relPath = path.relative(process.cwd(), filePath);
+      
+      // Excluir directorios sensibles
+      if (excludeDirs.some(d => relPath.startsWith(d))) continue;
+      
       const stat = fs.statSync(filePath);
       
       if (stat.isDirectory()) {
@@ -193,4 +206,6 @@ function main() {
 }
 
 main();
+
+
 

@@ -17,6 +17,7 @@ import {
 import { CandleData } from '@/lib/types';
 import { calculateRSI, calculateSMA, calculateEMA, calculateADX, calculateStochastic, calculateBollingerBands } from '@/lib/indicators';
 import { useTheme } from 'next-themes';
+import { marketHoursService } from '@/lib/services/marketHoursService';
 
 interface TradingViewChartProps {
   data: CandleData[];
@@ -417,6 +418,54 @@ export function TradingViewChart({
     userInteractedRef.current = false;
   }, [symbol, interval]);
 
+  // AGREGAR LÍNEAS DE APERTURA Y CIERRE DE MERCADO
+  useEffect(() => {
+    if (!chartRef.current || !symbol || data.length === 0) return;
+
+    const chart = chartRef.current;
+    const candleSeries = candleSeriesRef.current;
+    if (!candleSeries) return;
+
+    try {
+      const marketHours = marketHoursService.getMarketHours(symbol);
+      
+      // Si es cripto o forex (24/7), no mostrar líneas
+      if (marketHours.isOpen24) return;
+
+      // Calcular timestamps de apertura y cierre en UTC
+      const today = new Date();
+      const openTimeToday = new Date(today);
+      openTimeToday.setUTCHours(marketHours.openTime.hour, marketHours.openTime.minute, 0, 0);
+      
+      const closeTimeToday = new Date(today);
+      closeTimeToday.setUTCHours(marketHours.closeTime.hour, marketHours.closeTime.minute, 0, 0);
+
+      const openTimestamp = Math.floor(openTimeToday.getTime() / 1000) as UTCTimestamp;
+      const closeTimestamp = Math.floor(closeTimeToday.getTime() / 1000) as UTCTimestamp;
+
+      // Crear líneas de precio para marcar apertura y cierre
+      candleSeries.createPriceLine({
+        price: 0, // El precio será dinámico, esto es solo un placeholder
+        color: '#22c55e',
+        lineWidth: 2,
+        lineStyle: LineStyle.Dashed,
+        axisLabelVisible: false,
+        title: `Apertura: ${marketHours.openTime.hour.toString().padStart(2, '0')}:${marketHours.openTime.minute.toString().padStart(2, '0')} UTC`,
+      });
+
+      candleSeries.createPriceLine({
+        price: 0,
+        color: '#ef4444',
+        lineWidth: 2,
+        lineStyle: LineStyle.Dashed,
+        axisLabelVisible: false,
+        title: `Cierre: ${marketHours.closeTime.hour.toString().padStart(2, '0')}:${marketHours.closeTime.minute.toString().padStart(2, '0')} UTC`,
+      });
+    } catch (err) {
+      console.error('[TradingViewChart] Error adding market hours lines:', err);
+    }
+  }, [symbol, data.length, chartReady]);
+
   // ...existing code...
   useEffect(() => {
     if (!chartReady || !candleSeriesRef.current) return;
@@ -487,10 +536,12 @@ export function TradingViewChart({
 
     try {
       const closes = data.map(d => +d.close);
+      const highs = data.map(d => +d.high);
+      const lows = data.map(d => +d.low);
       const smaValues = calculateSMA(closes, 20);
       const emaValues = calculateEMA(closes, 20);
-      const adxValues = calculateADX(data as Array<{ high: number; low: number; close: number }>, 14);
-      const stochasticData = calculateStochastic(data as Array<{ high: number; low: number; close: number }>, 14, 3, 3);
+      const adxValues = calculateADX(highs, lows, closes, 14);
+      const stochasticData = calculateStochastic(highs, lows, closes, 14, 3);
 
       const lastSma = smaValues[smaValues.length - 1];
       const lastEma = emaValues[emaValues.length - 1];
@@ -499,8 +550,27 @@ export function TradingViewChart({
       setSmaValue(lastSma > 0 ? lastSma : null);
       setEmaValue(lastEma > 0 ? lastEma : null);
       setAdxValue(!isNaN(lastAdx) && isFinite(lastAdx) ? lastAdx : null);
-      setStochasticK(stochasticData.currentK !== undefined && !isNaN(stochasticData.currentK) ? stochasticData.currentK : null);
-      setStochasticD(stochasticData.currentD !== undefined && !isNaN(stochasticData.currentD) ? stochasticData.currentD : null);
+      
+      // Extraer últimos valores válidos de Stochastic
+      let lastK: number | null = null;
+      let lastD: number | null = null;
+      
+      for (let i = stochasticData.k.length - 1; i >= 0; i--) {
+        if (!isNaN(stochasticData.k[i])) {
+          lastK = stochasticData.k[i];
+          break;
+        }
+      }
+      
+      for (let i = stochasticData.d.length - 1; i >= 0; i--) {
+        if (!isNaN(stochasticData.d[i])) {
+          lastD = stochasticData.d[i];
+          break;
+        }
+      }
+      
+      setStochasticK(lastK !== null ? lastK : null);
+      setStochasticD(lastD !== null ? lastD : null);
     } catch (err) {
       console.error('[TradingViewChart] SMA/EMA/ADX/Stochastic error:', err);
       setSmaValue(null);
@@ -713,16 +783,37 @@ export function TradingViewChart({
         </div>
       )}
 
-      <div className="flex items-center gap-4 px-4 py-2 border-t border-slate-800 text-[11px] text-slate-500">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 px-4 py-3 border-t border-slate-800 text-[11px] text-slate-500 bg-slate-900/30">
         <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm bg-[#26a69a] inline-block" />Alcista
+          <span className="flex gap-0.5">
+            <span className="w-1.5 h-3 rounded-sm bg-[#26a69a]" />
+            <span className="w-1.5 h-3 rounded-sm bg-[#ef5350]" />
+          </span>
+          <span className="text-slate-300 font-medium text-xs">Alcista/Bajista</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm bg-[#ef5350] inline-block" />Bajista
-        </div>
+
         {showVolume && (
-          <div className="flex items-center gap-1.5 ml-auto">
-            <span className="w-3 h-3 bg-slate-600/50 inline-block rounded-sm" />Volumen
+          <div className="flex items-center gap-1.5">
+            <span className="w-3 h-3 bg-slate-600/50 rounded-sm" />
+            <span className="text-slate-300 font-medium text-xs">Volumen</span>
+          </div>
+        )}
+
+        {showRSI && (
+          <div className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-sm bg-[#8b5cf6]" />
+            <span className="text-slate-300 font-medium text-xs">RSI(14)</span>
+          </div>
+        )}
+
+        {showBollinger && (
+          <div className="flex items-center gap-1.5">
+            <span className="flex gap-1">
+              <span className="w-2 h-0.5 bg-[#818cf8]" />
+              <span className="w-1.5 h-1 bg-[#64748b]" />
+              <span className="w-2 h-0.5 bg-[#818cf8]" />
+            </span>
+            <span className="text-slate-300 font-medium text-xs">Bollinger</span>
           </div>
         )}
       </div>

@@ -23,7 +23,7 @@ export function AutoAnalysisDisplay({
   timeframe,
   candleData,
 }: AutoAnalysisDisplayProps) {
-  const { analysis, explanation, isLoading, error } = useAutoAnalysis(
+  const { analysis, explanation, isLoading, error, runAnalysis } = useAutoAnalysis(
     symbol,
     timeframe,
     candleData,
@@ -46,6 +46,10 @@ export function AutoAnalysisDisplay({
     }));
   };
 
+  const handleRunAnalysis = async () => {
+    await runAnalysis(symbol, timeframe, candleData, 'comprehensive');
+  };
+
   if (error) {
     return (
       <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-6">
@@ -60,7 +64,7 @@ export function AutoAnalysisDisplay({
     );
   }
 
-  if (isLoading || !analysis) {
+  if (isLoading) {
     return (
       <div className="rounded-lg border border-border bg-card p-6">
         <div className="space-y-4">
@@ -76,6 +80,26 @@ export function AutoAnalysisDisplay({
     );
   }
 
+  if (!analysis) {
+    return (
+      <div className="rounded-lg border border-border bg-card p-6">
+        <div className="space-y-4 text-center">
+          <p className="text-muted-foreground">
+            Haz clic en el botón para analizar automáticamente las velas y obtener recomendaciones
+          </p>
+          <button
+            onClick={handleRunAnalysis}
+            disabled={isLoading}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <Zap className="w-4 h-4" />
+            Ejecutar Análisis
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const trend = analysis.summary.trend;
   const isUptrend = trend === 'alcista';
   const prediction = analysis.mainPrediction;
@@ -83,6 +107,18 @@ export function AutoAnalysisDisplay({
 
   return (
     <div className="space-y-4">
+      {/* Botón para ejecutar/actualizar análisis */}
+      <div className="flex justify-end">
+        <button
+          onClick={handleRunAnalysis}
+          disabled={isLoading}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+        >
+          <Zap className="w-4 h-4" />
+          {isLoading ? 'Analizando...' : 'Ejecutar Análisis'}
+        </button>
+      </div>
+
       {/* Header - Resumen Rápido */}
       <div className="rounded-lg border border-border bg-card p-6">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">

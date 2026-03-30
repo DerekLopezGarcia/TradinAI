@@ -39,7 +39,12 @@ export function ChatPanel({ symbol, timeframe }: ChatPanelProps) {
       setIsLoading(true);
 
       try {
-        const response = await fetch(`/api/ai?message=${encodeURIComponent(message)}&symbol=${symbol}`);
+        const params = new URLSearchParams();
+        params.set('message', message);
+        if (symbol) params.set('symbol', symbol);
+        
+        const response = await fetch(`/api/ai?${params.toString()}`);
+        if (!response.ok) throw new Error(`API error: ${response.status}`);
         const data = await response.json();
 
         addChatMessage({

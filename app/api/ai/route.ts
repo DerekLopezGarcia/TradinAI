@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AIAnalysisRequest, AIChatRequest } from '@/lib/types';
+import { analyzeCandles, CandleAnalysisInput } from '@/lib/services/candleAnalysisService';
+import { validateMessage, validateSymbol } from '@/lib/services/validationService';
 
 /**
- * API de Análisis de IA - Proporciona análisis técnico y conversación de mercado
+ * API de Análisis de IA - Proporciona análisis técnico profesional y conversación de mercado
  * Endpoints:
- * - POST /api/ai - Análisis técnico de gráficos
+ * - POST /api/ai/analyze - Análisis profesional de velas japonesas
+ * - POST /api/ai - Análisis técnico de gráficos (legacy)
  * - GET /api/ai - Chat de análisis de mercado
  */
 
@@ -282,11 +285,88 @@ async function generateAIAnalysis(prompt: string): Promise<string> {
 // ==================== HANDLERS ====================
 
 /**
+ * POST /api/ai/analyze
+ * 
+ * Análisis profesional de velas japonesas con sistema completo
+ * Cuerpo esperado:
+ * {
+ *   "symbol": "BTCUSDT",
+ *   "timeframe": "1h",
+ *   "candles": [...],
+ *   "analysisDepth": "comprehensive",
+ *   "tradingStyle": "swing"
+ * }
+ */
+export async function analyzeHandler(request: NextRequest) {
+  const startTime = Date.now();
+  
+  try {
+    const body = await request.json();
+    const { symbol, timeframe, candles, analysisDepth = 'standard', tradingStyle = 'swing' } = body;
+
+    // Validar entrada
+    if (!symbol || !timeframe || !Array.isArray(candles) || candles.length === 0) {
+      return NextResponse.json(
+        { error: 'Se requieren: symbol, timeframe y candles (array)' },
+        { status: 400 }
+      );
+    }
+
+    // Validar que las velas tengan la estructura correcta
+    const validCandles = candles.every(c => 
+      typeof c.time === 'number' && typeof c.open === 'number' &&
+      typeof c.high === 'number' && typeof c.low === 'number' &&
+      typeof c.close === 'number' && typeof c.volume === 'number'
+    );
+
+    if (!validCandles) {
+      return NextResponse.json(
+        { error: 'Las velas deben tener: time, open, high, low, close, volume' },
+        { status: 400 }
+      );
+    }
+
+    // Ejecutar análisis
+    const analysisInput: CandleAnalysisInput = {
+      symbol,
+      timeframe: timeframe as any,
+      candles,
+      analysisDepth: analysisDepth as any,
+      tradingStyle: tradingStyle as any
+    };
+
+    const analysis = analyzeCandles(analysisInput);
+
+    return NextResponse.json({
+      success: true,
+      data: analysis,
+      processingTime: Date.now() - startTime,
+      timestamp: Date.now()
+    });
+
+  } catch (error) {
+    console.error('Error en análisis de velas:', error);
+    return NextResponse.json(
+      {
+        error: 'Fallo en el análisis de velas',
+        details: error instanceof Error ? error.message : 'Error desconocido',
+        timestamp: Date.now()
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
  * POST /api/ai
  *
- * Análisis técnico de gráficos usando IA
+ * Análisis técnico de gráficos usando IA (legacy)
  */
 export async function POST(request: NextRequest) {
+  // Detectar si es para el endpoint /analyze
+  if (request.nextUrl.pathname === '/api/ai/analyze') {
+    return analyzeHandler(request);
+  }
   const startTime = Date.now();
 
   try {
@@ -384,9 +464,17 @@ export async function GET(request: NextRequest) {
     const symbol = searchParams.get('symbol') || '';
 
     // Validar entrada
-    if (!message) {
+    if (!message || !validateMessage(message)) {
       return NextResponse.json(
-        { error: 'Message parameter is required' },
+        { error: 'Message parameter is required and must be valid' },
+        { status: 400 }
+      );
+    }
+
+    // Validar símbolo si se proporciona
+    if (symbol && !validateSymbol(symbol)) {
+      return NextResponse.json(
+        { error: 'Invalid symbol format' },
         { status: 400 }
       );
     }
