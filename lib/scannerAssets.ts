@@ -171,7 +171,7 @@ export const ASSETS_BY_CATEGORY = {
     { symbol: 'LOGI', name: 'Logitech', description: 'Periféricos de computadora' },
   ],
 
-  // === BANCOS (15) ===
+  // === BANCOS (10 - Removidos: HSBC, BARCLAYS, DBKR, BBVA, SAB sin soporte en APIs) ===
   'Bancos': [
     { symbol: 'JPM', name: 'JPMorgan Chase', description: 'Banco de inversión' },
     { symbol: 'BAC', name: 'Bank of America', description: 'Banco comercial' },
@@ -183,11 +183,6 @@ export const ASSETS_BY_CATEGORY = {
     { symbol: 'PNC', name: 'PNC Financial', description: 'Banco regional' },
     { symbol: 'USB', name: 'US Bancorp', description: 'Banco de servicios' },
     { symbol: 'KEY', name: 'KeyCorp', description: 'Banco regional' },
-    { symbol: 'HSBC', name: 'HSBC', description: 'Banco global británico' },
-    { symbol: 'BARCLAYS', name: 'Barclays', description: 'Banco británico' },
-    { symbol: 'DBKR', name: 'Deutsche Bank', description: 'Banco alemán' },
-    { symbol: 'BBVA', name: 'BBVA', description: 'Banco español' },
-    { symbol: 'SAB', name: 'SABADELL', description: 'Banco español' },
   ],
 
   // === CONSUMO (19) ===

@@ -18,6 +18,7 @@ import { TimeFrame, CandleData } from '@/lib/types';
 
 /** Mapeo de símbolos a IDs de CoinGecko */
 const COINGECKO_IDS: Record<string, string> = {
+  // Criptos principales (originales)
   'BTCUSD': 'bitcoin',
   'ETHUSD': 'ethereum',
   'SOLUSD': 'solana',
@@ -26,6 +27,32 @@ const COINGECKO_IDS: Record<string, string> = {
   'DOGEUSD': 'dogecoin',
   'POLKAUSD': 'polkadot',
   'LITEUSD': 'litecoin',
+  
+  // Criptos adicionales (T1.3+: Fix datos faltantes)
+  'BNBUSD': 'binancecoin',
+  'POLYUSD': 'polygon',
+  'AVAXUSD': 'avalanche-2',
+  'LINKUSD': 'chainlink',
+  'MATICUSD': 'matic-network',
+  'DOTUSD': 'polkadot',
+  'ETCUSD': 'ethereum-classic',
+  'XMRUSD': 'monero',
+  'DASHUSD': 'dash',
+  'ZECUSD': 'zcash',
+  'XLMUSD': 'stellar',
+  'XTZUSD': 'tezos',
+  'FILUSD': 'filecoin',
+  'WAVESUSD': 'waves',
+  'NEARUSD': 'near',
+  'ATOMUSD': 'cosmos',
+  'ALGOUSD': 'algorand',
+  'VETUSD': 'vechain',
+  'IOTAUSD': 'iota',
+  'HBARUSD': 'hedera-hashgraph',
+  'CHZUSD': 'chiliz',
+  'SANDUSD': 'the-sandbox',
+  'SUIUSD': 'sui',
+  'ARBUSD': 'arbitrum',
 };
 
 /** Símbolos de criptomonedas conocidas */
@@ -199,7 +226,12 @@ async function getPriceData(symbol: string) {
       console.warn(`Binance price failed for ${symbol}, trying CoinGecko:`, binanceErr);
       // Fallback: CoinGecko
       try {
-        const coinId = COINGECKO_IDS[symbol] || 'bitcoin';
+        // T1.3+: NO usar 'bitcoin' como default - rechazar si no está mapeado
+        const coinId = COINGECKO_IDS[symbol];
+        if (!coinId) {
+          throw new Error(`No mapping in CoinGecko for ${symbol}`);
+        }
+        
         const coinPrice = await marketService.getCoinPrice(coinId);
         return {
           symbol,
@@ -213,7 +245,7 @@ async function getPriceData(symbol: string) {
           timestamp: coinPrice.lastUpdated,
         };
       } catch (coingeckoErr) {
-        throw new Error(`No se puede obtener precio para ${symbol}`);
+        throw new Error(`No se puede obtener precio para ${symbol} - Binance y CoinGecko fallaron`);
       }
     }
   }
