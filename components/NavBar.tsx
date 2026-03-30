@@ -88,20 +88,43 @@ export function NavBar({ selectedType, searchQuery, onSearchChange }: NavBarProp
     setLoadingType(type);
     const store = useMarketStore.getState();
     
-    // Timeout de 18 segundos para la carga
+    // T1.3: Timeout reducido a 5 segundos (detectar fallos rápido vs 18s)
     const timeoutId = setTimeout(() => {
-      console.warn(`⏱️ Timeout en carga de ${type}`);
+      console.warn(`⏱️ Timeout (5s) en carga de ${type}`);
       setLoadingType(null);
       loadedTypes.current.add(type);
-    }, 18000);
+    }, 5000);
 
     try {
       const currentFailed = new Set<string>();
       failedSymbolsRef.current.set(type, currentFailed);
 
+      // T1.3: Función helper para limitar concurrencia (máx 3 requests simultáneos)
+      const fetchWithLimit = async (items: any[], fetchFn: (item: any) => Promise<any>) => {
+        const results: any[] = [];
+        const executing: Promise<any>[] = [];
+
+        for (const item of items) {
+          const promise = fetchFn(item).then(
+            (result) => { executing.splice(executing.indexOf(promise), 1); return result; },
+            (error) => { executing.splice(executing.indexOf(promise), 1); throw error; }
+          );
+
+          executing.push(promise);
+          if (executing.length >= 3) {
+            await Promise.race(executing);
+          }
+        }
+
+        await Promise.allSettled(executing);
+        return results;
+      };
+
       if (type === 'favorites') {
         const list = store.assets.filter(a => a.isFavorite);
-        await Promise.allSettled(list.map(async (asset) => {
+        
+        // T1.3: Limitar a 3 requests simultáneos
+        await Promise.allSettled(list.slice(0, 3).map(async (asset) => {
           try {
             if (!validateSymbol(asset.symbol)) {
               currentFailed.add(asset.symbol);
@@ -113,14 +136,20 @@ export function NavBar({ selectedType, searchQuery, onSearchChange }: NavBarProp
               type: 'price'
             });
             
-            const res = await fetch(`/api/market?${params.toString()}`);
+            // T1.3: Timeout individual de 2s por request
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 2000);
+            
+            const res = await fetch(`/api/market?${params.toString()}`, { signal: controller.signal });
+            clearTimeout(timeoutId);
+            
             if (!res.ok) {
               currentFailed.add(asset.symbol);
               return;
             }
             const d = await res.json();
             
-            // Validar que tenemos precio válido - más permisivo
+            // T1.3: Validar que tenemos precio válido
             if (d?.price !== undefined && d?.price !== null && d?.price !== '') {
               const price = parseFloat(String(d.price));
               if (!isNaN(price)) {
@@ -164,8 +193,8 @@ export function NavBar({ selectedType, searchQuery, onSearchChange }: NavBarProp
           addOrUpdateAssetPrice(symbol, symbol, data.price, data.change, data.changePercent, 'crypto');
         }
         
-        // Cargar en lotes de 5 para evitar rate limiting
-        const batchSize = 5;
+        // T1.3: Cargar en lotes de 3 (vs 5) para rate limiting más agresivo
+        const batchSize = 3;
         for (let i = 0; i < symbolsToFetch.length; i += batchSize) {
           const batch = symbolsToFetch.slice(i, i + batchSize);
           
@@ -176,7 +205,13 @@ export function NavBar({ selectedType, searchQuery, onSearchChange }: NavBarProp
                 type: 'price'
               });
               
-              const res = await fetch(`/api/market?${params.toString()}`);
+              // T1.3: Timeout de 2s individual por request
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 2000);
+              
+              const res = await fetch(`/api/market?${params.toString()}`, { signal: controller.signal });
+              clearTimeout(timeoutId);
+              
               if (!res.ok) {
                 currentFailed.add(symbol);
                 return;

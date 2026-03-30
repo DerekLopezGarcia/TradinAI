@@ -47,6 +47,18 @@ class PriceCache {
   }
 
   /**
+   * T1.3: Obtiene precio del caché aunque esté expirado (stale)
+   * Útil como fallback cuando la API falla
+   * Retorna null si no hay nada en caché
+   */
+  getStale(symbol: string): CachedPrice | null {
+    if (!validateSymbol(symbol)) return null;
+    const cached = this.cache.get(symbol);
+    // NO validar timestamp, retornar aunque esté viejo
+    return this.cache.get(symbol) || null;
+  }
+
+  /**
    * Guarda un precio en caché
    */
   set(symbol: string, price: number, change: number, changePercent: number): void {
