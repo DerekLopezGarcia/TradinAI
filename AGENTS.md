@@ -445,8 +445,33 @@ Edit `candleAnalysisService.ts`:
 
 ---
 
+## ⚠️ INSTRUCCIÓN IMPORTANTE: NO GENERAR DOCUMENTACIÓN
+
+**POR FAVOR LEER ESTO:**
+
+❌ **NO generes archivos de documentación** (markdown, .md, notas, guías, etc.)  
+❌ **NO crees archivos locales** de explicación o tutoriales  
+❌ **NO documentes tareas** en archivos separados  
+❌ **NO hagas "notas técnicas"** o "guías de implementación"  
+
+✅ **SOLO implementa el código**:
+- Modifica archivos necesarios
+- Actualiza DEVELOPMENT_ROADMAP.md si es crítico
+- Nada más
+
+**Razón**: El código debe ser auto-explicativo. Si necesitas detalles, inclúyelos en:
+1. Comentarios en el código (inline)
+2. Docstrings de funciones/clases (JSDoc)
+3. En los commits (git messages claros)
+
+**Excepción**: DEVELOPMENT_ROADMAP.md puede ser actualizado, pero es TODO.
+
+---
+
 **Para más detalles, ver:**
 - `ARQUITECTURA_COMPLETA.md` - Guía técnica completa
 - `REFACTORIZACION_FINAL_COMPLETA.md` - Resumen ejecutivo
 - `LISTADO_ARCHIVOS_CREADOS.md` - Lista detallada de cambios
+
+
 

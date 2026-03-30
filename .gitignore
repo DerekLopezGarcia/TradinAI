@@ -73,3 +73,11 @@ pnpm-lock.yaml
 # Misc
 .cache/
 .eslintcache
+
+# Local Development Files (NOT to be committed)
+DEVELOPMENT_ROADMAP.md
+LOCAL_*.md
+*.local.md
+PRIVATE_*.txt
+
+

@@ -126,6 +126,48 @@ const CONTINUATION_PATTERNS = [
   'Separating Lines'
 ];
 
+// ==================== CACHE TEMPORAL ====================
+
+/**
+ * Cache de análisis con TTL de 30 segundos
+ * Evita re-análisis de los mismos símbolos en corto tiempo
+ */
+class AnalysisCache {
+  private cache = new Map<string, { result: CandleAnalysisResponse; timestamp: number }>();
+  private TTL = 30000; // 30 segundos
+
+  get(key: string): CandleAnalysisResponse | null {
+    const cached = this.cache.get(key);
+    if (!cached) return null;
+
+    if (Date.now() - cached.timestamp > this.TTL) {
+      this.cache.delete(key);
+      return null;
+    }
+
+    return cached.result;
+  }
+
+  set(key: string, result: CandleAnalysisResponse): void {
+    this.cache.set(key, { result, timestamp: Date.now() });
+  }
+
+  clear(): void {
+    this.cache.clear();
+  }
+
+  private cleanupExpired(): void {
+    const now = Date.now();
+    for (const [key, value] of this.cache.entries()) {
+      if (now - value.timestamp > this.TTL) {
+        this.cache.delete(key);
+      }
+    }
+  }
+}
+
+const analysisCache = new AnalysisCache();
+
 // ==================== CLASE PRINCIPAL ====================
 
 export class CandleAnalyzer {
@@ -142,11 +184,20 @@ export class CandleAnalyzer {
   }
 
   /**
-   * Ejecuta el análisis completo
+   * Ejecuta el análisis completo (OPTIMIZADO CON PARALELIZACIÓN)
+   * T1.1: Paralelizar indicadores independientes + cache temporal
+   * T1.1 Fase 2: Web Workers para verdadera paralelización
    */
-  analyze(): CandleAnalysisResponse {
+  async analyze(): Promise<CandleAnalysisResponse> {
     if (this.candles.length < 20) {
       throw new Error('Se requieren al menos 20 velas para un análisis confiable');
+    }
+
+    // Verificar cache primero
+    const cacheKey = `${this.symbol}:${this.timeframe}:${this.candles[this.candles.length - 1].time}`;
+    const cachedResult = analysisCache.get(cacheKey);
+    if (cachedResult) {
+      return cachedResult;
     }
 
     const closes = this.candles.map(c => c.close);
@@ -154,19 +205,12 @@ export class CandleAnalyzer {
     const lows = this.candles.map(c => c.low);
     const volumes = this.candles.map(c => c.volume);
 
-    // Análisis de tendencia
-    const trendAnalysis = this.analyzeTrend(closes, highs, lows);
+    // PARALELIZAR: Ejecutar análisis independientes simultáneamente
+    // T1.1 Fase 2: Indicadores en Web Workers, tendencia/patrones/niveles síncronos
+    const [trendAnalysis, patterns, indicatorStatus, keyLevels] =
+      await this.analyzeInParallel(closes, highs, lows, volumes);
 
-    // Patrones de velas
-    const patterns = this.identifyPatterns();
-
-    // Indicadores técnicos
-    const indicatorStatus = this.calculateIndicators(closes, highs, lows, volumes);
-
-    // Niveles clave
-    const keyLevels = this.identifyKeyLevels(highs, lows);
-
-    // Predicciones
+    // Predicciones (dependen de análisis previos, así que van después)
     const mainPrediction = this.generatePrediction(
       trendAnalysis,
       patterns,
@@ -191,7 +235,7 @@ export class CandleAnalyzer {
       'inverse'
     );
 
-    // Resúmenes
+    // Resúmenes (pueden hacerse en paralelo después)
     const shortAnalysis = this.generateShortAnalysis(
       trendAnalysis,
       patterns,
@@ -225,7 +269,7 @@ export class CandleAnalyzer {
       indicatorStatus
     );
 
-    return {
+    const result: CandleAnalysisResponse = {
       symbol: this.symbol,
       timeframe: this.timeframe,
       timestamp: Date.now(),
@@ -247,6 +291,31 @@ export class CandleAnalyzer {
         'Considerar eventos macroeconómicos y noticias de última hora'
       ]
     };
+
+    // Guardar en cache
+    analysisCache.set(cacheKey, result);
+
+    return result;
+  }
+
+  /**
+   * Ejecuta análisis independientes en paralelo (T1.1 Fase 2 - Web Workers)
+   */
+  private async analyzeInParallel(
+    closes: number[],
+    highs: number[],
+    lows: number[],
+    volumes: number[]
+  ): Promise<[TrendAnalysis, CandlePattern[], IndicatorStatus, KeyLevels]> {
+    // Tendencia, patrones y niveles son síncronos (rápidos)
+    const trendAnalysis = this.analyzeTrend(closes, highs, lows);
+    const patterns = this.identifyPatterns();
+    const keyLevels = this.identifyKeyLevels(highs, lows);
+
+    // Indicadores se calculan en Web Workers (asíncrono)
+    const indicatorStatus = await this.calculateIndicators(closes, highs, lows, volumes);
+
+    return [trendAnalysis, patterns, indicatorStatus, keyLevels];
   }
 
   // ==================== ANÁLISIS DE TENDENCIA ====================
@@ -505,12 +574,145 @@ export class CandleAnalyzer {
 
   // ==================== INDICADORES TÉCNICOS ====================
 
-  private calculateIndicators(
+  private async calculateIndicators(
+    closes: number[],
+    highs: number[],
+    lows: number[],
+    volumes: number[]
+  ): Promise<IndicatorStatus> {
+    // T1.1 Fase 2: Intentar usar Web Workers para verdadera paralelización
+    // Si no están soportados, fallback a cálculo síncrono
+    
+    try {
+      // Importar worker pool dinámicamente (solo en navegador)
+      if (typeof window !== 'undefined') {
+        const { getWorkerPool } = await import('@/lib/workers/workerPool');
+        const workerPool = getWorkerPool();
+
+        // Si workers están soportados, ejecutar indicadores en paralelo
+        if (workerPool.isSupported()) {
+          return await this.calculateIndicatorsWithWorkers(
+            workerPool,
+            closes,
+            highs,
+            lows,
+            volumes
+          );
+        }
+      }
+    } catch (error) {
+      console.warn('Worker initialization failed, using sync calculation:', error);
+    }
+
+    // Fallback: cálculo síncrono (servidor o navegador sin Web Workers)
+    return this.calculateIndicatorsSync(closes, highs, lows, volumes);
+  }
+
+  /**
+   * Calcular indicadores usando Web Workers (Verdadera paralelización)
+   * T1.1 Fase 2: 5 indicadores en paralelo
+   */
+  private async calculateIndicatorsWithWorkers(
+    workerPool: any,
+    closes: number[],
+    highs: number[],
+    lows: number[],
+    volumes: number[]
+  ): Promise<IndicatorStatus> {
+    // Ejecutar todos los indicadores en paralelo
+    const [rsiValues, macdData, bbData, stochData, atrValues] = await Promise.all([
+      workerPool.execute({
+        id: 'rsi',
+        type: 'rsi',
+        closes,
+      }),
+      workerPool.execute({
+        id: 'macd',
+        type: 'macd',
+        closes,
+      }),
+      workerPool.execute({
+        id: 'bb',
+        type: 'bollingerBands',
+        closes,
+      }),
+      workerPool.execute({
+        id: 'stoch',
+        type: 'stochastic',
+        highs,
+        lows,
+        closes,
+      }),
+      workerPool.execute({
+        id: 'atr',
+        type: 'atr',
+        highs,
+        lows,
+        closes,
+      }),
+    ]);
+
+    // Extraer valores finales
+    const rsi = rsiValues?.[rsiValues.length - 1] || 50;
+    const macd = macdData?.macd?.[macdData.macd.length - 1] || 0;
+    const signal = macdData?.signal?.[macdData.signal.length - 1] || 0;
+    const histogram = macd - signal;
+
+    const bbUpper = bbData?.upper?.[bbData.upper.length - 1] || closes[closes.length - 1];
+    const bbMiddle = bbData?.middle?.[bbData.middle.length - 1] || closes[closes.length - 1];
+    const bbLower = bbData?.lower?.[bbData.lower.length - 1] || closes[closes.length - 1];
+
+    const stochK = stochData?.k?.[stochData.k.length - 1] || 50;
+    const stochD = stochData?.d?.[stochData.d.length - 1] || 50;
+
+    const atr = atrValues?.[atrValues.length - 1] || 0;
+
+    const currentVolume = volumes[volumes.length - 1] || 0;
+    const avgVolume = volumes.slice(-20).reduce((a, b) => a + b, 0) / 20;
+
+    return {
+      rsi: {
+        value: rsi,
+        status: rsi > 70 ? 'overbought' : rsi < 30 ? 'oversold' : 'neutral'
+      },
+      macd: {
+        value: macd,
+        signal,
+        histogram,
+        status: histogram > 0 ? 'bullish' : 'bearish'
+      },
+      bollingerBands: {
+        upper: bbUpper,
+        middle: bbMiddle,
+        lower: bbLower,
+        position: closes[closes.length - 1] > bbUpper ? 'above_upper' :
+                 closes[closes.length - 1] < bbLower ? 'below_lower' : 'inside'
+      },
+      stochastic: {
+        k: stochK,
+        d: stochD,
+        status: stochK > 80 ? 'overbought' : stochK < 20 ? 'oversold' : 'neutral'
+      },
+      atr,
+      volume: {
+        current: currentVolume,
+        average: avgVolume,
+        status: currentVolume > avgVolume * 1.2 ? 'high' :
+               currentVolume < avgVolume * 0.8 ? 'low' : 'normal'
+      }
+    };
+  }
+
+  /**
+   * Fallback: Calcular indicadores síncronamente (Fase 1 o sin Web Workers)
+   */
+  private calculateIndicatorsSync(
     closes: number[],
     highs: number[],
     lows: number[],
     volumes: number[]
   ): IndicatorStatus {
+    // T1.1 Fase 1: Cálculo síncrono (fallback)
     const rsiValues = calculateRSI(closes, 14);
     const rsi = rsiValues[rsiValues.length - 1] || 50;
 
@@ -906,8 +1108,10 @@ export class CandleAnalyzer {
 /**
  * Función simplificada para análisis rápido
  */
-export function analyzeCandles(input: CandleAnalysisInput): CandleAnalysisResponse {
+export async function analyzeCandles(input: CandleAnalysisInput): Promise<CandleAnalysisResponse> {
   const analyzer = new CandleAnalyzer(input);
-  return analyzer.analyze();
+  return await analyzer.analyze();
 }
+
+
 

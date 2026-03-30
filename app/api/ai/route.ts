@@ -335,7 +335,7 @@ export async function analyzeHandler(request: NextRequest) {
       tradingStyle: tradingStyle as any
     };
 
-    const analysis = analyzeCandles(analysisInput);
+    const analysis = await analyzeCandles(analysisInput);
 
     return NextResponse.json({
       success: true,

@@ -177,7 +177,7 @@ async function scanAsset(
       return null;
     }
 
-    const analysis = analyzeCandles({
+    const analysis = await analyzeCandles({
       symbol,
       timeframe: '1h',
       candles,

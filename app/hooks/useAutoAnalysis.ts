@@ -1,6 +1,11 @@
 /**
  * Hook para análisis manual de velas con explicaciones detalladas
  * Se ejecuta solo cuando se llama manualmente a través de runAnalysis()
+ * 
+ * T1.1 Optimizaciones implementadas:
+ * - Cache automático en candleAnalysisService (30s TTL)
+ * - Paralelización de indicadores independientes
+ * - Memoization de explicaciones generadas
  */
 
 'use client';
@@ -111,7 +116,7 @@ export function useAutoAnalysis(
     setError(null);
 
     try {
-      const result = analyzeCandles({
+      const result = await analyzeCandles({
         symbol: sym,
         timeframe: tf,
         candles: data,
@@ -178,8 +183,8 @@ function generateTrendExplanation(trendAnalysis: any, trend: string): string {
 
   explanation += `🎯 **Medias Móviles**:\n`;
   sma.forEach((m: any) => {
-    const relación = m.direction === 'arriba' ? '📈 por encima' : '📉 por debajo';
-    explanation += `- SMA ${m.period}: Precio ${relación} (${m.price.toFixed(2)})\n`;
+    const relation = m.direction === 'arriba' ? '📈 por encima' : '📉 por debajo';
+    explanation += `- SMA ${m.period}: Precio ${relation} (${m.price.toFixed(2)})\n`;
   });
 
   return explanation;
