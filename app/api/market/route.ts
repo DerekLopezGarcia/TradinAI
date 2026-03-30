@@ -90,6 +90,50 @@ const FOREX_SYMBOL_MAP: Record<string, string> = {
   'DKKUSD': 'DKK=X',
 };
 
+/** Mapeo de símbolos Índices a formato Yahoo Finance */
+const INDICES_SYMBOL_MAP: Record<string, string> = {
+  // US
+  'SPX': '^GSPC',      // S&P 500
+  'NDX': '^IXIC',      // NASDAQ Composite
+  'DXY': 'DX=F',       // Dollar Index
+  'VIX': '^VIX',       // Volatility Index
+  
+  // Europa
+  'DAX': '^GDAXI',     // Alemania
+  'FTSE': '^FTSE',     // UK
+  'CAC40': '^FCHI',    // Francia
+  'IBEX': '^IBEX',     // España
+  'MIB': '^FTSEMIB',   // Italia
+  
+  // Asia-Pacific
+  'ASX': '^AXJO',      // Australia
+  'NIKKEI': '^N225',   // Japón
+  'HANGSENG': '^HSI',  // Hong Kong
+  'SHANGHAI': '000001.SS', // China
+  'SENSEX': '^BSESN',  // India
+  'KOPSI': '^KS11',    // Corea del Sur
+  'SSETF': '000001.SS', // Shanghai SSE
+  'MEXBOL': '^MXX',    // México
+  'BOVESPA': '^BVSP',  // Brasil
+  'KLCI': '^KLSE',     // Malasia
+  'SET': '^SET',       // Tailandia
+};
+
+/** Mapeo de símbolos Commodities a formato Yahoo Finance */
+const COMMODITIES_SYMBOL_MAP: Record<string, string> = {
+  // Metales
+  'GOLD': 'GC=F',      // Oro (COMEX)
+  'SILVER': 'SI=F',    // Plata (COMEX)
+  'COPPER': 'HG=F',    // Cobre (COMEX)
+  'PLATINUM': 'PL=F',  // Platino (NYMEX)
+  'PALLADIUM': 'PA=F', // Paladio (NYMEX)
+  
+  // Metales industriales
+  'NICKEL': 'NI=F',    // Níquel
+  'ALUMINUM': 'ALI=F', // Aluminio
+  'ZINC': 'ZN=F',      // Zinc
+};
+
 /** Mapeo de símbolos Futuros a formato Yahoo Finance (=F) */
 const FUTURES_SYMBOL_MAP: Record<string, string> = {
   // Energía
@@ -312,8 +356,12 @@ async function getPriceData(symbol: string) {
 
   // Stocks, índices, forex, commodities, futuros → Yahoo Finance primero
   try {
-    // Fix: Mapear símbolos Forex y Futuros a formato Yahoo Finance
-    const yahooSymbol = FOREX_SYMBOL_MAP[symbol] || FUTURES_SYMBOL_MAP[symbol] || symbol;
+    // Fix: Mapear símbolos Forex, Índices, Commodities y Futuros a formato Yahoo Finance
+    const yahooSymbol = FOREX_SYMBOL_MAP[symbol] || 
+                        INDICES_SYMBOL_MAP[symbol] || 
+                        COMMODITIES_SYMBOL_MAP[symbol] || 
+                        FUTURES_SYMBOL_MAP[symbol] || 
+                        symbol;
     const yp = await marketService.getYahooPrice(yahooSymbol);
     return {
       symbol,

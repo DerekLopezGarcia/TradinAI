@@ -68,12 +68,13 @@ function determinateAssetType(symbol: string): string {
     }
   }
   
-  // Índices
-  if (['SPX', 'NDX', 'DXY', 'INDU', 'CCMP', 'VIX'].includes(symbol)) {
+  // Índices - lista completa
+  const indicesSymbols = ['SPX', 'NDX', 'DXY', 'INDU', 'CCMP', 'VIX', 'DAX', 'FTSE', 'CAC40', 'IBEX', 'MIB', 'ASX', 'NIKKEI', 'HANGSENG', 'SHANGHAI', 'SENSEX', 'KOPSI', 'SSETF', 'MEXBOL', 'BOVESPA', 'KLCI', 'SET'];
+  if (indicesSymbols.includes(symbol)) {
     return 'index';
   }
   
-  // Commodities
+  // Commodities - metales y stocks mineros
   if (['GOLD', 'SILVER', 'COPPER', 'PLATINUM', 'PALLADIUM', 'NICKEL', 'ALUMINUM', 'ZINC', 'FCX', 'NEM', 'SCCO', 'ALB', 'ARCH', 'WRK', 'IP', 'PKG'].includes(symbol)) {
     return 'commodity';
   }
