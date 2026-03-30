@@ -169,7 +169,18 @@ const STOCK_SYMBOLS = new Set([
 
 /** Símbolos de índices */
 const INDEX_SYMBOLS = new Set([
-  'SPX', 'INDU', 'CCMP', 'VIX'
+  // US
+  'SPX', 'INDU', 'CCMP', 'VIX', 'DXY',
+  
+  // Europa
+  'DAX', 'FTSE', 'CAC40', 'IBEX', 'MIB',
+  
+  // Asia-Pacific
+  'ASX', 'NIKKEI', 'HANGSENG', 'SHANGHAI', 'SENSEX', 'KOPSI', 'SSETF', 
+  
+  // América Latina
+  'MEXBOL', 'BOVESPA', 'KLCI', 'SET',
+  'RUSINDEX'  // Rusia
 ]);
 
 /** Símbolos de Forex */
@@ -267,11 +278,24 @@ async function getHistoryData(symbol: string, interval: TimeFrame) {
       }
     }
   } else {
-    const data = await marketService.getStockHistory(symbol, interval, days);
-    if (!data || data.length === 0) {
-      throw new Error(`No hay datos históricos para ${symbol}`);
+    // Para índices, stocks, commodities, etc. - mapear a Yahoo Finance si es necesario
+    const assetType = getAssetType(symbol);
+    let yahooSymbol = symbol;
+    
+    if (assetType === 'index') {
+      yahooSymbol = INDICES_SYMBOL_MAP[symbol] || symbol;
+      console.log(`📊 Index ${symbol} → Yahoo: ${yahooSymbol}`);
+    } else if (assetType === 'forex') {
+      yahooSymbol = FOREX_SYMBOL_MAP[symbol] || symbol;
+    } else if (assetType === 'commodity') {
+      yahooSymbol = COMMODITIES_SYMBOL_MAP[symbol] || symbol;
     }
-    return { symbol, interval, data, source: 'Finnhub', isFallback: false, timestamp: Date.now() };
+    
+    const data = await marketService.getStockHistory(yahooSymbol, interval, days);
+    if (!data || data.length === 0) {
+      throw new Error(`No hay datos históricos para ${symbol} (${yahooSymbol})`);
+    }
+    return { symbol, interval, data, source: 'Finnhub/Yahoo', isFallback: false, timestamp: Date.now() };
   }
 }
 
@@ -380,7 +404,17 @@ async function getPriceData(symbol: string) {
                         COMMODITIES_SYMBOL_MAP[symbol] || 
                         FUTURES_SYMBOL_MAP[symbol] || 
                         symbol;
+    
+    if (['DXY', 'MIB'].includes(symbol)) {
+      console.log(`💰 getPriceData: ${symbol} → Yahoo: ${yahooSymbol}`);
+    }
+    
     const yp = await marketService.getYahooPrice(yahooSymbol);
+    
+    if (['DXY', 'MIB'].includes(symbol)) {
+      console.log(`✅ Yahoo price para ${symbol}: ${yp.price}`);
+    }
+    
     return {
       symbol,
       price: yp.price,
@@ -391,7 +425,11 @@ async function getPriceData(symbol: string) {
       timestamp: Date.now(),
     };
   } catch (yahooErr) {
-    console.warn(`Yahoo price failed for ${symbol}, trying Finnhub:`, yahooErr);
+    if (['DXY', 'MIB'].includes(symbol)) {
+      console.warn(`⚠️ Yahoo price failed para ${symbol}: ${yahooErr}, trying Finnhub`);
+    } else {
+      console.warn(`Yahoo price failed for ${symbol}, trying Finnhub:`, yahooErr);
+    }
   }
 
   // Fallback: Finnhub (puede dar 403 en plan gratuito para algunos símbolos)
