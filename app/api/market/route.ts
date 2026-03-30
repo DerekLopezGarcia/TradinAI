@@ -55,6 +55,41 @@ const COINGECKO_IDS: Record<string, string> = {
   'ARBUSD': 'arbitrum',
 };
 
+/** Mapeo de símbolos Forex a formato Yahoo Finance */
+const FOREX_SYMBOL_MAP: Record<string, string> = {
+  'EURUSD': 'EURUSD=X',
+  'EURGBP': 'EURGBP=X',
+  'EURJPY': 'EURJPY=X',
+  'EURCHF': 'EURCHF=X',
+  'EURCAD': 'EURCAD=X',
+  'EURAUD': 'EURAUD=X',
+  'EURNZD': 'EURNZD=X',
+  'GBPUSD': 'GBPUSD=X',
+  'GBPJPY': 'GBPJPY=X',
+  'GBPCHF': 'GBPCHF=X',
+  'GBPCAD': 'GBPCAD=X',
+  'GBPAUD': 'GBPAUD=X',
+  'GBPNZD': 'GBPNZD=X',
+  'JPYUSD': 'JPY=X',
+  'CHFJPY': 'CHFJPY=X',
+  'CADJPY': 'CADJPY=X',
+  'AUDJPY': 'AUDJPY=X',
+  'NZDJPY': 'NZDJPY=X',
+  'CHFUSD': 'CHFUSD=X',
+  'CADUSD': 'CADUSD=X',
+  'AUDUSD': 'AUDUSD=X',
+  'NZDUSD': 'NZDUSD=X',
+  'SGDUSD': 'SGD=X',
+  'HKDUSD': 'HKD=X',
+  'NOKUSD': 'NOK=X',
+  'BRLRSD': 'BRL=X',
+  'INRUSD': 'INR=X',
+  'ZARUSD': 'ZAR=X',
+  'MXNUSD': 'MXN=X',
+  'SEKUSD': 'SEK=X',
+  'DKKUSD': 'DKK=X',
+};
+
 /** Símbolos de criptomonedas conocidas */
 const CRYPTO_SYMBOLS = Object.keys(COINGECKO_IDS);
 
@@ -252,7 +287,9 @@ async function getPriceData(symbol: string) {
 
   // Stocks, índices, forex, commodities → Yahoo Finance primero
   try {
-    const yp = await marketService.getYahooPrice(symbol);
+    // Fix: Mapear símbolos Forex a formato Yahoo Finance
+    const yahooSymbol = FOREX_SYMBOL_MAP[symbol] || symbol;
+    const yp = await marketService.getYahooPrice(yahooSymbol);
     return {
       symbol,
       price: yp.price,

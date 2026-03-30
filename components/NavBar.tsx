@@ -48,6 +48,35 @@ const SCANNER_CATEGORIES = getCategories()
 
 const ALL_ASSET_TYPES = [...ASSET_TYPES, ...SCANNER_CATEGORIES];
 
+// Fix: Función para determinar tipo de activo por símbolo
+function determinateAssetType(symbol: string): string {
+  // Criptos terminan con USD
+  if (symbol.endsWith('USD') && symbol.length <= 8) {
+    return 'crypto'; // Ej: BTCUSD, ETHUSD
+  }
+  
+  // Forex tiene pares como EURUSD (6 caracteres típicamente)
+  if (symbol.match(/^[A-Z]{6}$/) || symbol.includes('USD')) {
+    // Si es 6 caracteres, probablemente sea forex
+    if (symbol.length === 6) {
+      return 'forex'; // Ej: EURUSD, GBPUSD
+    }
+  }
+  
+  // Índices
+  if (['SPX', 'NDX', 'DXY', 'INDU', 'CCMP', 'VIX'].includes(symbol)) {
+    return 'index';
+  }
+  
+  // Commodities
+  if (['WTI', 'BRENT', 'NATGAS', 'COPPER', 'GOLD', 'SILVER'].includes(symbol)) {
+    return 'commodity';
+  }
+  
+  // Default: stock
+  return 'stock';
+}
+
 export function NavBar({ selectedType, searchQuery, onSearchChange }: NavBarProps) {
   const router = useRouter();
   const { assets, addAsset, toggleFavorite, setSelectedAsset, updateAssetPrice, addOrUpdateAssetPrice } = useMarketStore();
@@ -227,7 +256,11 @@ export function NavBar({ selectedType, searchQuery, onSearchChange }: NavBarProp
                   
                   // Guardar en caché
                   priceCache.set(symbol, price, isNaN(change) ? 0 : change, isNaN(changePercent) ? 0 : changePercent);
-                  addOrUpdateAssetPrice(symbol, symbol, price, isNaN(change) ? 0 : change, isNaN(changePercent) ? 0 : changePercent, 'crypto');
+                  
+                  // Fix: Determinar tipo correcto del símbolo (no asumir 'crypto')
+                  const assetType = determinateAssetType(symbol);
+                  
+                  addOrUpdateAssetPrice(symbol, symbol, price, isNaN(change) ? 0 : change, isNaN(changePercent) ? 0 : changePercent, assetType);
                 } else {
                   currentFailed.add(symbol);
                 }
