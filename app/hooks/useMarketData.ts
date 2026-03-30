@@ -107,6 +107,14 @@ export function useMarketData(symbol: string, interval: TimeFrame) {
     setError(null);
 
     const cancelled = { value: false };
+    
+    // Timeout máximo de 15 segundos para evitar loading infinito
+    const timeoutId = setTimeout(() => {
+      if (!cancelled.value) {
+        console.warn(`⏱️ Timeout después de 15s para ${symbol}/${interval}`);
+        setLoading(false);
+      }
+    }, 15000);
 
     const loadHistory = async () => {
       try {
@@ -166,7 +174,11 @@ export function useMarketData(symbol: string, interval: TimeFrame) {
         setData([]);
         dataRef.current = [];
       } finally {
-        if (!cancelled.value) setLoading(false);
+        console.log(`  🔄 Finalizando - cancelled: ${cancelled.value}, loading será: ${!cancelled.value}`);
+        if (!cancelled.value) {
+          console.log(`  ✅ setLoading(false) ejecutado`);
+          setLoading(false);
+        }
       }
     };
 
@@ -177,6 +189,7 @@ export function useMarketData(symbol: string, interval: TimeFrame) {
     return () => {
       cancelled.value = true;
       clearInterval(historyTimer);
+      clearTimeout(timeoutId);
     };
   }, [symbol, interval]);
 

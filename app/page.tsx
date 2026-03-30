@@ -65,6 +65,8 @@ export default function Home() {
   useEffect(() => {
     if (dataError) { setError(dataError); setTimeout(() => toast.error(`Error: ${dataError}`), 100); }
   }, [dataError]);
+
+  // Mostrar contenido mientras carga - no bloquear UI
   if (!selectedAsset) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -75,6 +77,7 @@ export default function Home() {
       </div>
     );
   }
+  
   const isPositive = selectedAsset.changePercent >= 0;
   return (
     <div className="min-h-screen bg-background transition-colors duration-300" suppressHydrationWarning>
