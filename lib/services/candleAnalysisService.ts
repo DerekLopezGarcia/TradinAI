@@ -4,7 +4,7 @@
  * 
  * Capacidades:
  * - Análisis OHLCV completo
- * - Identificación de +50 patrones de velas
+ * - Identificación de +50 patrones de velas (16+ de IG.com)
  * - Cálculo de tendencias (estructura, MA, ADX)
  * - Indicadores técnicos complementarios
  * - Predicciones probabilísticas con múltiples escenarios
@@ -15,7 +15,34 @@
  * - ✅ Confiabilidad dinámica: Se calcula basado en validaciones (55-100%)
  * - ✅ Volumen creciente: Engulfing y Soldados validan que volumen aumenta secuencialmente
  * - ✅ Descripción mejorada: Incluye información de validaciones (✓ Volumen confirmador)
- * - OBJETIVO: Reducir falsos positivos de 40% a <25% (precisión >75%)
+ * 
+ * PATRONES DE 1 VELA (5 total):
+ * - Doji (indecisión)
+ * - Marubozu (decisión fuerte)
+ * - Hammer (reversión alcista)
+ * - Shooting Star (reversión bajista)
+ * - Spinning Top (indecisión)
+ * - Inverted Hammer (reversión alcista)
+ * 
+ * PATRONES DE 2 VELAS (9 total):
+ * - Bullish Engulfing (reversión alcista)
+ * - Bearish Engulfing (reversión bajista)
+ * - Piercing Line (reversión alcista)
+ * - Dark Cloud Cover (reversión bajista)
+ * - Bullish Harami (indecisión)
+ * - Bearish Harami (indecisión)
+ * - Bullish Kicker (continuación alcista)
+ * - Bearish Kicker (continuación bajista)
+ * 
+ * PATRONES DE 3 VELAS (7 total):
+ * - Three White Soldiers (reversión alcista fuerte)
+ * - Three Black Crows (reversión bajista fuerte)
+ * - Morning Star (reversión alcista)
+ * - Evening Star (reversión bajista)
+ * - Rising Three Methods (continuación alcista)
+ * - Falling Three Methods (continuación bajista)
+ * 
+ * OBJETIVO: Reducir falsos positivos de 40% a <25% (precisión >75%)
  */
 
 import { TimeFrame, CandleData } from '@/lib/types';
@@ -554,6 +581,30 @@ export class CandleAnalyzer {
       };
     }
 
+    // T2.1 NUEVOS PATRONES: Spinning Top
+    if (bodySize > 0 && bodySize < totalSize * 0.3 && upperWick > bodySize * 1.5 && lowerWick > bodySize * 1.5) {
+      return {
+        name: 'Spinning Top',
+        type: 'indecision',
+        positions: [index],
+        reliability: 50,
+        description: 'Indecisión. Cuerpo pequeño con mechas largas arriba y abajo. Posible cambio próximo'
+      };
+    }
+
+    // T2.1 NUEVOS PATRONES: Inverted Hammer (alcista potencial)
+    if (upperWick > bodySize * 2 && lowerWick < bodySize * 0.5 && candle.close > candle.open) {
+      const volumeConfirming = this.isVolumeConfirming(index, avgVolume, 1.5);
+      const reliability = volumeConfirming ? 70 : 50;
+      return {
+        name: 'Inverted Hammer',
+        type: 'bullish_reversal',
+        positions: [index],
+        reliability,
+        description: `Martillo invertido. Potencial reversión alcista. Mecha superior larga. ${volumeConfirming ? '✓ Volumen confirmador' : ''}`
+      };
+    }
+
     return null;
   }
 
@@ -619,6 +670,76 @@ export class CandleAnalyzer {
         positions: [index1, index2],
         reliability,
         description: `Reversión bajista. Segunda vela roja envuelve completamente la primera verde. ${volumeIncreasing ? '✓ Volumen confirmador' : ''}`
+      };
+    }
+
+    // T2.1 NUEVOS PATRONES: Piercing Line (bullish)
+    if (
+      candle1.close < candle1.open &&
+      candle2.close > candle2.open &&
+      candle2.open < candle1.low &&
+      candle2.close > candle1.close &&
+      candle2.close > candle1.open + (candle1.open - candle1.close) / 2
+    ) {
+      const volumeConfirming = this.isVolumeConfirming(index2, avgVolume, 1.2);
+      const reliability = volumeConfirming ? 70 : 50;
+      return {
+        name: 'Piercing Line',
+        type: 'bullish_reversal',
+        positions: [index1, index2],
+        reliability,
+        description: `Línea penetrante. Vela roja seguida de verde que penetra pasado el 50% de la roja. ${volumeConfirming ? '✓ Volumen confirmador' : ''}`
+      };
+    }
+
+    // T2.1 NUEVOS PATRONES: Dark Cloud Cover (bearish)
+    if (
+      candle1.close > candle1.open &&
+      candle2.close < candle2.open &&
+      candle2.open > candle1.high &&
+      candle2.close < candle1.close &&
+      candle2.close < candle1.open - (candle1.close - candle1.open) / 2
+    ) {
+      const volumeConfirming = this.isVolumeConfirming(index2, avgVolume, 1.2);
+      const reliability = volumeConfirming ? 70 : 50;
+      return {
+        name: 'Dark Cloud Cover',
+        type: 'bearish_reversal',
+        positions: [index1, index2],
+        reliability,
+        description: `Nube oscura. Vela verde seguida de roja que penetra pasado el 50% de la verde. ${volumeConfirming ? '✓ Volumen confirmador' : ''}`
+      };
+    }
+
+    // T2.1 NUEVOS PATRONES: Bullish Harami (indecisión → potencial alcista)
+    if (
+      candle1.close < candle1.open &&
+      candle2.close > candle2.open &&
+      candle2.high < candle1.close &&
+      candle2.low > candle1.open
+    ) {
+      return {
+        name: 'Bullish Harami',
+        type: 'indecision',
+        positions: [index1, index2],
+        reliability: 55,
+        description: 'Harami alcista. Segunda vela verde completamente contenida dentro de la roja. Posible reversión'
+      };
+    }
+
+    // T2.1 NUEVOS PATRONES: Bearish Harami (indecisión → potencial bajista)
+    if (
+      candle1.close > candle1.open &&
+      candle2.close < candle2.open &&
+      candle2.high < candle1.close &&
+      candle2.low > candle1.open
+    ) {
+      return {
+        name: 'Bearish Harami',
+        type: 'indecision',
+        positions: [index1, index2],
+        reliability: 55,
+        description: 'Harami bajista. Segunda vela roja completamente contenida dentro de la verde. Posible reversión'
       };
     }
 
@@ -705,6 +826,42 @@ export class CandleAnalyzer {
         positions: [index1, index2, index3],
         reliability,
         description: `Fuerte reversión bajista. Tres velas rojas consecutivas en orden decreciente. ${volumeTrend ? '✓ Volumen confirmador' : ''}`
+      };
+    }
+
+    // T2.1 NUEVOS PATRONES: Morning Star (bullish reversal)
+    if (
+      candle1.close < candle1.open && // Primera roja
+      candle2.open < candle1.low && // Segunda abre más baja
+      candle3.close > candle3.open && // Tercera verde
+      candle3.close > candle1.open + (candle1.open - candle1.close) / 2 // Cierra pasado 50% primera
+    ) {
+      const momentumConfirming = this.isMomentumConfirming(momentum, 'bullish');
+      const reliability = momentumConfirming ? 75 : 60;
+      return {
+        name: 'Morning Star',
+        type: 'bullish_reversal',
+        positions: [index1, index2, index3],
+        reliability,
+        description: `Estrella de la mañana. Patrón de reversión alcista fuerte. Roja + pequeña + verde. ${momentumConfirming ? '✓ Momentum confirmador' : ''}`
+      };
+    }
+
+    // T2.1 NUEVOS PATRONES: Evening Star (bearish reversal)
+    if (
+      candle1.close > candle1.open && // Primera verde
+      candle2.open > candle1.high && // Segunda abre más alta
+      candle3.close < candle3.open && // Tercera roja
+      candle3.close < candle1.open - (candle1.close - candle1.open) / 2 // Cierra pasado 50% primera
+    ) {
+      const momentumConfirming = this.isMomentumConfirming(momentum, 'bearish');
+      const reliability = momentumConfirming ? 75 : 60;
+      return {
+        name: 'Evening Star',
+        type: 'bearish_reversal',
+        positions: [index1, index2, index3],
+        reliability,
+        description: `Estrella de la tarde. Patrón de reversión bajista fuerte. Verde + pequeña + roja. ${momentumConfirming ? '✓ Momentum confirmador' : ''}`
       };
     }
 
