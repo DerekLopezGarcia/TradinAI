@@ -2,6 +2,7 @@ import { CandleData, TimeFrame } from '@/lib/types';
 
 /**
  * Servicio para obtener datos históricos de Binance API
+ * T1.4: Cache inteligente con TTL variable según timeframe
  * Proporciona velas con excelente resolución y sin rate limiting restrictivo
  */
 
@@ -19,10 +20,27 @@ export interface BinanceKline {
   takerBuyQuoteAssetVolume: string;
 }
 
+// T1.4: TTL variable según timeframe
+const CANDLE_CACHE_TTL: Record<TimeFrame, number> = {
+  '1m': 10000,   // 10s - velas de 1m cambian muy rápido
+  '5m': 15000,   // 15s
+  '15m': 30000,  // 30s
+  '1h': 60000,   // 1m - velas de 1h son más estables
+  '4h': 120000,  // 2m
+  '1d': 300000,  // 5m - datos de día cambian lentamente
+  '1w': 600000,  // 10m - semanas muy estables
+};
+
 class BinanceService {
   private baseUrl = 'https://api.binance.com/api/v3';
   private cache = new Map<string, { data: any; timestamp: number }>();
-  private readonly cacheTTL = 60000; // 1 minuto
+
+  /**
+   * T1.4: Obtiene TTL según timeframe
+   */
+  private getCacheTTL(timeframe: TimeFrame): number {
+    return CANDLE_CACHE_TTL[timeframe] || 60000;
+  }
 
   /**
    * Mapeo de TimeFrame a Binance interval
@@ -45,26 +63,22 @@ class BinanceService {
    * Incluye mapeos especiales para símbolos que Binance no soporta con USDT
    */
   private normalizePair(symbol: string): string {
-    // Mapeos especiales para pares que no existen en USDT pero sí en otros
     const specialMappings: Record<string, string> = {
-      'LTCUSD': 'LTCUSDT',    // Litecoin → LTCUSDT (si falla, usar LTCBTC)
-      'DOTUSD': 'DOTUSDT',    // Polkadot → DOTUSDT
-      'LTCBTC': 'LTCBTC',     // Litecoin vs Bitcoin (fallback)
+      'LTCUSD': 'LTCUSDT',
+      'DOTUSD': 'DOTUSDT',
+      'LTCBTC': 'LTCBTC',
     };
     
     if (specialMappings[symbol]) {
       return specialMappings[symbol];
     }
     
-    // BTCUSD → BTCUSDT, ETHUSD → ETHUSDT, etc.
     if (symbol.endsWith('USD')) {
       return symbol.replace('USD', 'USDT');
     }
-    // Si ya es USDT, mantenerlo
     if (symbol.includes('USDT')) {
       return symbol;
     }
-    // Default: agregar USDT
     return symbol + 'USDT';
   }
 
@@ -72,21 +86,20 @@ class BinanceService {
    * Obtiene el número de velas límite según el timeframe
    */
   private getLimit(timeframe: TimeFrame): number {
-    // Binance límite es 1000 por defecto, pero podemos pedir menos
     const limits: Record<TimeFrame, number> = {
-      '1m': 1000,   // ~16 horas
-      '5m': 1000,   // ~3.5 días
-      '15m': 1000,  // ~10 días
-      '1h': 500,    // ~20 días
-      '4h': 500,    // ~83 días
-      '1d': 365,    // ~1 año
-      '1w': 200,    // ~4 años
+      '1m': 1000,
+      '5m': 1000,
+      '15m': 1000,
+      '1h': 500,
+      '4h': 500,
+      '1d': 365,
+      '1w': 200,
     };
     return limits[timeframe] || 500;
   }
 
   /**
-   * Obtiene datos históricos de Binance
+   * T1.4: Obtiene datos históricos de Binance con cache inteligente
    */
   async getHistoricalCandles(
     symbol: string,
@@ -94,8 +107,9 @@ class BinanceService {
   ): Promise<CandleData[]> {
     const cacheKey = `binance:${symbol}:${interval}`;
     const cached = this.cache.get(cacheKey);
+    const ttl = this.getCacheTTL(interval);
 
-    if (cached && Date.now() - cached.timestamp < this.cacheTTL) {
+    if (cached && Date.now() - cached.timestamp < ttl) {
       return cached.data;
     }
 

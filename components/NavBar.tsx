@@ -2,11 +2,12 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Plus, X, Heart, ChevronDown, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Plus, X, Heart, ChevronDown, Loader2, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
 import { useMarketStore } from '@/lib/store';
 import { getCategories, getAssetsByCategory, getAssetDescription } from '@/lib/scannerAssets';
 import { priceCache } from '@/lib/services/priceCache';
 import { validateSymbol, createSafeParams } from '@/lib/services/validationService';
+import { errorLoggingService } from '@/lib/services/errorLoggingService';
 
 interface NavBarProps {
   selectedType: string | null;
@@ -234,23 +235,32 @@ export function NavBar({ selectedType, searchQuery, onSearchChange }: NavBarProp
           const batch = symbolsToFetch.slice(i, i + batchSize);
           
           await Promise.allSettled(batch.map(async (symbol: string) => {
+            const params = createSafeParams({
+              symbol: symbol.toUpperCase(),
+              type: 'price'
+            });
+            
+            // T1.3: Timeout de 2s individual por request
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 2000);
+            
             try {
-              const params = createSafeParams({
-                symbol: symbol.toUpperCase(),
-                type: 'price'
-              });
-              
-              // T1.3: Timeout de 2s individual por request
-              const controller = new AbortController();
-              const timeoutId = setTimeout(() => controller.abort(), 2000);
-              
               const res = await fetch(`/api/market?${params.toString()}`, { signal: controller.signal });
               clearTimeout(timeoutId);
               
               if (!res.ok) {
+                // T1.5: Logging mejorado - registrar error específico
+                errorLoggingService.logError(
+                  symbol,
+                  `HTTP ${res.status}`,
+                  'API',
+                  res.status,
+                  'Fallo al obtener precio'
+                );
                 currentFailed.add(symbol);
                 return;
               }
+              
               const d = await res.json();
               
               // Validar que tenemos precio válido - más permisivo
@@ -268,12 +278,39 @@ export function NavBar({ selectedType, searchQuery, onSearchChange }: NavBarProp
                   
                   addOrUpdateAssetPrice(symbol, symbol, price, isNaN(change) ? 0 : change, isNaN(changePercent) ? 0 : changePercent, assetType);
                 } else {
+                  // T1.5: Logging - precio no es un número válido
+                  errorLoggingService.logError(
+                    symbol,
+                    'Precio no es número válido',
+                    'Parser',
+                    undefined,
+                    `Valor recibido: ${d.price}`
+                  );
                   currentFailed.add(symbol);
                 }
               } else {
+                // T1.5: Logging - datos vacíos
+                errorLoggingService.logError(
+                  symbol,
+                  'Datos incompletos o vacíos',
+                  'API',
+                  undefined,
+                  'Respuesta sin campo "price"'
+                );
                 currentFailed.add(symbol);
               }
-            } catch { 
+            } catch (err) {
+              clearTimeout(timeoutId);
+              // T1.5: Logging - capturar tipo específico de error
+              if (err instanceof Error) {
+                if (err.name === 'AbortError') {
+                  errorLoggingService.logError(symbol, 'Timeout al conectar API', 'Network', 408, 'Request excedió 2s');
+                } else {
+                  errorLoggingService.logError(symbol, err, 'Network', undefined, err.message);
+                }
+              } else {
+                errorLoggingService.logError(symbol, 'Error desconocido', 'Unknown');
+              }
               currentFailed.add(symbol);
             }
           }));
@@ -289,6 +326,8 @@ export function NavBar({ selectedType, searchQuery, onSearchChange }: NavBarProp
         await Promise.allSettled(list.map(async (asset) => {
           try {
             if (!validateSymbol(asset.symbol)) {
+              // T1.5: Logging - símbolo inválido
+              errorLoggingService.logError(asset.symbol, 'Símbolo inválido', 'Validation');
               currentFailed.add(asset.symbol);
               return;
             }
@@ -300,6 +339,14 @@ export function NavBar({ selectedType, searchQuery, onSearchChange }: NavBarProp
             
             const res = await fetch(`/api/market?${params.toString()}`);
             if (!res.ok) {
+              // T1.5: Logging - error HTTP
+              errorLoggingService.logError(
+                asset.symbol,
+                `HTTP ${res.status}`,
+                'API',
+                res.status,
+                'Fallo al obtener precio'
+              );
               currentFailed.add(asset.symbol);
               return;
             }
@@ -313,12 +360,34 @@ export function NavBar({ selectedType, searchQuery, onSearchChange }: NavBarProp
                 const changePercent = parseFloat(String(d.changePercent ?? 0));
                 updateAssetPrice(asset.symbol, price, isNaN(change) ? 0 : change, isNaN(changePercent) ? 0 : changePercent);
               } else {
+                // T1.5: Logging - precio inválido
+                errorLoggingService.logError(
+                  asset.symbol,
+                  'Precio no es número válido',
+                  'Parser',
+                  undefined,
+                  `Valor recibido: ${d.price}`
+                );
                 currentFailed.add(asset.symbol);
               }
             } else {
+              // T1.5: Logging - datos vacíos
+              errorLoggingService.logError(
+                asset.symbol,
+                'Datos incompletos o vacíos',
+                'API',
+                undefined,
+                'Respuesta sin campo "price"'
+              );
               currentFailed.add(asset.symbol);
             }
-          } catch { 
+          } catch (err) {
+            // T1.5: Logging - error de excepción
+            if (err instanceof Error) {
+              errorLoggingService.logError(asset.symbol, err, 'Network', undefined, err.message);
+            } else {
+              errorLoggingService.logError(asset.symbol, 'Error desconocido', 'Unknown');
+            }
             currentFailed.add(asset.symbol);
           }
         }));
@@ -509,7 +578,10 @@ export function NavBar({ selectedType, searchQuery, onSearchChange }: NavBarProp
                                           <div className="flex items-center gap-2 ml-2">
                                             <div className="text-right">
                                               {isFailed ? (
-                                                <p className="text-xs text-destructive font-medium">No cargó</p>
+                                                <div className="flex items-center gap-1">
+                                                  <AlertCircle className="w-4 h-4 text-destructive" />
+                                                  <p className="text-xs text-destructive font-medium">Sin datos</p>
+                                                </div>
                                               ) : asset.price > 0 ? (
                                                 <>
                                                   <p className="text-xs font-mono font-bold text-foreground">${asset.price.toFixed(2)}</p>

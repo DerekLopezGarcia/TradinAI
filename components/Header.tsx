@@ -4,8 +4,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useMarketStore } from '@/lib/store';
 import { TimeFrame } from '@/lib/types';
-import { TrendingUp, TrendingDown, Heart, Menu, Bell, Settings, Sparkles, Loader2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, Heart, Menu, Sparkles, Loader2 } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { NotificationPanel } from '@/components/NotificationPanel';
+import { SettingsPanel } from '@/components/SettingsPanel';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -130,13 +132,8 @@ export function Header({ onMenuClick }: HeaderProps) {
               Recomendaciones
             </Link>
             <ThemeToggle />
-            <button className="p-2 rounded-lg transition-colors hover:bg-muted relative">
-              <Bell className="w-5 h-5 text-foreground" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-destructive rounded-full animate-pulse" />
-            </button>
-            <button className="p-2 rounded-lg transition-colors hover:bg-muted">
-              <Settings className="w-5 h-5 text-foreground" />
-            </button>
+            <NotificationPanel />
+            <SettingsPanel />
           </div>
         </div>
 

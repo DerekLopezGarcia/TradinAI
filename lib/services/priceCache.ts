@@ -1,6 +1,6 @@
 /**
  * Servicio de caché para precios de activos
- * Evita peticiones duplicadas dentro de un periodo de tiempo
+ * T1.4: Cache inteligente con TTL variable por proveedor y fallback stale
  */
 
 import { validateSymbol, createSafeParams } from './validationService';
@@ -10,6 +10,8 @@ interface CachedPrice {
   change: number;
   changePercent: number;
   timestamp: number;
+  provider?: string;
+  isStale?: boolean;
 }
 
 interface PriceRequest {
@@ -18,56 +20,97 @@ interface PriceRequest {
   reject: (error: Error) => void;
 }
 
+// T1.4: TTL variable por proveedor
+const PROVIDER_TTL: Record<string, number> = {
+  'BINANCE': 30000,        // 30s - casi tiempo real, high volume
+  'CRYPTO': 30000,         // 30s - CoinGecko, YahooFinance
+  'STOCK': 60000,          // 60s - Yahoo, menos volatilidad
+  'FOREX': 45000,          // 45s - medio
+  'INDEX': 60000,          // 60s - indices no tan volatiles
+  'COMMODITY': 45000,      // 45s - medio
+  'DEFAULT': 30000,        // 30s - default
+};
+
 class PriceCache {
   private cache: Map<string, CachedPrice> = new Map();
-  private cacheExpiryMs = 30000; // 30 segundos de caché
   private requestQueue: PriceRequest[] = [];
   private batchProcessing = false;
   private batchSize = 10;
   private batchDelayMs = 500;
-  private maxCacheSize = 1000; // Prevenir memory leak
+  private maxCacheSize = 1000;
 
   /**
-   * Obtiene un precio del caché si es válido
+   * T1.4: Obtiene TTL según proveedor/tipo de activo
    */
-  get(symbol: string): CachedPrice | null {
-    if (!validateSymbol(symbol)) return null;
-    
-    const cached = this.cache.get(symbol);
-    
-    if (!cached) return null;
-    
-    // Si el caché es más viejo de lo permitido, descartarlo
-    if (Date.now() - cached.timestamp > this.cacheExpiryMs) {
-      this.cache.delete(symbol);
-      return null;
-    }
-    
-    return cached;
+  private getTTL(provider?: string): number {
+    if (!provider) return PROVIDER_TTL.DEFAULT;
+    const key = provider.toUpperCase();
+    return PROVIDER_TTL[key] || PROVIDER_TTL.DEFAULT;
   }
 
   /**
-   * T1.3: Obtiene precio del caché aunque esté expirado (stale)
-   * Útil como fallback cuando la API falla
+   * T1.4: Obtiene un precio del caché si es válido (no expirado)
+   */
+  get(symbol: string, provider?: string): CachedPrice | null {
+    if (!validateSymbol(symbol)) return null;
+    
+    const cached = this.cache.get(symbol);
+    if (!cached) return null;
+    
+    const ttl = this.getTTL(provider);
+    const now = Date.now();
+    
+    // Si no está expirado, retornar
+    if (now - cached.timestamp <= ttl) {
+      return cached;
+    }
+    
+    // Está expirado pero podría ser útil como stale
+    return null;
+  }
+
+  /**
+   * T1.4: Obtiene precio del caché aunque esté expirado (stale)
+   * Usado como fallback cuando API falla
    * Retorna null si no hay nada en caché
    */
   getStale(symbol: string): CachedPrice | null {
     if (!validateSymbol(symbol)) return null;
     const cached = this.cache.get(symbol);
-    // NO validar timestamp, retornar aunque esté viejo
-    return this.cache.get(symbol) || null;
+    
+    if (!cached) return null;
+    
+    // Marcar como stale para que el cliente sepa
+    return {
+      ...cached,
+      isStale: true,
+    };
+  }
+
+  /**
+   * T1.4: Obtiene precio del caché con fallback a stale
+   * Primero intenta obtener precio válido
+   * Si expira, intenta obtener stale (mejor que nada)
+   */
+  getOrStale(symbol: string, provider?: string): CachedPrice | null {
+    if (!validateSymbol(symbol)) return null;
+    
+    // Intentar obtener precio válido
+    const valid = this.get(symbol, provider);
+    if (valid) return valid;
+    
+    // Fallback a stale
+    return this.getStale(symbol);
   }
 
   /**
    * Guarda un precio en caché
    */
-  set(symbol: string, price: number, change: number, changePercent: number): void {
+  set(symbol: string, price: number, change: number, changePercent: number, provider?: string): void {
     if (!validateSymbol(symbol)) return;
     if (!this.isValidPrice(price, change, changePercent)) return;
     
-    // Implementar límite de caché para evitar memory leak
     if (this.cache.size >= this.maxCacheSize) {
-      // Remover entrada más antigua
       const oldestKey = this.cache.keys().next().value;
       if (oldestKey) this.cache.delete(oldestKey);
     }
@@ -77,7 +120,25 @@ class PriceCache {
       change,
       changePercent,
       timestamp: Date.now(),
+      provider,
+      isStale: false,
     });
+  }
+
+  /**
+   * T1.4: Invalida entrada de caché (cuando hay cambios en tiempo real)
+   */
+  invalidate(symbol: string): void {
+    if (validateSymbol(symbol)) {
+      this.cache.delete(symbol);
+    }
+  }
+
+  /**
+   * T1.4: Invalida múltiples símbolos (broadcast de cambios)
+   */
+  invalidateMultiple(symbols: string[]): void {
+    symbols.forEach(symbol => this.invalidate(symbol));
   }
 
   /**
@@ -99,16 +160,55 @@ class PriceCache {
   }
 
   /**
-   * Limpia entradas expiradas
+   * T1.4: Limpia entradas expiradas (garbage collection)
    */
-  cleanExpired(): void {
+  cleanExpired(provider?: string): number {
     const now = Date.now();
+    const ttl = this.getTTL(provider);
+    let removed = 0;
     
     for (const [symbol, data] of this.cache.entries()) {
-      if (now - data.timestamp > this.cacheExpiryMs) {
+      if (now - data.timestamp > ttl) {
         this.cache.delete(symbol);
+        removed++;
       }
     }
+    
+    return removed;
+  }
+
+  /**
+   * T1.4: Obtiene estadísticas de caché
+   */
+  getStats(): {
+    totalCached: number;
+    validCount: number;
+    staleCount: number;
+    oldestEntry?: number;
+  } {
+    const now = Date.now();
+    let validCount = 0;
+    let staleCount = 0;
+    let oldestEntry: number | undefined;
+
+    for (const [, data] of this.cache.entries()) {
+      const ttl = PROVIDER_TTL[data.provider?.toUpperCase() || ''] || PROVIDER_TTL.DEFAULT;
+      if (now - data.timestamp <= ttl) {
+        validCount++;
+      } else {
+        staleCount++;
+      }
+      if (!oldestEntry || data.timestamp < oldestEntry) {
+        oldestEntry = data.timestamp;
+      }
+    }
+
+    return {
+      totalCached: this.cache.size,
+      validCount,
+      staleCount,
+      oldestEntry,
+    };
   }
 
   /**
@@ -123,11 +223,10 @@ class PriceCache {
 
     try {
       while (this.requestQueue.length > 0) {
-        // Tomar los primeros batchSize símbolos
         const batch = this.requestQueue.splice(0, this.batchSize);
         const symbols = batch
           .map(r => r.symbol)
-          .filter(s => validateSymbol(s)); // Validar antes de enviar
+          .filter(s => validateSymbol(s));
 
         if (symbols.length === 0) {
           batch.forEach(r => r.reject(new Error('Invalid symbol')));
@@ -135,7 +234,6 @@ class PriceCache {
         }
 
         try {
-          // Usar URLSearchParams seguro
           const params = createSafeParams({
             symbols: symbols.join(','),
             type: 'price'
@@ -149,12 +247,10 @@ class PriceCache {
 
           const data = await res.json();
           
-          // Validar que la respuesta sea un array
           if (!Array.isArray(data)) {
             throw new Error('Invalid response format');
           }
           
-          // Procesar respuesta
           if (Array.isArray(data)) {
             data.forEach((item: any, index: number) => {
               const request = batch[index];
@@ -164,24 +260,38 @@ class PriceCache {
                   change: Number(item.change || 0),
                   changePercent: Number(item.changePercent || 0),
                   timestamp: Date.now(),
+                  provider: item.source || 'API',
+                  isStale: false,
                 };
                 
-                // Validar y guardar en caché
                 if (this.isValidPrice(price.price, price.change, price.changePercent)) {
-                  this.set(request.symbol, price.price, price.change, price.changePercent);
+                  this.set(request.symbol, price.price, price.change, price.changePercent, item.source);
                   request.resolve(price);
                 } else {
-                  request.reject(new Error('Invalid price data'));
+                  // T1.4: Usar stale como fallback
+                  const stale = this.getStale(request.symbol);
+                  if (stale) {
+                    request.resolve(stale);
+                  } else {
+                    request.reject(new Error('Invalid price data'));
+                  }
                 }
               }
             });
           }
         } catch (error) {
           const err = error instanceof Error ? error : new Error('Error fetching prices');
-          batch.forEach(r => r.reject(err));
+          // T1.4: Intentar fallback con stale prices
+          batch.forEach(r => {
+            const stale = this.getStale(r.symbol);
+            if (stale) {
+              r.resolve(stale);
+            } else {
+              r.reject(err);
+            }
+          });
         }
 
-        // Delay entre lotes para evitar rate limiting
         if (this.requestQueue.length > 0) {
           await new Promise(resolve => setTimeout(resolve, this.batchDelayMs));
         }
@@ -195,23 +305,17 @@ class PriceCache {
    * Fetch de precio con batching automático
    */
   async fetchPrice(symbol: string): Promise<CachedPrice> {
-    // Validar símbolo
     if (!validateSymbol(symbol)) {
       throw new Error('Invalid symbol format');
     }
 
-    // Primero verificar caché
     const cached = this.get(symbol);
     if (cached) {
       return cached;
     }
 
-    // Crear promise que se resolverá cuando se procese el batch
     return new Promise((resolve, reject) => {
       this.requestQueue.push({ symbol, resolve, reject });
-      
-      // Iniciar procesamiento de batch
-      // setTimeout para permitir que se agreguen más símbolos en el mismo ciclo
       setTimeout(() => this.processBatch(), 10);
     });
   }

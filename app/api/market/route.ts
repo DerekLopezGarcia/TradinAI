@@ -542,11 +542,31 @@ export async function GET(request: NextRequest) {
         return NextResponse.json(priceData);
     }
   } catch (error) {
+    // T1.5: Logging mejorado con detalles descriptivos
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const isDevelopment = process.env.NODE_ENV === 'development';
+
+    // Categorizar tipo de error para logging
+    let errorType = 'UNKNOWN';
+    if (errorMessage.includes('timeout') || errorMessage.includes('503') || errorMessage.includes('502')) {
+      errorType = 'PROVIDER_UNAVAILABLE';
+    } else if (errorMessage.includes('rate') || errorMessage.includes('429')) {
+      errorType = 'RATE_LIMITED';
+    } else if (errorMessage.includes('Invalid') || errorMessage.includes('invalid')) {
+      errorType = 'INVALID_SYMBOL';
+    } else if (errorMessage.includes('No data') || errorMessage.includes('No hay datos')) {
+      errorType = 'NO_DATA_AVAILABLE';
+    } else if (errorMessage.includes('network') || errorMessage.includes('ECONNREFUSED')) {
+      errorType = 'NETWORK_ERROR';
+    }
+
     console.error('Market API error:', {
       symbol,
       type,
       interval,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      errorType,
+      errorMessage,
+      timestamp: new Date().toISOString(),
     });
 
     return NextResponse.json(
@@ -555,12 +575,32 @@ export async function GET(request: NextRequest) {
         symbol,
         type,
         timestamp: Date.now(),
-        details: process.env.NODE_ENV === 'development'
-          ? (error instanceof Error ? error.message : 'Unknown error')
-          : undefined,
+        errorType,
+        // T1.5: Proporcionar detalles en desarrollo y producción con categorización
+        details: isDevelopment
+          ? {
+              message: errorMessage,
+              type: errorType,
+              suggestion: getErrorSuggestion(errorType, symbol),
+            }
+          : { type: errorType },
       },
       { status: 500 }
     );
   }
 }
 
+/**
+ * T1.5: Obtiene sugerencia de solución según el tipo de error
+ */
+function getErrorSuggestion(errorType: string, symbol: string): string {
+  const suggestions: Record<string, string> = {
+    PROVIDER_UNAVAILABLE: 'El proveedor de datos no está disponible. Intenta de nuevo en unos minutos.',
+    RATE_LIMITED: 'Se alcanzó el límite de solicitudes. Espera un momento antes de intentar de nuevo.',
+    INVALID_SYMBOL: `"${symbol}" no es un símbolo válido. Verifica la ortografía.`,
+    NO_DATA_AVAILABLE: `No hay datos disponibles para "${symbol}" en este momento.`,
+    NETWORK_ERROR: 'Error de conexión de red. Verifica tu conexión a internet.',
+    UNKNOWN: 'Error desconocido. Intenta de nuevo.',
+  };
+  return suggestions[errorType] || suggestions.UNKNOWN;
+}

@@ -223,5 +223,58 @@ Con esta arquitectura:
 - ✅ Todo se testea (independientemente)
 - ✅ Todo escala (sin refactorizar)
 
+---
+
+## 🔍 Debugging: Ver Errores de Datos (T1.5)
+
+### Acceder al Historial de Errores
+
+Abre **Developer Console** (F12) en el navegador y escribe:
+
+```javascript
+// Ver últimos 50 errores
+errorLoggingService.getErrorHistory(undefined, 50)
+
+// Ver errores de un símbolo específico
+errorLoggingService.getErrorsBySymbol('BTCUSD')
+
+// Ver resumen: cuántos timeout, rate limits, etc.
+errorLoggingService.getErrorSummary()
+
+// Exportar todos los logs en JSON
+JSON.stringify(errorLoggingService.exportLogs(), null, 2)
+
+// Copiar al clipboard
+copy(errorLoggingService.getErrorHistory(undefined, 100))
+
+// Limpiar historial
+errorLoggingService.clearHistory()
+```
+
+### Ejemplo de Output
+
+```javascript
+[
+  {
+    timestamp: Date("2026-04-07T14:32:45.123Z"),
+    symbol: "BTCUSD",
+    category: "API_TIMEOUT",
+    message: "⏱️ BTCUSD [API]: Timeout - API tardó demasiado (408)",
+    provider: "API",
+    statusCode: 408,
+    errorDetails: "Request excedió 2s"
+  },
+  {
+    timestamp: Date("2026-04-07T14:32:46.456Z"),
+    symbol: "ETHUSD",
+    category: "RATE_LIMITED",
+    message: "🚫 ETHUSD [Binance]: Demasiadas solicitudes (rate limited) (429)",
+    provider: "Binance",
+    statusCode: 429,
+    errorDetails: "Se alcanzó el límite de solicitudes"
+  }
+]
+```
+
 **¡Listo para crear!** 🚀
 

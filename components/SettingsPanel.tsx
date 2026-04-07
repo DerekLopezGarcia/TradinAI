@@ -1,0 +1,233 @@
+'use client';
+
+import { useState, useRef, useEffect } from 'react';
+import { useTheme } from 'next-themes';
+import { Settings, X, Trash2, Download, Moon, Sun, RotateCcw, AlertCircle } from 'lucide-react';
+import toast from 'react-hot-toast';
+
+export function SettingsPanel() {
+  const { theme, setTheme } = useTheme();
+  const [isOpen, setIsOpen] = useState(false);
+  const [language, setLanguage] = useState('es');
+  const panelRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        panelRef.current &&
+        !panelRef.current.contains(event.target as Node) &&
+        buttonRef.current &&
+        !buttonRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isOpen]);
+
+  const handleClearCache = () => {
+    if (confirm('¿Estás seguro que deseas limpiar el caché? Se eliminarán los datos de precios en caché.')) {
+      localStorage.clear();
+      sessionStorage.clear();
+      toast.success('Caché limpiado');
+      setIsOpen(false);
+    }
+  };
+
+  const handleExportData = () => {
+    try {
+      // SEGURIDAD: Solo exportar datos específicos y seguros, NO todo localStorage
+      const safeData = {
+        timestamp: new Date().toISOString(),
+        version: '2.0.0',
+        theme,
+        language,
+        // Solo incluir preferencias de usuario, NO tokens o datos sensibles
+        userPreferences: {
+          selectedTimeframe: localStorage.getItem('trading-ia-store') 
+            ? (() => {
+              try {
+                const store = JSON.parse(localStorage.getItem('trading-ia-store') || '{}');
+                return { selectedTimeframe: store.state?.selectedTimeframe };
+              } catch {
+                return {};
+              }
+            })()
+            : {},
+        },
+      };
+      
+      const element = document.createElement('a');
+      element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(JSON.stringify(safeData, null, 2)));
+      element.setAttribute('download', `trading-ia-backup-${Date.now()}.json`);
+      element.style.display = 'none';
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+      
+      toast.success('Datos exportados (solo preferencias)');
+    } catch (error) {
+      toast.error('Error al exportar datos');
+    }
+  };
+
+  const handleResetApp = () => {
+    if (confirm('¿Estás seguro que deseas reiniciar la aplicación a valores por defecto? Esta acción no se puede deshacer.')) {
+      localStorage.clear();
+      sessionStorage.clear();
+      location.reload();
+    }
+  };
+
+  return (
+    <div className="relative">
+      {/* Botón de configuración */}
+      <button
+        ref={buttonRef}
+        onClick={() => setIsOpen(!isOpen)}
+        className="p-2 rounded-lg transition-colors hover:bg-muted"
+        title="Configuración"
+      >
+        <Settings className="w-5 h-5 text-foreground" />
+      </button>
+
+      {/* Panel de configuración */}
+      {isOpen && (
+        <div
+          ref={panelRef}
+          className="absolute right-0 top-full mt-2 w-80 bg-card border border-border rounded-lg shadow-lg z-50 max-h-[600px] overflow-y-auto flex flex-col"
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 border-b border-border bg-muted/30 sticky top-0">
+            <div className="flex items-center gap-2">
+              <Settings className="w-5 h-5 text-primary" />
+              <h3 className="font-semibold text-sm">Configuración</h3>
+            </div>
+            <button
+              onClick={() => setIsOpen(false)}
+              className="p-1 hover:bg-muted rounded-lg transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Contenido */}
+          <div className="p-4 space-y-4">
+            {/* Tema */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground flex items-center gap-2">
+                {theme === 'dark' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+                Tema
+              </label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setTheme('light')}
+                  className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                    theme === 'light'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  <Sun className="w-4 h-4 inline mr-1" />
+                  Claro
+                </button>
+                <button
+                  onClick={() => setTheme('dark')}
+                  className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                    theme === 'dark'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  <Moon className="w-4 h-4 inline mr-1" />
+                  Oscuro
+                </button>
+              </div>
+            </div>
+
+            {/* Idioma */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">Idioma</label>
+              <select
+                value={language}
+                onChange={(e) => {
+                  setLanguage(e.target.value);
+                  toast.success('Idioma cambiado (próximamente)');
+                }}
+                className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+              >
+                <option value="es">Español</option>
+                <option value="en" disabled>English (próximamente)</option>
+                <option value="pt" disabled>Português (próximamente)</option>
+              </select>
+            </div>
+
+            {/* Datos */}
+            <div className="space-y-2 pt-4 border-t border-border">
+              <p className="text-sm font-medium text-foreground">Datos</p>
+              
+              <button
+                onClick={handleExportData}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 hover:bg-muted text-sm font-medium text-foreground transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                Exportar datos
+              </button>
+
+              <button
+                onClick={handleClearCache}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-orange-500/10 hover:bg-orange-500/20 text-orange-600 text-sm font-medium transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+                Limpiar caché
+              </button>
+            </div>
+
+            {/* Información */}
+            <div className="space-y-2 pt-4 border-t border-border">
+              <p className="text-sm font-medium text-foreground">Información</p>
+              
+              <div className="bg-muted/30 rounded-lg p-3 space-y-1 text-xs text-muted-foreground">
+                <div className="flex justify-between">
+                  <span>Versión:</span>
+                  <span className="font-mono">2.0.0</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Ambiente:</span>
+                  <span className="font-mono">{process.env.NODE_ENV}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Fecha:</span>
+                  <span className="font-mono">{new Date().toLocaleDateString('es-ES')}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Reset */}
+            <div className="pt-4 border-t border-border">
+              <button
+                onClick={handleResetApp}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-destructive/10 hover:bg-destructive/20 text-destructive text-sm font-medium transition-colors"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Reiniciar app
+              </button>
+            </div>
+
+            {/* Aviso */}
+            <div className="bg-muted/30 rounded-lg p-3 flex gap-2 text-xs text-muted-foreground">
+              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <span>Los cambios se guardan automáticamente en el navegador</span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
