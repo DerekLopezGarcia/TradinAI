@@ -103,9 +103,25 @@ export class NewsSentimentService {
   private readonly NEGATORS_ES = ['no', 'ni', 'nunca', 'jamas', 'sin', 'nada'];
 
   /**
+   * Normalizar texto: remover diacríticos y caracteres especiales
+   * Convierte "crítico" → "critico", "pánico" → "panico"
+   * Usa NFD (Canonical Decomposition) para separar diacríticos
+   */
+  private normalizeDiacritics(text: string): string {
+    // NFD: descompone caracteres acentuados
+    // Ejemplo: "á" → "a" + combining accent mark
+    // Luego remove combining marks [\u0300-\u036f]
+    // Finalmente remove non-word characters (punctuation, etc.)
+    return text
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')  // Remove combining diacritical marks
+      .replace(/[^\w]/g, '');            // Remove punctuation/special chars
+  }
+
+  /**
    * Detectar idioma del texto
    */
-  private detectLanguage(text: string): 'en' | 'es' | 'other' {
+  private detectLanguage(text: string): 'en' | 'es' {
     const lowerText = text.toLowerCase();
     
     // Palabras clave de espanol
@@ -135,29 +151,6 @@ export class NewsSentimentService {
   /**
    * Traduccion basica de palabras clave del espanol al ingles
    */
-  private translateSpanishToEnglish(text: string): string {
-    const translations: Record<string, string> = {
-      'sube': 'surge', 'baja': 'falls', 'crece': 'grows', 'pierde': 'loses',
-      'gana': 'gains', 'compra': 'buy', 'venta': 'sell', 'exito': 'success',
-      'fracaso': 'failure', 'crisis': 'crisis', 'quiebra': 'bankruptcy',
-      'alcista': 'bullish', 'bajista': 'bearish', 'positivo': 'positive',
-      'negativo': 'negative', 'acuerdo': 'agreement', 'conflicto': 'conflict',
-      'mejora': 'improvement', 'declive': 'decline', 'expansion': 'expansion',
-      'contraccion': 'contraction', 'inversion': 'investment', 'ganancia': 'profit',
-      'perdida': 'loss', 'riesgo': 'risk', 'oportunidad': 'opportunity',
-      'fortaleza': 'strength', 'debilidad': 'weakness', 'presion': 'pressure',
-      'confianza': 'confidence', 'incertidumbre': 'uncertainty',
-    };
-
-    let translated = text.toLowerCase();
-    Object.entries(translations).forEach(([es, en]) => {
-      const regex = new RegExp(`\\b${es}\\b`, 'gi');
-      translated = translated.replace(regex, en);
-    });
-    
-    return translated;
-  }
-
   /**
    * Analizar sentimiento de un texto (multiidioma)
    */
@@ -195,14 +188,8 @@ export class NewsSentimentService {
       negativeWords = this.NEGATIVE_WORDS_ES;
       intensifiers = this.INTENSIFIERS_ES;
       negators = this.NEGATORS_ES;
-    } else if (language === 'other') {
-      // Intentar traducir espanol primero, luego usar ingles
-      processText = this.translateSpanishToEnglish(text).toLowerCase();
-      positiveWords = this.POSITIVE_WORDS_EN;
-      negativeWords = this.NEGATIVE_WORDS_EN;
-      intensifiers = this.INTENSIFIERS_EN;
-      negators = this.NEGATORS_EN;
     }
+    // Language is 'en' by default, no need for else branch
 
     const words = processText.split(/\s+/);
 
@@ -213,19 +200,19 @@ export class NewsSentimentService {
 
     // Analizar palabras
     for (let i = 0; i < words.length; i++) {
-      const word = words[i].replace(/[^\w]/g, '');
+      const word = this.normalizeDiacritics(words[i]);
       
       // Buscar intensificadores
       let intensifier = 1;
       if (i > 0) {
-        const prevWord = words[i - 1].replace(/[^\w]/g, '');
+        const prevWord = this.normalizeDiacritics(words[i - 1]);
         intensifier = intensifiers[prevWord] || 1;
       }
 
       // Buscar negadores
       let isNegated = false;
       if (i > 0) {
-        const prevWord = words[i - 1].replace(/[^\w]/g, '');
+        const prevWord = this.normalizeDiacritics(words[i - 1]);
         isNegated = negators.includes(prevWord);
       }
 
@@ -303,7 +290,7 @@ export class NewsSentimentService {
     const intensityDesc = Math.abs(score) > 0.6 ? 'strong' :
                           Math.abs(score) > 0.3 ? 'moderate' : 'weak';
 
-    const langPrefix = language === 'es' ? '[ES] ' : language === 'other' ? '[TR] ' : '';
+    const langPrefix = language === 'es' ? '[ES] ' : '';
 
     return `${langPrefix}${intensityDesc} ${scoreDesc} sentiment with ${keywordCount} keyword(s)`;
   }

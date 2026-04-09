@@ -14,7 +14,7 @@ import { CandleData, TimeFrame } from '@/lib/types';
 export interface IntradayPrediction {
   timeframe: '4h' | '8h' | '24h';
   expectedDirection: 'up' | 'down' | 'neutral';
-  probability: number;                    // 0-100, confianza de la predicción
+  probability: number;                    // 0-100, prediction confidence (scaled from internal 20-80 range)
   priceTarget: number | null;             // Precio objetivo estimado
   priceTargetPercent: number;             // % de cambio esperado
   
@@ -55,6 +55,17 @@ export class IntradayPredictionService {
     currentPrice: number,
     timeframe: TimeFrame = '1h'
   ): IntradayPrediction {
+    // Map input timeframe to prediction output timeframe
+    // Short timeframes (1m-1h) → 4h prediction
+    // Medium timeframes (4h) → 8h prediction
+    // Long timeframes (1d+) → 24h prediction
+    let predictionTimeframe: '4h' | '8h' | '24h' = '4h';
+    if (timeframe === '4h') {
+      predictionTimeframe = '8h';
+    } else if (timeframe === '1d' || timeframe === '1w') {
+      predictionTimeframe = '24h';
+    }
+
     // Calcular métricas actuales
     const currentMomentum = this.calculateMomentum(currentCandles);
     const currentVolatility = this.calculateVolatility(currentCandles);
@@ -72,9 +83,9 @@ export class IntradayPredictionService {
       allHistoricalCandles
     );
 
-    // Combinar factores para predicción 4h
-    const prediction4h = this.generatePrediction(
-      '4h',
+    // Combinar factores para predicción con el timeframe especificado
+    const prediction = this.generatePrediction(
+      predictionTimeframe,
       currentMomentum,
       currentVolatility,
       currentTrend,
@@ -84,7 +95,7 @@ export class IntradayPredictionService {
       currentPrice
     );
 
-    return prediction4h;
+    return prediction;
   }
 
   /**
@@ -168,14 +179,14 @@ export class IntradayPredictionService {
   private findSimilarHistoricalPatterns(
     currentCandles: CandleData[],
     historicalCandles: CandleData[]
-  ): { similarity: number; nextDirection: 'up' | 'down'; movePercent: number } {
+  ): { similarity: number; nextDirection: 'up' | 'down' | 'neutral'; movePercent: number } {
     // Obtener patrón actual (últimas 5 velas)
     const currentPattern = currentCandles.slice(-5);
     if (currentPattern.length < 5) {
-      return { similarity: 0, nextDirection: 'neutral' as any, movePercent: 0 };
+      return { similarity: 0, nextDirection: 'neutral', movePercent: 0 };
     }
 
-    let bestMatch = { similarity: 0, nextDirection: 'up' as 'up' | 'down', movePercent: 0 };
+    let bestMatch = { similarity: 0, nextDirection: 'neutral' as 'up' | 'down' | 'neutral', movePercent: 0 };
 
     // Buscar en histórico
     for (let i = 5; i < Math.min(historicalCandles.length - 5, 200); i++) {
@@ -236,11 +247,24 @@ export class IntradayPredictionService {
     currentCandles: CandleData[],
     historicalCandles: CandleData[]
   ): { support: number; resistance: number } {
+    // Guard: Ensure we have at least some price data
+    let currentPrice: number;
+    
+    if (currentCandles.length > 0) {
+      currentPrice = currentCandles[currentCandles.length - 1].close;
+    } else if (historicalCandles.length > 0) {
+      // Fallback: use last historical candle as current price
+      currentPrice = historicalCandles[historicalCandles.length - 1].close;
+    } else {
+      // No data available - throw clear error
+      throw new Error('calculateSupportResistance requires either currentCandles or historicalCandles with data');
+    }
+
     const allCandles = [...historicalCandles, ...currentCandles];
     const recentCandles = allCandles.slice(-50);
 
     if (recentCandles.length === 0) {
-      const currentPrice = currentCandles[currentCandles.length - 1].close;
+      // Should not happen given the guard above, but keep for safety
       return { support: currentPrice * 0.98, resistance: currentPrice * 1.02 };
     }
 
@@ -252,7 +276,6 @@ export class IntradayPredictionService {
     let support = Math.min(...lows);
 
     // Ajustar si están demasiado lejos
-    const currentPrice = currentCandles[currentCandles.length - 1].close;
     if (resistance - currentPrice > currentPrice * 0.05) {
       resistance = currentPrice + (currentPrice * 0.03);
     }
@@ -292,9 +315,10 @@ export class IntradayPredictionService {
     else if (trend === 'strong_down') probabilityUp -= 20;
 
     // Factor de patrón histórico (+/- 10%)
-    if (historicalPattern.similarity > 70) {
+    // Only apply if we have a strong match and meaningful direction (not neutral)
+    if (historicalPattern.similarity > 70 && historicalPattern.nextDirection !== 'neutral') {
       if (historicalPattern.nextDirection === 'up') probabilityUp += 10;
-      else probabilityUp -= 10;
+      else if (historicalPattern.nextDirection === 'down') probabilityUp -= 10;
     }
 
     // Clamp entre 20-80 (evitar predicciones demasiado extremas)
@@ -334,7 +358,7 @@ export class IntradayPredictionService {
     return {
       timeframe,
       expectedDirection,
-      probability: Math.abs(probabilityUp - 50) * 2, // 0-100
+      probability: ((probabilityUp - 20) / 60) * 100, // Properly scaled 0-100 from clamped range 20-80
       priceTarget,
       priceTargetPercent,
       factors: {

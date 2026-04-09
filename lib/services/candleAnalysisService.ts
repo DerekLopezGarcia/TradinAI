@@ -16,7 +16,7 @@
  * - ✅ Volumen creciente: Engulfing y Soldados validan que volumen aumenta secuencialmente
  * - ✅ Descripción mejorada: Incluye información de validaciones (✓ Volumen confirmador)
  * 
- * PATRONES DE 1 VELA (5 total):
+ * PATRONES DE 1 VELA (6 total):
  * - Doji (indecisión)
  * - Marubozu (decisión fuerte)
  * - Hammer (reversión alcista)
@@ -24,7 +24,7 @@
  * - Spinning Top (indecisión)
  * - Inverted Hammer (reversión alcista)
  * 
- * PATRONES DE 2 VELAS (9 total):
+ * PATRONES DE 2 VELAS (8 total):
  * - Bullish Engulfing (reversión alcista)
  * - Bearish Engulfing (reversión bajista)
  * - Piercing Line (reversión alcista)
@@ -34,7 +34,7 @@
  * - Bullish Kicker (continuación alcista)
  * - Bearish Kicker (continuación bajista)
  * 
- * PATRONES DE 3 VELAS (7 total):
+ * PATRONES DE 3 VELAS (6 total):
  * - Three White Soldiers (reversión alcista fuerte)
  * - Three Black Crows (reversión bajista fuerte)
  * - Morning Star (reversión alcista)

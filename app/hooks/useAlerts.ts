@@ -85,19 +85,14 @@ export function useAlerts({
     const events = alertService.checkAllAlerts(symbol, currentPrice, candles);
 
     if (events.length > 0) {
+      // Procesar eventos: notifica observadores y envía notificaciones web
+      alertService.processTriggerEvents(events);
+
+      // Agregar a state solo una vez
       setTriggeredEvents(prev => [...prev, ...events].slice(-50)); // Mantener últimos 50
     }
   }, [symbol, currentPrice, candles, enabled]);
 
-  // Suscribirse a eventos de alerta (para notificaciones en tiempo real)
-  useEffect(() => {
-    const unsubscribe = alertService.subscribe((event: AlertTriggerEvent) => {
-      // Este callback se llama cuando se dispara una alerta en cualquier parte
-      setTriggeredEvents(prev => [...prev, event].slice(-50));
-    });
-
-    return unsubscribe;
-  }, []);
 
   return {
     alerts: symbol ? alerts.filter(a => a.symbol === symbol) : alerts,

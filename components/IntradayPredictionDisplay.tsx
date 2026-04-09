@@ -92,7 +92,7 @@ export function IntradayPredictionDisplay({
         </div>
 
         {/* Price Target */}
-        {prediction.priceTarget && (
+        {prediction.priceTarget != null && (
           <div className="bg-white/50 dark:bg-slate-800/50 p-2 rounded">
             <p className="text-xs text-slate-600 dark:text-slate-400">Target Price</p>
             <p className="text-sm font-semibold text-slate-900 dark:text-white">

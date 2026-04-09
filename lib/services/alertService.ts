@@ -228,7 +228,8 @@ export class AlertService {
   }
 
   /**
-   * Verificar todas las alertas para un símbolo
+   * Verificar todas las alertas para un símbolo (pure check sin efectos secundarios)
+   * Los observadores se notifican desde el caller (useAlerts hook)
    */
   public checkAllAlerts(symbol: string, currentPrice: number, candles: CandleData[]): AlertTriggerEvent[] {
     const alertsForSymbol = this.getAlertsBySymbol(symbol);
@@ -249,16 +250,24 @@ export class AlertService {
         };
 
         triggeredEvents.push(event);
-
-        // Notificar observadores
-        this.notifyObservers(event);
-
-        // Enviar notificación web
-        this.sendNotification(alert, message);
       }
     }
 
     return triggeredEvents;
+  }
+
+  /**
+   * Procesar eventos disparados: notificar observadores y enviar notificaciones web
+   * Se llama desde useAlerts para evitar duplicados
+   */
+  public processTriggerEvents(events: AlertTriggerEvent[]): void {
+    for (const event of events) {
+      // Notificar observadores
+      this.notifyObservers(event);
+
+      // Enviar notificación web
+      this.sendNotification(event.alert, event.message);
+    }
   }
 
   /**

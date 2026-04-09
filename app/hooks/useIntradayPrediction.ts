@@ -4,13 +4,14 @@
 
 import { useEffect, useState } from 'react';
 import { intradayPredictionService, IntradayPrediction } from '@/lib/services/intradayPredictionService';
-import { CandleData } from '@/lib/types';
+import { CandleData, TimeFrame } from '@/lib/types';
 
 export interface UseIntradayPredictionProps {
   symbol: string;
   currentCandles: CandleData[];
   historicalCandles: CandleData[];
   currentPrice: number;
+  timeframe?: TimeFrame;  // Optional timeframe for prediction (maps to 4h/8h/24h)
   enabled?: boolean;
 }
 
@@ -19,6 +20,7 @@ export function useIntradayPrediction({
   currentCandles,
   historicalCandles,
   currentPrice,
+  timeframe = '1h',
   enabled = true
 }: UseIntradayPredictionProps) {
   const [prediction, setPrediction] = useState<IntradayPrediction | null>(null);
@@ -26,8 +28,12 @@ export function useIntradayPrediction({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!enabled || !currentCandles.length || !currentPrice) {
+    // Early return if disabled or missing required data
+    // Note: currentPrice can legitimately be 0, so check explicitly for undefined/NaN
+    if (!enabled || !currentCandles.length || currentPrice === undefined || Number.isNaN(currentPrice)) {
       setPrediction(null);
+      setLoading(false);
+      setError(null);
       return;
     }
 
@@ -41,7 +47,8 @@ export function useIntradayPrediction({
           symbol,
           currentCandles,
           historicalCandles,
-          currentPrice
+          currentPrice,
+          timeframe
         );
 
         setPrediction(pred);
@@ -55,7 +62,7 @@ export function useIntradayPrediction({
     };
 
     generatePrediction();
-  }, [symbol, currentCandles, historicalCandles, currentPrice, enabled]);
+  }, [symbol, currentCandles, historicalCandles, currentPrice, timeframe, enabled]);
 
   return { prediction, loading, error };
 }
