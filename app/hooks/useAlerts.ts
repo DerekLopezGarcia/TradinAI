@@ -43,10 +43,14 @@ export function useAlerts({
       return null;
     }
 
-    const newAlert = alertService.createAlert(symbol, name, condition, options);
-    setAlerts(alertService.getAlerts());
-
-    return newAlert;
+    try {
+      const newAlert = alertService.createAlert(symbol, name, condition, options);
+      setAlerts(alertService.getAlerts());
+      return newAlert;
+    } catch (error) {
+      console.error('useAlerts: error creating alert:', error instanceof Error ? error.message : 'Unknown error');
+      return null;
+    }
   }, [symbol]);
 
   // Actualizar alerta
@@ -78,11 +82,11 @@ export function useAlerts({
 
   // Verificar alertas cuando hay datos nuevos
   useEffect(() => {
-    if (!enabled || !symbol || currentPrice === undefined || !candles || candles.length === 0) {
+    if (!enabled || !symbol || currentPrice === undefined) {
       return;
     }
 
-    const events = alertService.checkAllAlerts(symbol, currentPrice, candles);
+    const events = alertService.checkAllAlerts(symbol, currentPrice, candles ?? []);
 
     if (events.length > 0) {
       // Procesar eventos: notifica observadores y envía notificaciones web

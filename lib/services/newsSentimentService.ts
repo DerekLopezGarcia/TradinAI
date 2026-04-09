@@ -98,8 +98,8 @@ export class NewsSentimentService {
     'significativamente': 1.5, 'considerablemente': 1.5, 'sustancialmente': 1.5,
   };
 
-  // Negadores
-  private readonly NEGATORS_EN = ['not', 'no', 'never', 'without', 'nothing', "n't"];
+  // Negadores — incluye formas normalizadas de contracciones (dont, isnt, etc.)
+  private readonly NEGATORS_EN = ['not', 'no', 'never', 'without', 'nothing', 'nt', 'dont', 'doesnt', 'isnt', 'wasnt', 'cant', 'wont', 'shouldnt', 'wouldnt', 'couldnt'];
   private readonly NEGATORS_ES = ['no', 'ni', 'nunca', 'jamas', 'sin', 'nada'];
 
   /**
@@ -144,13 +144,10 @@ export class NewsSentimentService {
     if (spanishCount > englishCount && spanishCount > 3) return 'es';
     if (englishCount > spanishCount && englishCount > 3) return 'en';
     
-    // Por defecto, assume ingles (es el mas comun en noticias financieras)
+    // Por defecto, asume inglés (es el más común en noticias financieras)
     return 'en';
   }
 
-  /**
-   * Traduccion basica de palabras clave del espanol al ingles
-   */
   /**
    * Analizar sentimiento de un texto (multiidioma)
    */

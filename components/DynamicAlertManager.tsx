@@ -15,7 +15,7 @@ interface DynamicAlertManagerProps {
 }
 
 export function DynamicAlertManager({ symbol, currentPrice }: DynamicAlertManagerProps) {
-  const { alerts, triggeredEvents, createAlert, deleteAlert, setAlertEnabled, clearTriggeredEvents } = useAlerts({ symbol });
+  const { alerts, triggeredEvents, createAlert, deleteAlert, setAlertEnabled, clearTriggeredEvents } = useAlerts({ symbol, currentPrice });
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -36,15 +36,26 @@ export function DynamicAlertManager({ symbol, currentPrice }: DynamicAlertManage
       return;
     }
 
+    const numericValue = parseFloat(formData.value);
+    if (isNaN(numericValue)) {
+      alert('Please enter a valid numeric value');
+      return;
+    }
+
     const condition: AlertCondition = {
       type: formData.type,
       operator: formData.operator,
-      value: parseFloat(formData.value)
+      value: numericValue
     };
 
-    createAlert(formData.name, condition, {
+    const result = createAlert(formData.name, condition, {
       soundEnabled: formData.soundEnabled
     });
+
+    if (result === null) {
+      alert('Failed to create alert. Please check your inputs.');
+      return;
+    }
 
     // Reset form
     setFormData({

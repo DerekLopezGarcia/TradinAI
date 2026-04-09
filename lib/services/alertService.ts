@@ -97,8 +97,8 @@ export class AlertService {
       throw new Error('Invalid condition value');
     }
     // ✅ Validar range para SMA period
-    if (condition.period && (condition.period < 2 || condition.period > 200)) {
-      throw new Error('Invalid period: must be between 2 and 200');
+    if (condition.period !== undefined && (!Number.isInteger(condition.period) || condition.period < 2 || condition.period > 200)) {
+      throw new Error('Invalid period: must be an integer between 2 and 200');
     }
 
     const alert: Alert = {
@@ -196,8 +196,9 @@ export class AlertService {
         break;
 
       case 'percent_change':
-        if (candles.length > 0) {
-          const change = ((currentPrice - candles[candles.length - 1].close) / candles[candles.length - 1].close) * 100;
+        if (candles.length >= 2) {
+          const refCandle = candles[candles.length - 2];
+          const change = ((currentPrice - refCandle.close) / refCandle.close) * 100;
           conditionMet = this.checkNumericCondition(change, condition);
         }
         break;
@@ -228,8 +229,9 @@ export class AlertService {
   }
 
   /**
-   * Verificar todas las alertas para un símbolo (pure check sin efectos secundarios)
-   * Los observadores se notifican desde el caller (useAlerts hook)
+   * Verificar todas las alertas para un símbolo.
+   * Actualiza lastTriggeredAt en alertas disparadas y retorna los eventos.
+   * Los observadores se notifican mediante processTriggerEvents() desde el caller (useAlerts hook).
    */
   public checkAllAlerts(symbol: string, currentPrice: number, candles: CandleData[]): AlertTriggerEvent[] {
     const alertsForSymbol = this.getAlertsBySymbol(symbol);
@@ -316,8 +318,8 @@ export class AlertService {
     const gains = changes.filter(c => c > 0).reduce((a, b) => a + b, 0);
     const losses = Math.abs(changes.filter(c => c < 0).reduce((a, b) => a + b, 0));
 
-    const avgGain = gains / 14;
-    const avgLoss = losses / 14;
+    const avgGain = gains / changes.length;
+    const avgLoss = losses / changes.length;
     const rs = avgGain / Math.max(avgLoss, 0.0001);
 
     return 100 - (100 / (1 + rs));
@@ -365,24 +367,35 @@ export class AlertService {
   private generateAlertMessage(alert: Alert, currentPrice: number, candles: CandleData[]): string {
     const condition = alert.condition;
     // ✅ Sanitizar valores para evitar inyección
-    const sanitizedSymbol = (alert.symbol || '').replace(/[^A-Z0-9]/g, '');
-    const sanitizedName = (alert.name || '').substring(0, 50).replace(/[<>]/g, '');
+    const sanitizedSymbol = (alert.symbol || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+    const operatorLabel: Record<AlertOperator, string> = {
+      gt: 'exceeded',
+      gte: 'reached or exceeded',
+      lt: 'dropped below',
+      lte: 'dropped to or below',
+      eq: 'reached'
+    };
 
     switch (condition.type) {
       case 'price':
-        return `Alert: ${sanitizedSymbol} price ${condition.operator === 'gt' ? 'exceeded' : 'dropped below'} ${condition.value.toFixed(2)}. Current: ${currentPrice.toFixed(2)}`;
+        return `Alert: ${sanitizedSymbol} price ${operatorLabel[condition.operator] || 'matched'} ${condition.value.toFixed(2)}. Current: ${currentPrice.toFixed(2)}`;
 
-      case 'percent_change':
-        const change = ((currentPrice - candles[candles.length - 1].close) / candles[candles.length - 1].close) * 100;
+      case 'percent_change': {
+        const refClose = candles.length >= 2 ? candles[candles.length - 2].close : currentPrice;
+        const change = ((currentPrice - refClose) / refClose) * 100;
         return `Alert: ${sanitizedSymbol} changed by ${change.toFixed(2)}% (target: ${condition.value}%)`;
+      }
 
-      case 'rsi':
+      case 'rsi': {
         const rsi = this.calculateRSI(candles);
-        return `Alert: ${sanitizedSymbol} RSI is ${rsi.toFixed(1)} (target: ${condition.operator === 'gt' ? 'above' : 'below'} ${condition.value})`;
+        return `Alert: ${sanitizedSymbol} RSI is ${rsi.toFixed(1)} (target: ${operatorLabel[condition.operator] || ''} ${condition.value})`;
+      }
 
-      case 'macd':
+      case 'macd': {
         const macd = this.calculateMACD(candles);
         return `Alert: ${sanitizedSymbol} MACD is ${macd.toFixed(4)} (target: ${condition.value})`;
+      }
 
       case 'sma_cross':
         return `Alert: ${sanitizedSymbol} SMA crossover detected`;

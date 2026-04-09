@@ -112,8 +112,8 @@ export class IntradayPredictionService {
     const gains = changes.filter(c => c > 0).reduce((a, b) => a + b, 0);
     const losses = Math.abs(changes.filter(c => c < 0).reduce((a, b) => a + b, 0));
 
-    const avgGain = gains / 14;
-    const avgLoss = losses / 14;
+    const avgGain = gains / changes.length;
+    const avgLoss = losses / changes.length;
     const rs = avgGain / Math.max(avgLoss, 0.0001);
     const rsi = 100 - (100 / (1 + rs));
 
@@ -131,6 +131,7 @@ export class IntradayPredictionService {
     if (candles.length < 14) return 'normal';
 
     let sumTR = 0;
+    let trCount = 0;
     for (let i = 1; i < Math.min(14, candles.length); i++) {
       const tr = Math.max(
         candles[i].high - candles[i].low,
@@ -138,9 +139,10 @@ export class IntradayPredictionService {
         Math.abs(candles[i].low - candles[i - 1].close)
       );
       sumTR += tr;
+      trCount++;
     }
 
-    const atr = sumTR / 14;
+    const atr = trCount > 0 ? sumTR / trCount : 0;
     const currentPrice = candles[candles.length - 1].close;
     const atrPercent = (atr / currentPrice) * 100;
 
@@ -200,7 +202,8 @@ export class IntradayPredictionService {
         const nextCandles = historicalCandles.slice(i, Math.min(i + 5, historicalCandles.length));
         if (nextCandles.length > 0) {
           const movePercent = ((nextCandles[nextCandles.length - 1].close - historicalPattern[4].close) / historicalPattern[4].close) * 100;
-          const direction = movePercent > 0 ? 'up' : 'down';
+          const direction: 'up' | 'down' | 'neutral' =
+            movePercent > 0.01 ? 'up' : movePercent < -0.01 ? 'down' : 'neutral';
 
           bestMatch = {
             similarity,
@@ -291,10 +294,10 @@ export class IntradayPredictionService {
    */
   private generatePrediction(
     timeframe: '4h' | '8h' | '24h',
-    momentum: string,
-    volatility: string,
-    trend: string,
-    historicalPattern: any,
+    momentum: 'strong_positive' | 'positive' | 'neutral' | 'negative' | 'strong_negative',
+    volatility: 'very_low' | 'low' | 'normal' | 'high' | 'very_high',
+    trend: 'strong_up' | 'up' | 'neutral' | 'down' | 'strong_down',
+    historicalPattern: { similarity: number; nextDirection: 'up' | 'down' | 'neutral'; movePercent: number },
     support: number,
     resistance: number,
     currentPrice: number
@@ -362,9 +365,9 @@ export class IntradayPredictionService {
       priceTarget,
       priceTargetPercent,
       factors: {
-        momentum: momentum as any,
-        volatility: volatility as any,
-        trend: trend as any,
+        momentum,
+        volatility,
+        trend,
         patternMatch: historicalPattern.similarity,
         timeOfDay: this.getMarketTimeContext()
       },
