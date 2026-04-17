@@ -1,0 +1,97 @@
+{
+  "user": {
+    "email": "user@example.com",
+    "name": "John Doe",
+    "theme": "dark",
+    "language": "es"
+  },
+  "watchlists": [
+    {
+      "name": "Favoritos Crypto",
+      "description": "Mis criptomonedas favoritas",
+      "is_default": true,
+      "items": [
+        {
+          "symbol": "BTCUSD",
+          "asset_type": "crypto"
+        },
+        {
+          "symbol": "ETHUSD",
+          "asset_type": "crypto"
+        },
+        {
+          "symbol": "BNBUSD",
+          "asset_type": "crypto"
+        }
+      ]
+    },
+    {
+      "name": "Tech Stocks",
+      "description": "Acciones tecnológicas",
+      "is_default": false,
+      "items": [
+        {
+          "symbol": "AAPL",
+          "asset_type": "stock"
+        },
+        {
+          "symbol": "MSFT",
+          "asset_type": "stock"
+        },
+        {
+          "symbol": "GOOGL",
+          "asset_type": "stock"
+        }
+      ]
+    },
+    {
+      "name": "Commodities",
+      "description": "Materias primas",
+      "is_default": false,
+      "items": [
+        {
+          "symbol": "GOLD",
+          "asset_type": "commodity"
+        },
+        {
+          "symbol": "COPPER",
+          "asset_type": "commodity"
+        }
+      ]
+    }
+  ],
+  "alerts": [
+    {
+      "symbol": "BTCUSD",
+      "asset_type": "crypto",
+      "condition_type": "price_above",
+      "target_price": 50000,
+      "frequency": "once",
+      "is_active": true
+    },
+    {
+      "symbol": "AAPL",
+      "asset_type": "stock",
+      "condition_type": "price_below",
+      "target_price": 150,
+      "frequency": "daily",
+      "is_active": true
+    },
+    {
+      "symbol": "GOLD",
+      "asset_type": "commodity",
+      "condition_type": "percent_change",
+      "trigger_percentage": 5,
+      "frequency": "always",
+      "is_active": true
+    },
+    {
+      "symbol": "ETHUSD",
+      "asset_type": "crypto",
+      "condition_type": "technical_signal",
+      "frequency": "once",
+      "is_active": false
+    }
+  ]
+}
+

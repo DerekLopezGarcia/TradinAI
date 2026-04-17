@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  # PostgreSQL en Railway (producción)
+  # Para desarrollo local, reemplaza con imagen PostgreSQL:
+  
+  # postgres:
+  #   image: postgres:16-alpine
+  #   environment:
+  #     POSTGRES_USER: postgres
+  #     POSTGRES_PASSWORD: postgres
+  #     POSTGRES_DB: trading_ia
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U postgres"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+  # NextJS App
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      # Railway variables (reemplazar con tus valores)
+      RAILWAY_DATABASE_HOST: ${RAILWAY_DATABASE_HOST:-localhost}
+      RAILWAY_DATABASE_PORT: ${RAILWAY_DATABASE_PORT:-5432}
+      RAILWAY_DATABASE_NAME: ${RAILWAY_DATABASE_NAME:-trading_ia}
+      RAILWAY_DATABASE_USER: ${RAILWAY_DATABASE_USER:-postgres}
+      RAILWAY_DATABASE_PASSWORD: ${RAILWAY_DATABASE_PASSWORD:-postgres}
+      # O usar DATABASE_URL:
+      DATABASE_URL: ${DATABASE_URL:-}
+    depends_on:
+      # postgres:  # Si usas PostgreSQL local, descomenta
+      #   condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: npm run dev
+
+# volumes:
+#   postgres_data:
+

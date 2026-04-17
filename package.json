@@ -10,7 +10,13 @@
     "lint": "next lint",
     "security-check": "node scripts/security-check.js",
     "validate-no-mocks": "node scripts/validate-no-mocks.js",
-    "pre-push": "npm run security-check && npm run validate-no-mocks && npm run lint"
+    "pre-push": "npm run security-check && npm run validate-no-mocks && npm run lint",
+    "test": "jest --passWithNoTests",
+    "test:security": "ts-node scripts/security-validation.ts",
+    "test:load": "ts-node scripts/load-test.ts",
+    "migrate": "ts-node scripts/migrate-data.ts",
+    "verify-deployment": "ts-node scripts/verify-deployment.ts",
+    "deploy-railway": "pwsh -File scripts/deploy-railway.ps1"
   },
   "dependencies": {
     "@types/react": "^19.0.0",
@@ -20,10 +26,12 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
     "date-fns": "^2.30.0",
+    "dotenv": "^16.3.1",
     "lightweight-charts": "^4.2.3",
     "lucide-react": "^0.294.0",
     "next": "^16.1.7",
     "next-themes": "^0.4.6",
+    "pg": "^8.11.3",
     "postcss": "^8.4.31",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -34,8 +42,14 @@
     "zustand": "^4.4.1"
   },
   "devDependencies": {
+    "@jest/globals": "^30.3.0",
+    "@types/jest": "^30.0.0",
     "@types/node": "^20.0.0",
+    "@types/pg": "^8.11.6",
     "eslint": "^8.52.0",
-    "eslint-config-next": "^15.0.0"
+    "eslint-config-next": "^15.0.0",
+    "jest": "^30.3.0",
+    "ts-jest": "^29.4.9",
+    "ts-node": "^10.9.2"
   }
 }
