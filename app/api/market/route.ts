@@ -296,7 +296,7 @@ async function getHistoryData(symbol: string, interval: TimeFrame) {
       if (!data || data.length === 0) {
         throw new Error(`No hay datos en Binance para ${symbol}`);
       }
-      return { symbol, interval, data, source: 'Binance', isFallback: false, timestamp: Date.now() };
+      return { symbol, interval, data, source: 'Binance', timestamp: Date.now() };
     } catch (binanceErr) {
       console.warn(`Binance failed for ${symbol}, trying CoinGecko:`, binanceErr);
       // Fallback: CoinGecko
@@ -306,7 +306,7 @@ async function getHistoryData(symbol: string, interval: TimeFrame) {
         if (!data || data.length === 0) {
           throw new Error(`No hay datos históricos para ${symbol}`);
         }
-        return { symbol, interval, data, source: 'CoinGecko', isFallback: false, timestamp: Date.now() };
+        return { symbol, interval, data, source: 'CoinGecko', timestamp: Date.now() };
       } catch (coingeckoErr) {
         throw new Error(`No hay datos históricos disponibles para ${symbol}`);
       }
@@ -338,7 +338,7 @@ async function getHistoryData(symbol: string, interval: TimeFrame) {
       if (!data || data.length === 0) {
         throw new Error(`No hay datos históricos para ${symbol} (${yahooSymbol})`);
       }
-      return { symbol, interval, data, source: 'Finnhub/Yahoo', isFallback: false, timestamp: Date.now() };
+      return { symbol, interval, data, source: 'Finnhub/Yahoo', timestamp: Date.now() };
     } catch (mappedErr) {
       // Si el mapeo falla, intentar con el símbolo directo
       if (['DXY', 'MIB'].includes(symbol)) {
@@ -353,7 +353,7 @@ async function getHistoryData(symbol: string, interval: TimeFrame) {
         if (['DXY', 'MIB'].includes(symbol)) {
           console.log(`✅ Obtuvo ${data.length} candles para ${symbol}`);
         }
-        return { symbol, interval, data, source: 'Finnhub/Yahoo', isFallback: false, timestamp: Date.now() };
+      return { symbol, interval, data, source: 'Finnhub/Yahoo', timestamp: Date.now() };
       } catch (directErr) {
         throw new Error(`No hay datos históricos para ${symbol}`);
       }

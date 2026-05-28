@@ -48,8 +48,6 @@ export function useMarketData(symbol: string, interval: TimeFrame) {
   const [data, setData] = useState<CandleData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isFallback] = useState(false); // siempre false — sin datos simulados
-
   const dataRef = useRef<CandleData[]>([]);
 
   // ── Polling de precio live (10 s para no exceder rate limit) ──────
@@ -201,5 +199,5 @@ export function useMarketData(symbol: string, interval: TimeFrame) {
     return () => clearInterval(priceTimer);
   }, [pollPrice]);
 
-  return { data, loading, error, isFallback };
+  return { data, loading, error };
 }

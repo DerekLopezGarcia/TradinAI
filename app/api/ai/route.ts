@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { AIAnalysisRequest, AIChatRequest } from '@/lib/types';
+import { AIAnalysisRequest } from '@/lib/types';
 import { analyzeCandles, CandleAnalysisInput } from '@/lib/services/candleAnalysisService';
-import { validateMessage, validateSymbol } from '@/lib/services/validationService';
 
 /**
  * API de Análisis de IA - Proporciona análisis técnico profesional y conversación de mercado
@@ -450,76 +449,5 @@ Proporciona un análisis técnico completo con recomendación en formato JSON.`;
   }
 }
 
-/**
- * GET /api/ai
- *
- * Chat de análisis de mercado con contexto web
- */
-export async function GET(request: NextRequest) {
-  const startTime = Date.now();
 
-  try {
-    const searchParams = request.nextUrl.searchParams;
-    const message = searchParams.get('message') || '';
-    const symbol = searchParams.get('symbol') || '';
-
-    // Validar entrada
-    if (!message || !validateMessage(message)) {
-      return NextResponse.json(
-        { error: 'Message parameter is required and must be valid' },
-        { status: 400 }
-      );
-    }
-
-    // Validar símbolo si se proporciona
-    if (symbol && !validateSymbol(symbol)) {
-      return NextResponse.json(
-        { error: 'Invalid symbol format' },
-        { status: 400 }
-      );
-    }
-
-    // Buscar contexto web
-    const context = await searchNews(
-      symbol ? `${symbol} ${message}` : message,
-      3
-    );
-
-    // Construir prompt para chat
-    const chatPrompt = `${symbol ? `Pregunta sobre ${symbol}: ` : ''}${message}
-
-Contexto de noticias:
-${formatNewsContext(context)}
-
-Responde de manera profesional y educativa.`;
-
-    // Generar respuesta de chat
-    const completion = await generateAIAnalysis(chatPrompt);
-
-    // Extraer contenido (puede ser JSON o texto plano)
-    const parsed = extractJSON(completion);
-    const responseText = parsed?.analysis || parsed?.response || completion;
-
-    return NextResponse.json({
-      response: responseText,
-      relatedNews: context.slice(0, 2),
-      symbol: symbol || undefined,
-      timestamp: Date.now(),
-      duration: Date.now() - startTime,
-    });
-  } catch (error) {
-    console.error('AI chat error:', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-      duration: Date.now() - startTime,
-    });
-
-    return NextResponse.json(
-      {
-        response: 'Lo siento, no pude procesar tu solicitud. Intenta de nuevo.',
-        timestamp: Date.now(),
-      },
-      { status: 500 }
-    );
-  }
-}
 

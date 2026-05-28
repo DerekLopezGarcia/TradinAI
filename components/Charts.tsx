@@ -34,12 +34,12 @@ export function PriceChart({ data, symbol, showVolume = true, indicators }: Pric
   // Validar que data no esté vacío
   if (!data || data.length === 0) {
     return (
-      <div className="p-6 space-y-4 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 rounded-lg border border-slate-800">
+      <div className="p-6 space-y-4 bg-card rounded-lg border border-border">
         <div className="h-96 flex items-center justify-center">
-          <p className="text-slate-400 text-center">
-            ⏳ Cargando datos de velas japonesas...
+          <p className="text-muted-foreground text-center">
+            Cargando datos de velas japonesas...
             <br />
-            <span className="text-xs text-slate-500">Por favor espera mientras se obtienen los datos del mercado</span>
+            <span className="text-xs text-muted-foreground/70">Por favor espera mientras se obtienen los datos del mercado</span>
           </p>
         </div>
       </div>

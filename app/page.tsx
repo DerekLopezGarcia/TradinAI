@@ -3,9 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useMarketStore } from '@/lib/store';
 import { useWidgetStore } from '@/lib/widgetStore';
+import { useAlertWatcher } from '@/app/hooks/useAlertWatcher';
 import { Header } from '@/components/Header';
 import { NavBar } from '@/components/NavBar';
-import { Sidebar } from '@/components/Sidebar';
 import { WidgetsPanel } from '@/components/WidgetsPanel';
 import { DashboardGrid } from '@/components/DashboardGrid';
 import { X, Zap } from 'lucide-react';
@@ -17,6 +17,8 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
+  useAlertWatcher({ symbol: selectedAsset?.symbol || '' });
+
   useEffect(() => {
     if (!selectedAsset || !selectedAsset.symbol) return;
     const loadRealPrice = async () => {
@@ -25,12 +27,12 @@ export default function Home() {
         const res = await fetch(`/api/market?${params.toString()}`);
         if (!res.ok) return;
         const data = await res.json();
-        if (data?.price && !isNaN(data.price)) {
+        if (data?.price !== undefined && data?.price !== null && !isNaN(Number(data.price))) {
           updateAssetPrice(
             selectedAsset.symbol,
-            parseFloat(data.price),
-            parseFloat(data.change ?? 0),
-            parseFloat(data.changePercent ?? 0)
+            parseFloat(String(data.price)),
+            parseFloat(String(data.change ?? 0)),
+            parseFloat(String(data.changePercent ?? 0))
           );
         }
       } catch (err) {
@@ -70,7 +72,6 @@ export default function Home() {
           },
         }}
       />
-      <Sidebar />
       <Header />
       <NavBar
         selectedType={null}
@@ -82,7 +83,7 @@ export default function Home() {
       <WidgetsPanel />
 
       <main
-        className={`p-4 md:p-6 space-y-6 transition-all duration-300 ease-out ${
+        className={`p-4 md:p-6 pb-20 lg:pb-6 space-y-6 transition-all duration-300 ease-out ${
           editMode ? 'ml-[270px]' : 'ml-0'
         }`}
       >

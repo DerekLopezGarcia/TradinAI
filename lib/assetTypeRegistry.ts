@@ -1,3 +1,4 @@
+import type { Asset } from '@/lib/types';
 import { getCategories, getAssetsByCategory, getAssetDescription } from '@/lib/scannerAssets';
 
 export interface AssetTypeConfig {
@@ -40,16 +41,16 @@ export const ALL_ASSET_TYPES: AssetTypeConfig[] = [...ASSET_TYPES, ...SCANNER_CA
 
 export function getAssetsForType(
   typeConfig: AssetTypeConfig,
-  assets: any[],
-  getScannerAssets: (categoryName: string) => any[],
-): any[] {
+  assets: Asset[],
+  getScannerAssets: (categoryName: string) => string[],
+): (Asset | string)[] {
   if (typeConfig.value === 'favorites') {
-    return assets.filter((a: any) => a.isFavorite);
+    return assets.filter((a) => a.isFavorite);
   }
   if (typeConfig.isScanner) {
     return getScannerAssets(typeConfig.label);
   }
-  return assets.filter((a: any) => a.type === typeConfig.value);
+  return assets.filter((a) => a.type === typeConfig.value);
 }
 
 export { getAssetDescription };

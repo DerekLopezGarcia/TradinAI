@@ -105,7 +105,6 @@ export async function GET(request: NextRequest) {
       count: result.candles.length,
       candles: result.candles,
       source: result.source,
-      isFallback: result.isFallback,
       timestamp: result.timestamp,
     });
 

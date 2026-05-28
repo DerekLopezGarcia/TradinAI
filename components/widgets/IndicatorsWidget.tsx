@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { useMarketData } from '@/app/hooks/useMarketData';
 import { Tooltip, IndicatorLegend } from '@/components/IndicatorTooltip';
-import { calculateRSI, calculateSMA, calculateADX, calculateStochastic } from '@/lib/indicators';
+import { calculateRSI, calculateSMA, calculateEMA, calculateADX, calculateStochastic } from '@/lib/indicators';
 import type { WidgetProps } from '@/lib/widgetRegistry';
 
 export function IndicatorsWidget({ symbol, timeframe }: WidgetProps) {
@@ -29,7 +29,7 @@ export function IndicatorsWidget({ symbol, timeframe }: WidgetProps) {
     const lastK = stoch.k.length > 0 ? stoch.k[stoch.k.length - 1] : null;
     const lastD = stoch.d.length > 0 ? stoch.d[stoch.d.length - 1] : null;
 
-    const emaValues = calculateSMA(closes, 20);
+    const emaValues = calculateEMA(closes, 20);
     const lastEMA = emaValues.length > 0 ? emaValues[emaValues.length - 1] : null;
 
     return {

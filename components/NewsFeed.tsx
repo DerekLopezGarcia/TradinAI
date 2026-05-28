@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { NewsItem } from '@/lib/types';
 import { Zap, ExternalLink } from 'lucide-react';
 
@@ -11,6 +12,14 @@ interface NewsFeedProps {
 export function NewsFeed({ symbol }: NewsFeedProps) {
   const [news, setNews] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const rowVirtualizer = useVirtualizer({
+    count: news.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 148,
+    overscan: 3,
+  });
 
   useEffect(() => {
     const fetchNews = async () => {
@@ -56,7 +65,7 @@ export function NewsFeed({ symbol }: NewsFeedProps) {
         <p className="text-xs text-muted-foreground">{symbol ? `Sobre ${symbol}` : 'Mercados'}</p>
       </div>
 
-      <div className="flex-1 overflow-y-auto max-h-[300px]">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto max-h-[300px]">
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <Zap className="w-5 h-5 animate-pulse text-muted-foreground" />
@@ -64,15 +73,18 @@ export function NewsFeed({ symbol }: NewsFeedProps) {
         ) : news.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground text-sm">Sin noticias</div>
         ) : (
-          <div className="divide-y divide-border">
-            {news.map((item) => (
-              <a
-                key={item.id}
-                href={item.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block p-4 hover:bg-muted/50 transition-colors group"
-              >
+          <div className="relative" style={{ height: `${rowVirtualizer.getTotalSize()}px` }}>
+            {rowVirtualizer.getVirtualItems().map((virtualItem) => {
+              const item = news[virtualItem.index];
+              return (
+                <a
+                  key={item.id}
+                  href={item.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="absolute top-0 left-0 w-full p-4 hover:bg-muted/50 transition-colors group border-b border-border"
+                  style={{ transform: `translateY(${virtualItem.start}px)`, height: `${virtualItem.size}px` }}
+                >
                 <div className="flex items-start justify-between gap-2 mb-1">
                   <h4 className="text-sm font-medium line-clamp-2 group-hover:text-primary transition-colors">
                     {item.title}
@@ -116,8 +128,9 @@ export function NewsFeed({ symbol }: NewsFeedProps) {
                     )}
                   </div>
                 )}
-              </a>
-            ))}
+                </a>
+              );
+            })}
           </div>
         )}
       </div>

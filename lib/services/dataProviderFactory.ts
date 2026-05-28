@@ -20,7 +20,6 @@ export interface CandleData {
 export interface DataProviderResult {
   candles: CandleData[];
   source: string;
-  isFallback: boolean;
   timestamp: number;
 }
 
@@ -197,7 +196,6 @@ export class DataProviderManager {
           return {
             candles,
             source: provider.name,
-            isFallback: provider !== providers[0],
             timestamp: Date.now()
           };
         } else {

@@ -10,12 +10,20 @@
 
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { CandleData, TimeFrame } from '@/lib/types';
-import { analyzeCandles } from '@/lib/services/candleAnalysisService';
+import {
+  analyzeCandles,
+  CandleAnalysisResponse,
+  CandlePattern,
+  TrendAnalysis,
+  IndicatorStatus,
+  Prediction,
+  NewsImpact,
+} from '@/lib/services/candleAnalysisService';
 
 export interface AnalysisExplanation {
-  analysis: any;
+  analysis: CandleAnalysisResponse | null;
   explanation: {
     tendencyReason: string;
     patternsReason: string;
@@ -27,7 +35,7 @@ export interface AnalysisExplanation {
   };
   isLoading: boolean;
   error: string | null;
-  newsImpact: any;
+  newsImpact: NewsImpact | null;
   runAnalysis: (symbol: string, timeframe: TimeFrame, candleData: CandleData[], analysisDepth?: 'basic' | 'standard' | 'comprehensive', includeNews?: boolean) => Promise<void>;
 }
 
@@ -40,10 +48,20 @@ export function useAutoAnalysis(
   timeframe: TimeFrame,
   candleData: CandleData[],
   analysisDepth: 'basic' | 'standard' | 'comprehensive' = 'standard',
-  includeNews: boolean = false
+  includeNews: boolean = false,
+  autoRun: boolean = false
 ): AnalysisExplanation {
-  const [analysis, setAnalysis] = useState<any>(null);
-  const [newsImpact, setNewsImpact] = useState<any>(null);
+  const [analysis, setAnalysis] = useState<CandleAnalysisResponse | null>(null);
+  const [newsImpact, setNewsImpact] = useState<NewsImpact | null>(null);
+  const [hasRun, setHasRun] = useState(false);
+
+  // Ejecutar análisis automáticamente cuando haya datos suficientes
+  useEffect(() => {
+    if (autoRun && candleData.length >= 20 && !hasRun && !analysis) {
+      runAnalysis(symbol, timeframe, candleData, analysisDepth, includeNews);
+      setHasRun(true);
+    }
+  }, [autoRun, candleData.length, symbol, timeframe]);
   const [explanation, setExplanation] = useState({
     tendencyReason: '',
     patternsReason: '',
@@ -57,7 +75,7 @@ export function useAutoAnalysis(
   const [error, setError] = useState<string | null>(null);
 
   // Función para generar explicación del análisis
-  const generateExplanation = useCallback((analysisResult: any) => {
+  const generateExplanation = useCallback((analysisResult: CandleAnalysisResponse) => {
     try {
       const trend = analysisResult.summary.trend;
       const patterns = analysisResult.patterns;
@@ -173,7 +191,7 @@ export function useAutoAnalysis(
 
 // ==================== Funciones de Generación de Explicaciones ====================
 
-function generateTrendExplanation(trendAnalysis: any, trend: string): string {
+function generateTrendExplanation(trendAnalysis: TrendAnalysis, trend: string): string {
   const { direction, structure, strength, adx, sma, ema } = trendAnalysis;
 
   let explanation = `**ANÁLISIS DE TENDENCIA (${trend.toUpperCase()})**\n\n`;
@@ -211,7 +229,7 @@ function generateTrendExplanation(trendAnalysis: any, trend: string): string {
   }
 
   explanation += `🎯 **Medias Móviles**:\n`;
-  sma.forEach((m: any) => {
+  sma.forEach((m: { period: number; price: number; direction: string }) => {
     const relation = m.direction === 'arriba' ? '📈 por encima' : '📉 por debajo';
     explanation += `- SMA ${m.period}: Precio ${relation} (${m.price.toFixed(2)})\n`;
   });
@@ -219,7 +237,7 @@ function generateTrendExplanation(trendAnalysis: any, trend: string): string {
   return explanation;
 }
 
-function generatePatternsExplanation(patterns: any[]): string {
+function generatePatternsExplanation(patterns: CandlePattern[]): string {
   let explanation = `**PATRONES DE VELAS IDENTIFICADOS**\n\n`;
 
   if (patterns.length === 0) {
@@ -249,7 +267,7 @@ function generatePatternsExplanation(patterns: any[]): string {
   return explanation;
 }
 
-function generateIndicatorsExplanation(indicators: any): string {
+function generateIndicatorsExplanation(indicators: IndicatorStatus): string {
   let explanation = `**ANÁLISIS DE INDICADORES TÉCNICOS**\n\n`;
 
   // RSI
@@ -318,7 +336,7 @@ function generateIndicatorsExplanation(indicators: any): string {
   return explanation;
 }
 
-function generatePredictionExplanation(prediction: any): string {
+function generatePredictionExplanation(prediction: Prediction): string {
   let explanation = `**PREDICCIÓN Y OBJETIVOS**\n\n`;
 
   explanation += `🎯 **Dirección Predicha**: ${prediction.direction.toUpperCase()}\n`;
@@ -369,7 +387,7 @@ function generateRiskExplanation(riskFactors: string[]): string {
   return explanation;
 }
 
-function generateNewsExplanation(newsImpact: any): string {
+function generateNewsExplanation(newsImpact: NewsImpact | undefined): string {
   if (!newsImpact) return '';
 
   let explanation = `**IMPACTO DE NOTICIAS**\n\n`;
@@ -399,9 +417,9 @@ function generateNewsExplanation(newsImpact: any): string {
 
 function generateExecutiveSummary(
   trend: string,
-  patterns: any[],
-  prediction: any,
-  summary: any
+  patterns: CandlePattern[],
+  prediction: Prediction,
+  summary: CandleAnalysisResponse['summary']
 ): string {
   let text = `**RESUMEN EJECUTIVO**\n\n`;
 

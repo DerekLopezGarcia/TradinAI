@@ -20,7 +20,7 @@ export const WIDGET_DEFINITIONS: WidgetDefinition[] = DEFAULT_WIDGETS.map((w) =>
   description: w.description,
   icon: w.icon,
   defaultLayout: w.defaultLayout,
-  defaultEnabled: ['chart', 'auto-analysis', 'indicators', 'chat', 'news', 'heatmap', 'rsi', 'volume', 'market-status'].includes(w.id),
+  defaultEnabled: ['chart', 'auto-analysis', 'indicators', 'news', 'heatmap', 'rsi', 'volume', 'market-status'].includes(w.id),
 }));
 
 function generateDefaultLayouts(): ResponsiveLayouts {
@@ -47,9 +47,6 @@ function generateDefaultLayouts(): ResponsiveLayouts {
 }
 
 export interface WidgetStore {
-  sidebarOpen: boolean;
-  setSidebarOpen: (open: boolean) => void;
-  toggleSidebar: () => void;
   enabledWidgets: string[];
   toggleWidget: (id: string) => void;
   layouts: ResponsiveLayouts;
@@ -61,13 +58,10 @@ export interface WidgetStore {
 export const useWidgetStore = create<WidgetStore>()(
   persist(
     (set) => ({
-      sidebarOpen: false,
       enabledWidgets: WIDGET_DEFINITIONS.filter((w) => w.defaultEnabled).map((w) => w.id),
       layouts: generateDefaultLayouts(),
       editMode: false,
 
-      setSidebarOpen: (open) => set({ sidebarOpen: open }),
-      toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
       setEditMode: (mode) => set({ editMode: mode }),
 
       toggleWidget: (id) =>

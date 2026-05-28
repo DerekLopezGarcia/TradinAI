@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Asset, TimeFrame, ChatMessage, Alert } from '@/lib/types';
+import { Asset, AssetType, TimeFrame, Alert } from '@/lib/types';
 
 /**
  * IMPORTANTE: NO SE DEBEN USAR MOCK_ASSETS CON DATOS HARDCODEADOS
@@ -34,19 +34,16 @@ interface MarketStore {
   selectedAsset: Asset | null;
   selectedTimeframe: TimeFrame;
   favorites: string[];
-  chatMessages: ChatMessage[];
   alerts: Alert[];
 
   setSelectedAsset: (asset: Asset) => void;
   setSelectedTimeframe: (timeframe: TimeFrame) => void;
   toggleFavorite: (symbol: string) => void;
   updateAssetPrice: (symbol: string, price: number, change: number, changePercent: number) => void;
-  addOrUpdateAssetPrice: (symbol: string, name: string, price: number, change: number, changePercent: number, type?: string) => void;
-  addChatMessage: (message: ChatMessage) => void;
-  clearChatMessages: () => void;
+  addOrUpdateAssetPrice: (symbol: string, name: string, price: number, change: number, changePercent: number, type?: AssetType) => void;
   addAlert: (alert: Alert) => void;
   removeAlert: (alertId: string) => void;
-  addAsset: (data: { symbol: string; name: string; type: string }) => void;
+  addAsset: (data: { symbol: string; name: string; type: AssetType }) => void;
 }
 
 export const useMarketStore = create<MarketStore>()(
@@ -58,7 +55,6 @@ export const useMarketStore = create<MarketStore>()(
       selectedAsset: DEFAULT_ASSET,  // Seleccionar por defecto para que page no quede en loading
       selectedTimeframe: '1h',
       favorites: ['BTCUSD'],
-      chatMessages: [],
       alerts: [],
 
       setSelectedAsset: (asset) => set({ selectedAsset: asset }),
@@ -93,7 +89,7 @@ export const useMarketStore = create<MarketStore>()(
               : state.selectedAsset,
         })),
 
-      addOrUpdateAssetPrice: (symbol, name, price, change, changePercent, type = 'crypto' as any) =>
+      addOrUpdateAssetPrice: (symbol, name, price, change, changePercent, type: AssetType = 'crypto') =>
         set((state) => {
           const existingAsset = state.assets.find(a => a.symbol === symbol);
           
@@ -116,7 +112,7 @@ export const useMarketStore = create<MarketStore>()(
               id: `scanner_${symbol}`,
               symbol,
               name,
-              type: (type || 'crypto') as any,
+              type,
               price,
               change,
               changePercent,
@@ -127,13 +123,6 @@ export const useMarketStore = create<MarketStore>()(
             };
           }
         }),
-
-      addChatMessage: (message) =>
-        set((state) => ({
-          chatMessages: [...state.chatMessages, message],
-        })),
-
-      clearChatMessages: () => set({ chatMessages: [] }),
 
       addAlert: (alert) =>
         set((state) => ({
@@ -151,7 +140,7 @@ export const useMarketStore = create<MarketStore>()(
             id: String(Date.now()),
             symbol: data.symbol,
             name: data.name,
-            type: data.type as any,
+            type: data.type as AssetType,
             price: 0,
             change: 0,
             changePercent: 0,

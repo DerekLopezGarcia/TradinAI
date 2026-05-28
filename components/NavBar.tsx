@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Search, Plus, X } from 'lucide-react';
 import { useMarketStore } from '@/lib/store';
 import { AssetToolbar } from '@/components/AssetToolbar';
+import type { AssetType } from '@/lib/types';
 
 interface NavBarProps {
   selectedType: string | null;
@@ -17,7 +18,7 @@ export function NavBar({ searchQuery, onSearchChange }: NavBarProps) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newSymbol, setNewSymbol]       = useState('');
   const [newName, setNewName]           = useState('');
-  const [newType, setNewType]           = useState('stock');
+  const [newType, setNewType]           = useState<AssetType>('stock');
 
   const handleAddAsset = () => {
     if (newSymbol.trim() && newName.trim()) {
@@ -79,7 +80,7 @@ export function NavBar({ searchQuery, onSearchChange }: NavBarProps) {
               </div>
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1">Tipo</label>
-                <select value={newType} onChange={(e) => setNewType(e.target.value)}
+                <select value={newType} onChange={(e) => setNewType(e.target.value as AssetType)}
                   className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40">
                   <option value="crypto">🪙 Criptomonedas</option>
                   <option value="stock">📈 Acciones</option>

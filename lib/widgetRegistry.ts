@@ -4,7 +4,6 @@ import type { TimeFrame } from '@/lib/types';
 import { ChartWidget } from '@/components/widgets/ChartWidget';
 import { AutoAnalysisWidget } from '@/components/widgets/AutoAnalysisWidget';
 import { IndicatorsWidget } from '@/components/widgets/IndicatorsWidget';
-import { ChatWidget } from '@/components/widgets/ChatWidget';
 import { NewsWidget } from '@/components/widgets/NewsWidget';
 import { AlertsWidget } from '@/components/widgets/AlertsWidget';
 import { RecommendationsWidget } from '@/components/widgets/RecommendationsWidget';
@@ -72,14 +71,6 @@ export const DEFAULT_WIDGETS: WidgetRegistration[] = [
     icon: 'BarChart3',
     component: IndicatorsWidget,
     defaultLayout: { w: 4, h: 3, minW: 2, minH: 2 },
-  },
-  {
-    id: 'chat',
-    title: 'Asistente IA',
-    description: 'Chat con inteligencia artificial',
-    icon: 'MessageSquare',
-    component: ChatWidget,
-    defaultLayout: { w: 4, h: 4, minW: 2, minH: 2 },
   },
   {
     id: 'news',

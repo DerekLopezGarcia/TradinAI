@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Header } from '@/components/Header';
 import { NavBar } from '@/components/NavBar';
-import { Sidebar } from '@/components/Sidebar';
 import { RecommendationsPanel } from '@/components/RecommendationsPanel';
 import { ArrowLeft } from 'lucide-react';
 
@@ -15,7 +14,6 @@ export default function RecommendationsPage() {
 
   return (
     <div className="min-h-screen bg-background transition-colors duration-300">
-      <Sidebar />
       <Header />
       <NavBar selectedType={selectedType} onTypeChange={setSelectedType} searchQuery={searchQuery} onSearchChange={setSearchQuery} />
 

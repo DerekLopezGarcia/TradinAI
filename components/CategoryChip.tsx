@@ -9,6 +9,7 @@ import { priceCache } from '@/lib/services/priceCache';
 import { validateSymbol, createSafeParams } from '@/lib/services/validationService';
 import { errorLoggingService } from '@/lib/services/errorLoggingService';
 import { useAssetBarStore } from '@/lib/assetBarStore';
+import type { AssetType } from '@/lib/types';
 import type { AssetTypeConfig } from '@/lib/assetTypeRegistry';
 
 interface CategoryChipProps {
@@ -16,7 +17,7 @@ interface CategoryChipProps {
   isEditMode: boolean;
 }
 
-function determinateAssetType(symbol: string): string {
+function determinateAssetType(symbol: string): AssetType {
   if (['CL', 'BZ', 'NG', 'ZW', 'ZC', 'ZS', 'SB', 'KC', 'CC', 'CT', 'LBS', 'ES'].includes(symbol)) {
     return 'futures';
   }

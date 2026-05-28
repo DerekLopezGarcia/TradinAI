@@ -71,18 +71,6 @@ export interface Alert {
   triggeredAt?: number;
 }
 
-export interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: number;
-  context?: {
-    symbol?: string;
-    timeframe?: TimeFrame;
-    analysisId?: string;
-  };
-}
-
 export interface MarketState {
   assets: Asset[];
   selectedAsset: Asset | null;
@@ -130,19 +118,6 @@ export interface AIChartRequest {
   currentPrice: number;
   chartData: CandleData[];
   indicators: Indicator[];
-}
-
-export interface AIChatRequest {
-  message: string;
-  symbol?: string;
-  timeframe?: TimeFrame;
-  chatHistory?: ChatMessage[];
-}
-
-export interface AIChatResponse {
-  response: string;
-  relatedNews?: NewsItem[];
-  suggestedAssets?: string[];
 }
 
 // ==================== TIPOS PARA DATOS EN TIEMPO REAL ====================

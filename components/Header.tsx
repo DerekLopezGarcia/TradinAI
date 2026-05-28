@@ -1,22 +1,39 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { useMarketStore } from '@/lib/store';
 import { TimeFrame } from '@/lib/types';
-import { TrendingUp, TrendingDown, Heart, Menu, Sparkles, Loader2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, Heart, Sparkles, Loader2 } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { NotificationPanel } from '@/components/NotificationPanel';
 import { SettingsPanel } from '@/components/SettingsPanel';
-import { useWidgetStore } from '@/lib/widgetStore';
+
 
 export function Header() {
   const { selectedAsset, setSelectedAsset, assets, toggleFavorite } = useMarketStore();
-  const toggleSidebar = useWidgetStore((s) => s.toggleSidebar);
   const [isAssetDropdownOpen, setIsAssetDropdownOpen] = useState(false);
   const [isLoadingPrices, setIsLoadingPrices] = useState(false);
   const [failedAssets, setFailedAssets] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const assetListRef = useRef<HTMLDivElement>(null);
+
+  const filteredAssets = useMemo(() => {
+    if (!searchQuery) return assets;
+    const q = searchQuery.toLowerCase();
+    return assets.filter(
+      (a) => a.symbol.toLowerCase().includes(q) || a.name.toLowerCase().includes(q)
+    );
+  }, [assets, searchQuery]);
+
+  const assetVirtualizer = useVirtualizer({
+    count: filteredAssets.length,
+    getScrollElement: () => assetListRef.current,
+    estimateSize: () => 52,
+    overscan: 5,
+  });
 
   // Subscribirse a cambios del selectedAsset para asegurar re-render
   const [displayAsset, setDisplayAsset] = useState(selectedAsset);
@@ -94,6 +111,8 @@ export function Header() {
   const handleToggleDropdown = () => {
     if (!isAssetDropdownOpen && assets.length > 0) {
       loadAssetPrices();
+      setSearchQuery('');
+      assetVirtualizer.scrollToIndex(0);
     }
     setIsAssetDropdownOpen(!isAssetDropdownOpen);
   };
@@ -107,12 +126,6 @@ export function Header() {
       <div className="px-4 py-3">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
-            <button
-              onClick={toggleSidebar}
-              className="p-2 rounded-lg transition-colors hover:bg-muted"
-            >
-              <Menu className="w-5 h-5 text-foreground" />
-            </button>
             <div className="flex items-center gap-2">
               <div className="w-10 h-10 rounded-lg gradient-primary flex items-center justify-center">
                 <span className="text-sm font-bold text-white">TIA</span>
@@ -151,55 +164,72 @@ export function Header() {
             </button>
 
             {isAssetDropdownOpen && (
-              <div className="absolute top-full left-0 mt-2 w-72 bg-card border border-border rounded-lg p-2 z-50 max-h-96 overflow-y-auto shadow-xl">
-                {/* Mostrar spinner mientras carga */}
-                {isLoadingPrices ? (
-                  <div className="flex items-center justify-center py-6 gap-2 text-muted-foreground text-sm">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Cargando precios...
-                  </div>
-                ) : (
-                  assets.map((asset) => {
-                    const isFailed = failedAssets.has(asset.symbol);
-                    return (
-                      <div
-                        key={asset.id}
-                        onClick={() => {
-                          if (!isFailed) {
-                            setSelectedAsset(asset);
-                            setIsAssetDropdownOpen(false);
-                          }
-                        }}
-                        className={`flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 ${isFailed ? 'opacity-60 cursor-default' : 'cursor-pointer'} transition-colors`}
-                      >
-                        <div>
-                          <div className="font-medium text-sm text-foreground">{asset.symbol}</div>
-                          <div className="text-xs text-muted-foreground">{asset.name}</div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="text-right">
-                            {isFailed ? (
-                              <div className="text-xs text-destructive font-medium">No cargó</div>
-                            ) : (
-                              <>
-                                <div className="text-sm font-medium text-foreground">${asset.price.toFixed(2)}</div>
-                                <div className={`text-xs ${asset.changePercent >= 0 ? 'price-up' : 'price-down'}`}>
-                                  {asset.changePercent >= 0 ? '+' : ''}{asset.changePercent.toFixed(2)}%
-                                </div>
-                              </>
-                            )}
-                          </div>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); toggleFavorite(asset.symbol); }}
-                            className="p-1 rounded hover:bg-muted transition-colors"
+              <div className="absolute top-full left-0 mt-2 w-72 bg-card border border-border rounded-lg z-50 shadow-xl">
+                <div className="p-2">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Buscar activo..."
+                    className="w-full px-3 py-1.5 text-sm bg-muted/50 border border-border rounded-lg focus:outline-none focus:ring-1 focus:ring-primary text-foreground placeholder:text-muted-foreground"
+                  />
+                </div>
+                <div ref={assetListRef} className="overflow-y-auto" style={{ maxHeight: '384px' }}>
+                  {isLoadingPrices ? (
+                    <div className="flex items-center justify-center py-6 gap-2 text-muted-foreground text-sm">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Cargando precios...
+                    </div>
+                  ) : filteredAssets.length === 0 ? (
+                    <div className="text-center py-6 text-muted-foreground text-sm">Sin resultados</div>
+                  ) : (
+                    <div style={{ height: `${assetVirtualizer.getTotalSize()}px`, position: 'relative' }}>
+                      {assetVirtualizer.getVirtualItems().map((virtualItem) => {
+                        const asset = filteredAssets[virtualItem.index];
+                        const isFailed = failedAssets.has(asset.symbol);
+                        return (
+                          <div
+                            key={asset.id}
+                            onClick={() => {
+                              if (!isFailed) {
+                                setSelectedAsset(asset);
+                                setIsAssetDropdownOpen(false);
+                                setSearchQuery('');
+                              }
+                            }}
+                            className={`absolute top-0 left-0 w-full flex items-center justify-between px-2 py-2 rounded-lg hover:bg-muted/50 ${isFailed ? 'opacity-60 cursor-default' : 'cursor-pointer'} transition-colors`}
+                            style={{ transform: `translateY(${virtualItem.start}px)`, height: `${virtualItem.size}px` }}
                           >
-                            <Heart className={`w-4 h-4 transition-colors ${asset.isFavorite ? 'fill-red-500 text-red-500' : 'text-muted-foreground'}`} />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
+                            <div className="min-w-0 flex-1">
+                              <div className="font-medium text-sm text-foreground truncate">{asset.symbol}</div>
+                              <div className="text-xs text-muted-foreground truncate">{asset.name}</div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0 ml-2">
+                              <div className="text-right">
+                                {isFailed ? (
+                                  <div className="text-xs text-destructive font-medium">No cargó</div>
+                                ) : (
+                                  <>
+                                    <div className="text-sm font-medium text-foreground">${asset.price.toFixed(2)}</div>
+                                    <div className={`text-xs ${asset.changePercent >= 0 ? 'price-up' : 'price-down'}`}>
+                                      {asset.changePercent >= 0 ? '+' : ''}{asset.changePercent.toFixed(2)}%
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); toggleFavorite(asset.symbol); }}
+                                className="p-1 rounded hover:bg-muted transition-colors"
+                              >
+                                <Heart className={`w-4 h-4 transition-colors ${asset.isFavorite ? 'fill-red-500 text-red-500' : 'text-muted-foreground'}`} />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>

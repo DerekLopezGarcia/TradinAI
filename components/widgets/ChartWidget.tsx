@@ -1,12 +1,11 @@
 'use client';
 
-import { useMarketStore } from '@/lib/store';
 import { useMarketData } from '@/app/hooks/useMarketData';
 import { TradingViewChart } from '@/components/TradingViewChart';
 import type { WidgetProps } from '@/lib/widgetRegistry';
 
 export function ChartWidget({ symbol, timeframe }: WidgetProps) {
-  const { data, loading, error, isFallback } = useMarketData(symbol, timeframe);
+  const { data, loading, error } = useMarketData(symbol, timeframe);
 
   if (loading) {
     return (
@@ -44,7 +43,6 @@ export function ChartWidget({ symbol, timeframe }: WidgetProps) {
         showVolume={false}
         showRSI={false}
         showBollinger={false}
-        isFallback={isFallback}
       />
     </div>
   );

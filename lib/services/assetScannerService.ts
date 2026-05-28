@@ -97,6 +97,9 @@ export interface ScanResult {
   trend: 'alcista' | 'bajista' | 'lateral';
   category: string;
   lastUpdate: number;
+  score: number;
+  riskLevel: 'low' | 'medium' | 'high';
+  trendStrength: number;
 }
 
 export interface DailyRecommendation {
@@ -163,7 +166,7 @@ function calculateROI(
 
   const expectedReturn = (potentialGain * (probability / 100)) - (potentialLoss * ((100 - probability) / 100));
 
-  return Math.max(expectedReturn, 0);
+  return Math.round(expectedReturn * 100) / 100;
 }
 
 async function scanAsset(
@@ -200,6 +203,33 @@ async function scanAsset(
       prediction.probability
     );
 
+    const trendStrength = analysis.trendAnalysis.strength;
+
+    const roiNormalized = Math.min(100, Math.max(0, roi * 2));
+    const confidenceScore = prediction.probability;
+    const rrScore = Math.min(100, riskReward * 25);
+
+    const score = Math.round(
+      roiNormalized * 0.30 +
+      confidenceScore * 0.25 +
+      rrScore * 0.20 +
+      trendStrength * 0.15 +
+      (prediction.direction === 'bullish' && trend === 'alcista' ? 10 : prediction.direction === 'bajista' && trend === 'bajista' ? 10 : 0) * 0.10
+    );
+
+    const adx = analysis.trendAnalysis.adx;
+    const vol = analysis.indicatorStatus.atr || 0;
+    const volPct = currentPrice > 0 ? (vol / currentPrice) * 100 : 0;
+
+    let riskLevel: 'low' | 'medium' | 'high';
+    if (adx < 20 || riskReward < 0.8 || volPct > 4) {
+      riskLevel = 'high';
+    } else if (adx < 25 || riskReward < 1.5 || volPct > 2.5) {
+      riskLevel = 'medium';
+    } else {
+      riskLevel = 'low';
+    }
+
     return {
       symbol,
       currentPrice,
@@ -214,6 +244,9 @@ async function scanAsset(
       trend: trend as 'alcista' | 'bajista' | 'lateral',
       category,
       lastUpdate: Date.now(),
+      score,
+      riskLevel,
+      trendStrength,
     };
   } catch (error) {
     console.error(`Error escaneando ${symbol}:`, error);
@@ -227,6 +260,9 @@ export type ProgressCallback = (progress: {
   currentSymbol: string;
   percentage: number;
 }) => void;
+
+const BATCH_SIZE = 5;
+const BATCH_DELAY_MS = 200;
 
 export async function scanAllAssets(onProgress?: ProgressCallback): Promise<DailyRecommendation> {
   const startTime = Date.now();
@@ -248,27 +284,41 @@ export async function scanAllAssets(onProgress?: ProgressCallback): Promise<Dail
 
   let currentIndex = 0;
 
+  const allSymbols: { symbol: string; category: string }[] = [];
   for (const [category, assets] of Object.entries(ASSETS_BY_CATEGORY)) {
-    const symbols = assets.map((a: any) => a.symbol); // Extraer símbolos del formato objeto
+    const symbols = assets.map((a: { symbol: string }) => a.symbol);
     byCategory[category] = [];
-
     for (const symbol of symbols) {
-      currentIndex++;
-      totalScanned++;
-      const percentage = Math.round((currentIndex / totalAssets) * 100);
+      allSymbols.push({ symbol, category });
+    }
+  }
 
-      if (onProgress) {
-        onProgress({
-          current: currentIndex,
-          total: totalAssets,
-          currentSymbol: symbol,
-          percentage,
-        });
-      }
+  for (let batchStart = 0; batchStart < allSymbols.length; batchStart += BATCH_SIZE) {
+    const batch = allSymbols.slice(batchStart, batchStart + BATCH_SIZE);
 
-      try {
+    const results = await Promise.allSettled(
+      batch.map(async ({ symbol, category }) => {
+        currentIndex++;
+        totalScanned++;
+        const percentage = Math.round((currentIndex / totalAssets) * 100);
+
+        if (onProgress) {
+          onProgress({
+            current: currentIndex,
+            total: totalAssets,
+            currentSymbol: symbol,
+            percentage,
+          });
+        }
+
         const result = await scanAsset(symbol, category);
+        return { symbol, category, result };
+      })
+    );
 
+    for (const settled of results) {
+      if (settled.status === 'fulfilled') {
+        const { category, result } = settled.value;
         if (result) {
           byCategory[category].push(result);
           topRoi.push(result);
@@ -276,25 +326,27 @@ export async function scanAllAssets(onProgress?: ProgressCallback): Promise<Dail
         } else {
           failedScans++;
         }
-      } catch (error) {
-        console.error(`❌ ${symbol}:`, error);
+      } else {
         failedScans++;
+        console.error('Batch scan error:', settled.reason);
       }
+    }
 
-      await new Promise(resolve => setTimeout(resolve, 100));
+    if (batchStart + BATCH_SIZE < allSymbols.length) {
+      await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
     }
   }
 
   for (const category in byCategory) {
-    byCategory[category].sort((a, b) => b.roi - a.roi);
+    byCategory[category].sort((a, b) => b.score - a.score);
     byCategory[category] = byCategory[category].slice(0, 10);
   }
 
-  topRoi.sort((a, b) => b.roi - a.roi);
+  topRoi.sort((a, b) => b.score - a.score);
 
   const scanDuration = Date.now() - startTime;
 
-  console.log(`✅ Escaneo: ${successfulScans} analizados, ${failedScans} sin datos`);
+  console.log(`✅ Escaneo: ${successfulScans} analizados, ${failedScans} sin datos (${(scanDuration / 1000).toFixed(1)}s)`);
 
   return {
     timestamp: Date.now(),

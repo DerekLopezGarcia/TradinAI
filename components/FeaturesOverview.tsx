@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { BarChart3, Zap, MessageSquare, Bell, TrendingUp, Shield } from 'lucide-react';
+import { BarChart3, Zap, Bell, TrendingUp, Shield } from 'lucide-react';
 
 export function FeaturesOverview() {
   const features = [
@@ -16,12 +16,6 @@ export function FeaturesOverview() {
       title: 'Análisis con IA',
       description: 'Análisis automático de tendencias y recomendaciones',
       color: 'from-accent to-accent/50',
-    },
-    {
-      icon: <MessageSquare className="w-6 h-6" />,
-      title: 'Chat Conversacional',
-      description: 'Pregunta sobre el mercado y obtén respuestas inteligentes',
-      color: 'from-secondary to-secondary/50',
     },
     {
       icon: <Bell className="w-6 h-6" />,

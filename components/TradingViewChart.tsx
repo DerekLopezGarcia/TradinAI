@@ -26,7 +26,6 @@ interface TradingViewChartProps {
   showVolume?: boolean;
   showRSI?: boolean;
   showBollinger?: boolean;
-  isFallback?: boolean;
   onIndicatorsUpdate?: (indicators: { sma: number | null; ema: number | null; rsi: number | null; adx: number | null; stochasticK: number | null; stochasticD: number | null }) => void;
 }
 
@@ -37,7 +36,6 @@ export function TradingViewChart({
   showVolume = true,
   showRSI = true,
   showBollinger = false,
-  isFallback = false,
   onIndicatorsUpdate,
 }: TradingViewChartProps) {
   const containerRef    = useRef<HTMLDivElement>(null);
@@ -693,13 +691,6 @@ export function TradingViewChart({
 
   return (
     <div className="bg-[#0d1117] rounded-xl border border-slate-800 overflow-hidden" suppressHydrationWarning>
-      {isFallback && (
-        <div className="flex items-center gap-2 px-4 py-2 bg-red-500/10 border-b border-red-500/30 text-[11px] text-red-400">
-          <span>⚠️</span>
-          <span>Sin datos disponibles. Verifica el símbolo o intenta más tarde.</span>
-        </div>
-      )}
-
       <div className="flex flex-wrap items-center gap-3 px-4 py-3 border-b border-slate-800 text-xs select-none">
         <span className="text-white font-bold text-sm tracking-widest">{symbol}</span>
 

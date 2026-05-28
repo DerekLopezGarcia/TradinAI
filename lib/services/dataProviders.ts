@@ -3,6 +3,7 @@
  * Cada proveedor es independiente y escalable
  */
 
+import { TimeFrame } from '@/lib/types';
 import {
   IDataProvider,
   CandleData,
@@ -28,7 +29,7 @@ export class BinanceProvider implements IDataProvider {
   async fetch(symbol: string, interval: string): Promise<CandleData[]> {
     // Usa el binanceService existente
     const { binanceService } = await import('./binanceService');
-    return binanceService.getHistoricalCandles(symbol, interval as any);
+    return binanceService.getHistoricalCandles(symbol, interval as TimeFrame);
   }
 }
 
@@ -83,7 +84,7 @@ export class CoinGeckoProvider implements IDataProvider {
         low: candle[3],
         close: candle[4],
         volume: 0,
-      })).filter((c: any) => !isNaN(c.open) && !isNaN(c.close));
+      })).filter((c: CandleData) => !isNaN(c.open) && !isNaN(c.close));
 
       if (symbol === 'LTCUSD' && candles.length > 0) {
         console.log(`✅ CoinGecko: Obtuvo ${candles.length} candles para LTCUSD`);
@@ -134,14 +135,14 @@ export class TwelveDataProvider implements IDataProvider {
     const data = await response.json();
     if (data.status === 'error' || !data.values?.length) return [];
 
-    return data.values.reverse().map((candle: any) => ({
+    return data.values.reverse().map((candle: { datetime: string; open: string; high: string; low: string; close: string; volume: string }) => ({
       time: new Date(candle.datetime).getTime(),
       open: parseFloat(candle.open),
       high: parseFloat(candle.high),
       low: parseFloat(candle.low),
       close: parseFloat(candle.close),
       volume: parseFloat(candle.volume) || 0,
-    })).filter((c: any) => !isNaN(c.open) && !isNaN(c.close));
+    })).filter((c: CandleData) => !isNaN(c.open) && !isNaN(c.close));
   }
 }
 
@@ -189,7 +190,7 @@ export class YahooFinanceProvider implements IDataProvider {
       low: quotes.low?.[idx] || 0,
       close: quotes.close?.[idx] || 0,
       volume: quotes.volume?.[idx] || 0,
-    })).filter((c: any) => !isNaN(c.close) && c.close > 0);
+    })).filter((c: CandleData) => !isNaN(c.close) && c.close > 0);
   }
 }
 
@@ -226,7 +227,7 @@ export class QuandlProvider implements IDataProvider {
     if (!rows.length) return [];
 
     // Quandl retorna datos en orden inverso (más reciente primero)
-    return rows.map((row: any) => {
+    return rows.map((row: string[]) => {
       const [date, open, high, low, close, volume] = row;
       return {
         time: new Date(date).getTime(),
@@ -236,7 +237,7 @@ export class QuandlProvider implements IDataProvider {
         close: parseFloat(close),
         volume: parseFloat(volume) || 0,
       };
-    }).filter((c: any) => !isNaN(c.close) && c.close > 0);
+    }).filter((c: CandleData) => !isNaN(c.close) && c.close > 0);
   }
 }
 
@@ -285,46 +286,17 @@ export class AlpacaProvider implements IDataProvider {
       const data = await response.json();
       if (!data.bars?.length) return [];
 
-      return data.bars.map((bar: any) => ({
+      return data.bars.map((bar: { t: string; o: string; h: string; l: string; c: string; v: string }) => ({
         time: new Date(bar.t).getTime(),
         open: parseFloat(bar.o),
         high: parseFloat(bar.h),
         low: parseFloat(bar.l),
         close: parseFloat(bar.c),
         volume: parseFloat(bar.v) || 0,
-      })).filter((c: any) => !isNaN(c.close) && c.close > 0);
+      })).filter((c: CandleData) => !isNaN(c.close) && c.close > 0);
     } catch {
       return [];
     }
-  }
-}
-
-// ============================================================================
-// REGISTRO AUTOMÁTICO DE PROVEEDORES
-// ============================================================================
-
-export function registerDefaultProviders() {
-  // Importar aquí para evitar circular dependency
-  const { providerManager } = require('./dataProviderFactory') as any;
-  
-  // Verificar que providerManager existe
-  if (!providerManager) {
-    console.error('❌ ERROR: providerManager no está disponible. Circular dependency?');
-    throw new Error('Cannot register providers: providerManager is undefined');
-  }
-  
-  try {
-    providerManager.register(new BinanceProvider());
-    providerManager.register(new TwelveDataProvider());
-    providerManager.register(new AlpacaProvider());
-    providerManager.register(new YahooFinanceProvider());
-    providerManager.register(new QuandlProvider());
-    providerManager.register(new CoinGeckoProvider());
-
-    console.log('✅ Data providers registered successfully');
-  } catch (error) {
-    console.error('❌ Error registering providers:', error);
-    throw error;
   }
 }
 

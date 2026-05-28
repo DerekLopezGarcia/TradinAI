@@ -18,7 +18,7 @@ export interface UseDailyRecommendationsReturn {
   recommendations: DailyRecommendation | null;
   isLoading: boolean;
   error: string | null;
-  fetchRecommendations: (force?: boolean, timeframe?: string, minROI?: number) => Promise<void>;
+  fetchRecommendations: (force?: boolean) => Promise<void>;
   topRoi: ScanResult[];
   byCategory: { [key: string]: ScanResult[] };
   progress: {

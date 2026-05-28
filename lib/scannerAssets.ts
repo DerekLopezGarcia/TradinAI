@@ -305,7 +305,7 @@ export function getAssetsByCategory(category: string): string[] {
   const assets = ASSETS_BY_CATEGORY[category as keyof typeof ASSETS_BY_CATEGORY];
   if (!assets) return [];
   
-  return assets.map((asset: any) => asset.symbol);
+  return assets.map((asset: { symbol: string }) => asset.symbol);
 }
 
 /**
@@ -314,7 +314,7 @@ export function getAssetsByCategory(category: string): string[] {
 export function getAllAssets(): string[] {
   return Object.values(ASSETS_BY_CATEGORY)
     .flat()
-    .map((asset: any) => typeof asset === 'object' ? asset.symbol : asset);
+    .map((asset: { symbol: string }) => asset.symbol);
 }
 
 /**
@@ -322,9 +322,8 @@ export function getAllAssets(): string[] {
  */
 export function getAssetCategory(symbol: string): string | undefined {
   for (const [category, assets] of Object.entries(ASSETS_BY_CATEGORY)) {
-    const symbols = Array.isArray(assets) && assets.length > 0 && typeof assets[0] === 'object'
-      ? assets.map((a: any) => a.symbol)
-      : assets;
+    if (!Array.isArray(assets)) continue;
+    const symbols = (assets as { symbol: string }[]).map(a => a.symbol);
     
     if (symbols.includes(symbol)) {
       return category;
@@ -338,11 +337,10 @@ export function getAssetCategory(symbol: string): string | undefined {
  */
 export function getAssetDescription(symbol: string): { name: string; description: string } | null {
   for (const assets of Object.values(ASSETS_BY_CATEGORY)) {
-    if (Array.isArray(assets) && assets.length > 0 && typeof assets[0] === 'object') {
-      const asset = assets.find((a: any) => a.symbol === symbol);
-      if (asset) {
-        return { name: asset.name, description: asset.description };
-      }
+    if (!Array.isArray(assets) || assets.length === 0) continue;
+    const asset = (assets as { symbol: string; name: string; description: string }[]).find(a => a.symbol === symbol);
+    if (asset) {
+      return { name: asset.name, description: asset.description };
     }
   }
   return null;

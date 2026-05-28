@@ -19,6 +19,7 @@
     "deploy-railway": "pwsh -File scripts/deploy-railway.ps1"
   },
   "dependencies": {
+    "@tanstack/react-virtual": "^3.13.26",
     "@types/d3": "^7.4.3",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
@@ -32,6 +33,7 @@
     "lightweight-charts": "^4.2.3",
     "lucide-react": "^0.294.0",
     "next": "^16.1.7",
+    "next-intl": "^4.12.0",
     "next-themes": "^0.4.6",
     "pg": "^8.11.3",
     "postcss": "^8.4.31",
@@ -41,7 +43,9 @@
     "react-dom": "^19.0.0",
     "react-grid-layout": "^2.2.3",
     "react-hot-toast": "^2.4.1",
+    "react-markdown": "^10.1.0",
     "recharts": "^2.10.3",
+    "remark-gfm": "^4.0.1",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.5.3",
     "zustand": "^4.4.1"

@@ -3,6 +3,8 @@
  * Previene URL injection, XSS y otras vulnerabilidades
  */
 
+import { CandleData } from '@/lib/types';
+
 /**
  * Valida un símbolo de activo
  * Permite: A-Z, 0-9, máximo 20 caracteres
@@ -23,20 +25,6 @@ export function validateSymbol(symbol: string): boolean {
 export function validateTimeFrame(timeframe: string): boolean {
   const validFrames = ['1m', '5m', '15m', '1h', '4h', '1d', '1w'];
   return validFrames.includes(timeframe);
-}
-
-/**
- * Valida un mensaje de chat
- * Máximo 500 caracteres, sin caracteres especiales peligrosos
- * @param message - Mensaje a validar
- * @returns true si es válido
- */
-export function validateMessage(message: string): boolean {
-  if (!message || typeof message !== 'string') return false;
-  if (message.length > 500) return false;
-  // Evitar payloads XSS básicos
-  if (/<script|javascript:|onerror|onload/i.test(message)) return false;
-  return true;
 }
 
 /**
@@ -64,7 +52,7 @@ export function validateTradingStyle(style: string): boolean {
  * @param candles - Array de velas
  * @returns true si tienen estructura correcta
  */
-export function validateCandles(candles: any[]): boolean {
+export function validateCandles(candles: CandleData[]): boolean {
   if (!Array.isArray(candles) || candles.length === 0) return false;
   
   return candles.every(c => 

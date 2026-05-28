@@ -56,6 +56,7 @@ import {
   calculateADX,
   calculateStochastic 
 } from '@/lib/indicators';
+import { BaseService } from '@/lib/core/services';
 
 // ==================== TIPOS ====================
 
@@ -216,7 +217,7 @@ const analysisCache = new AnalysisCache();
 
 // ==================== CLASE PRINCIPAL ====================
 
-export class CandleAnalyzer {
+export class CandleAnalyzer extends BaseService {
   private candles: CandleData[];
   private symbol: string;
   private timeframe: TimeFrame;
@@ -225,6 +226,7 @@ export class CandleAnalyzer {
   private newsImpact?: NewsImpact;
 
   constructor(input: CandleAnalysisInput) {
+    super('CandleAnalyzer');
     this.candles = input.candles;
     this.symbol = input.symbol;
     this.timeframe = input.timeframe;
@@ -503,8 +505,8 @@ export class CandleAnalyzer {
     const closes = this.candles.map(c => c.close);
     const momentum = this.calculateMomentum(closes);
 
-    // Patrones de última vela (más importantes)
-    for (let i = Math.max(1, this.candles.length - 5); i < this.candles.length; i++) {
+    // Patrones de últimas 20 velas
+    for (let i = Math.max(1, this.candles.length - 20); i < this.candles.length; i++) {
       // Patrones de 1 vela
       const singlePattern = this.identifySingleCandlePattern(i, avgVolume, momentum);
       if (singlePattern) patterns.push(singlePattern);
@@ -792,6 +794,36 @@ export class CandleAnalyzer {
       };
     }
 
+    // Bullish Kicker: gap up con segunda vela alcista que no toca la primera
+    if (
+      candle1.close < candle1.open &&
+      candle2.close > candle2.open &&
+      candle2.low > candle1.high
+    ) {
+      return {
+        name: 'Bullish Kicker',
+        type: 'bullish_reversal',
+        positions: [index1, index2],
+        reliability: 80,
+        description: 'Fuerte señal alcista. Gap alcista con segunda vela verde que abre por encima de la anterior'
+      };
+    }
+
+    // Bearish Kicker: gap down con segunda vela bajista que no toca la primera
+    if (
+      candle1.close > candle1.open &&
+      candle2.close < candle2.open &&
+      candle2.high < candle1.low
+    ) {
+      return {
+        name: 'Bearish Kicker',
+        type: 'bearish_reversal',
+        positions: [index1, index2],
+        reliability: 80,
+        description: 'Fuerte señal bajista. Gap bajista con segunda vela roja que abre por debajo de la anterior'
+      };
+    }
+
     return null;
   }
 
@@ -914,6 +946,42 @@ export class CandleAnalyzer {
       };
     }
 
+    // Rising Three Methods: vela larga verde + 3 velas rojas pequeñas dentro del rango + vela verde que supera
+    if (
+      candle1.close > candle1.open &&
+      candle2.close < candle2.open && candle2.low > candle1.low &&
+      candle3.close < candle3.open && candle3.low > candle1.low &&
+      candle3.close > candle2.low &&
+      candle3.high < candle1.close &&
+      candle3.low > candle1.open
+    ) {
+      return {
+        name: 'Rising Three Methods',
+        type: 'continuation',
+        positions: [index1, index2, index3],
+        reliability: 70,
+        description: 'Continuación alcista. Vela larga verde seguida de pequeñas velas rojas correctivas dentro del rango'
+      };
+    }
+
+    // Falling Three Methods: vela larga roja + 3 velas verdes pequeñas dentro del rango + vela roja que supera
+    if (
+      candle1.close < candle1.open &&
+      candle2.close > candle2.open && candle2.high < candle1.high &&
+      candle3.close < candle3.open && candle3.high < candle1.high &&
+      candle3.close > candle2.close &&
+      candle3.high < candle1.open &&
+      candle3.low > candle1.close
+    ) {
+      return {
+        name: 'Falling Three Methods',
+        type: 'continuation',
+        positions: [index1, index2, index3],
+        reliability: 70,
+        description: 'Continuación bajista. Vela larga roja seguida de pequeñas velas verdes correctivas dentro del rango'
+      };
+    }
+
     return null;
   }
 
@@ -958,7 +1026,7 @@ export class CandleAnalyzer {
    * T1.1 Fase 2: 5 indicadores en paralelo
    */
   private async calculateIndicatorsWithWorkers(
-    workerPool: any,
+    workerPool: import('@/lib/workers/workerPool').WorkerPool,
     closes: number[],
     highs: number[],
     lows: number[],
@@ -1225,8 +1293,16 @@ export class CandleAnalyzer {
       );
 
       direction = bullishSignals > bearishSignals ? 'bullish' : 'bajista';
-      probability = Math.abs(bullishSignals - bearishSignals) * 10 + 55;
-      probability = Math.min(90, Math.max(50, probability));
+      const totalSignals = bullishSignals + bearishSignals;
+      if (totalSignals === 0) {
+        probability = 50;
+      } else {
+        const signalRatio = Math.abs(bullishSignals - bearishSignals) / totalSignals;
+        probability = 50 + signalRatio * 40;
+        const adxBoost = Math.min(10, Math.max(0, (trendAnalysis.adx - 20) * 0.5));
+        probability += direction === (trendAnalysis.direction === 'bullish' ? 'bullish' : 'bajista') ? adxBoost : 0;
+        probability = Math.min(88, Math.max(50, probability));
+      }
 
       if (direction === 'bullish') {
         const resistance1 = keyLevels.resistances[0] || currentPrice * 1.02;
@@ -1240,13 +1316,16 @@ export class CandleAnalyzer {
         stopLoss = keyLevels.resistances[keyLevels.resistances.length - 1] || currentPrice * 1.02;
       }
     } else if (scenario === 'alternative') {
-      // Escenario alternativo: opuesto al principal pero con menor probabilidad
       const mainDir = this.countBullishSignals(trendAnalysis, patterns, indicators) >
                      this.countBearishSignals(trendAnalysis, patterns, indicators) ?
                      'bullish' : 'bajista';
 
       direction = mainDir === 'bullish' ? 'bajista' : 'bullish';
-      probability = 30;
+      const bSig = this.countBullishSignals(trendAnalysis, patterns, indicators);
+      const bSig2 = this.countBearishSignals(trendAnalysis, patterns, indicators);
+      const diff = Math.abs(bSig - bSig2);
+      const maxSig = Math.max(bSig, bSig2);
+      probability = Math.min(40, Math.max(20, 30 - diff * 2 + (maxSig > 10 ? 5 : 0)));
 
       if (direction === 'bullish') {
         targetPrice = [currentPrice * 1.01, currentPrice * 1.02];
@@ -1256,11 +1335,11 @@ export class CandleAnalyzer {
         stopLoss = keyLevels.resistances[keyLevels.resistances.length - 1] || currentPrice * 1.03;
       }
     } else {
-      // Escenario inverso: para invalidar la tesis principal
-      direction = this.countBullishSignals(trendAnalysis, patterns, indicators) >
-                 this.countBearishSignals(trendAnalysis, patterns, indicators) ?
-                 'bajista' : 'bullish';
-      probability = 20;
+      const invBullish = this.countBullishSignals(trendAnalysis, patterns, indicators);
+      const invBearish = this.countBearishSignals(trendAnalysis, patterns, indicators);
+      const invDiff = Math.abs(invBullish - invBearish);
+      direction = invBullish > invBearish ? 'bajista' : 'bullish';
+      probability = Math.min(30, Math.max(10, 20 - invDiff * 1.5));
 
       if (direction === 'bullish') {
         stopLoss = keyLevels.supports[0] * 0.95 || currentPrice * 0.95;

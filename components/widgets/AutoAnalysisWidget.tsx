@@ -34,6 +34,7 @@ export function AutoAnalysisWidget({ symbol, timeframe }: WidgetProps) {
         symbol={symbol}
         timeframe={timeframe}
         candleData={data}
+        includeNews={true}
       />
     </div>
   );

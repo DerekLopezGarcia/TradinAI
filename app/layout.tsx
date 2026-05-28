@@ -4,6 +4,7 @@ import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 import { ThemeProvider } from '@/components/theme-provider';
 import { WidgetsDnDProvider } from '@/components/WidgetsDnDProvider';
+import { BottomNav } from '@/components/BottomNav';
 import { Toaster } from 'react-hot-toast';
 
 export const metadata: Metadata = {
@@ -32,6 +33,7 @@ export default function RootLayout({
         >
           <WidgetsDnDProvider>
             {children}
+            <BottomNav />
           </WidgetsDnDProvider>
           <Toaster
             position="bottom-right"

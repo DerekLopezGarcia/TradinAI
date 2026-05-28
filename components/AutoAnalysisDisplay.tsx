@@ -1,16 +1,34 @@
 'use client';
 
 import React, { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { CandleData, TimeFrame } from '@/lib/types';
 import { useAutoAnalysis } from '@/app/hooks/useAutoAnalysis';
+import type { CandlePattern, Prediction } from '@/lib/services/candleAnalysisService';
 import {
   ChevronDown,
   ChevronUp,
-  AlertCircle,
   TrendingUp,
   TrendingDown,
   Zap,
+  Target,
+  Shield,
+  AlertTriangle,
+  Newspaper,
+  CandlestickChart,
+  BarChart3,
+  Activity,
+  GripVertical,
 } from 'lucide-react';
+import {
+  AnalysisLoading,
+  AnalysisError,
+  AnalysisEmpty,
+  SentimentBadge,
+  ConfidenceGauge,
+  StatCard,
+  SectionCard,
+} from './AnalysisState';
 
 interface AutoAnalysisDisplayProps {
   symbol: string;
@@ -23,31 +41,29 @@ export function AutoAnalysisDisplay({
   symbol,
   timeframe,
   candleData,
-  includeNews = false,
+  includeNews = true,
 }: AutoAnalysisDisplayProps) {
   const { analysis, explanation, isLoading, error, newsImpact, runAnalysis } = useAutoAnalysis(
     symbol,
     timeframe,
     candleData,
     'comprehensive',
-    includeNews
+    includeNews,
+    true
   );
 
   const [expandedSections, setExpandedSections] = useState({
+    summary: true,
     trend: true,
     patterns: true,
     indicators: true,
     prediction: true,
     risk: false,
     news: true,
-    summary: true,
   });
 
   const toggleSection = (section: keyof typeof expandedSections) => {
-    setExpandedSections((prev) => ({
-      ...prev,
-      [section]: !prev[section],
-    }));
+    setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
   };
 
   const handleRunAnalysis = async () => {
@@ -55,53 +71,15 @@ export function AutoAnalysisDisplay({
   };
 
   if (error) {
-    return (
-      <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-6">
-        <div className="flex gap-3">
-          <AlertCircle className="w-6 h-6 text-destructive flex-shrink-0" />
-          <div>
-            <h3 className="font-semibold text-destructive">Error en Análisis</h3>
-            <p className="text-sm text-destructive/80 mt-1">{error}</p>
-          </div>
-        </div>
-      </div>
-    );
+    return <AnalysisError message={error} onRetry={handleRunAnalysis} />;
   }
 
   if (isLoading) {
-    return (
-      <div className="rounded-lg border border-border bg-card p-6">
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <span className="inline-block animate-spin">⟳</span>
-            <span className="text-muted-foreground">
-              Analizando velas para {symbol} ({timeframe})...
-            </span>
-          </div>
-          <div className="h-32 bg-background rounded animate-pulse" />
-        </div>
-      </div>
-    );
+    return <AnalysisLoading message={`Analizando ${symbol} (${timeframe})...`} />;
   }
 
   if (!analysis) {
-    return (
-      <div className="rounded-lg border border-border bg-card p-6">
-        <div className="space-y-4 text-center">
-          <p className="text-muted-foreground">
-            Haz clic en el botón para analizar automáticamente las velas y obtener recomendaciones
-          </p>
-          <button
-            onClick={handleRunAnalysis}
-            disabled={isLoading}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            <Zap className="w-4 h-4" />
-            Ejecutar Análisis
-          </button>
-        </div>
-      </div>
-    );
+    return <AnalysisEmpty symbol={symbol} onRunAnalysis={handleRunAnalysis} />;
   }
 
   const trend = analysis.summary.trend;
@@ -110,244 +88,279 @@ export function AutoAnalysisDisplay({
   const isPredictionUp = prediction.direction === 'bullish';
 
   return (
-    <div className="space-y-4">
-      {/* Botón para ejecutar/actualizar análisis */}
-      <div className="flex justify-end">
+    <div className="space-y-3">
+      {/* Header Actions */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
+            Análisis Técnico
+          </span>
+          <SentimentBadge
+            type={trend}
+            size="sm"
+          />
+        </div>
         <button
           onClick={handleRunAnalysis}
           disabled={isLoading}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-xs font-medium shadow-sm"
         >
-          <Zap className="w-4 h-4" />
-          {isLoading ? 'Analizando...' : 'Ejecutar Análisis'}
+          <Zap className="w-3.5 h-3.5" />
+          {isLoading ? 'Analizando...' : 'Actualizar'}
         </button>
       </div>
 
-      {/* Header - Resumen Rápido */}
-      <div className="rounded-lg border border-border bg-card p-6">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <div>
-            <p className="text-xs text-muted-foreground uppercase">Tendencia</p>
-            <div className="flex items-center gap-1 mt-2">
-              {isUptrend ? (
-                <TrendingUp className="w-5 h-5 text-green-500" />
-              ) : (
-                <TrendingDown className="w-5 h-5 text-red-500" />
-              )}
-              <p className="font-bold text-lg capitalize">{trend}</p>
-            </div>
+      {/* Summary Dashboard */}
+      <SectionCard
+        title="Resumen Rápido"
+        icon={<BarChart3 className="w-4 h-4" />}
+      >
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <StatCard
+            label="Tendencia"
+            value={trend.charAt(0).toUpperCase() + trend.slice(1)}
+            icon={isUptrend ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+            color={isUptrend ? 'success' : 'danger'}
+          />
+          <StatCard
+            label="Sentimiento"
+            value={analysis.summary.overallSentiment}
+            color={isUptrend ? 'success' : 'danger'}
+          />
+          <div className="rounded-lg border border-border bg-background p-3">
+            <ConfidenceGauge value={prediction.probability} size="sm" />
           </div>
-
-          <div>
-            <p className="text-xs text-muted-foreground uppercase">Sentimiento</p>
-            <p className="font-semibold text-sm mt-2">
-              {analysis.summary.overallSentiment}
-            </p>
-          </div>
-
-          <div>
-            <p className="text-xs text-muted-foreground uppercase">Predicción</p>
-            <div className="flex items-center gap-1 mt-2">
-              {isPredictionUp ? (
-                <Zap className="w-4 h-4 text-green-500" />
-              ) : (
-                <Zap className="w-4 h-4 text-red-500" />
-              )}
-              <p className="font-semibold capitalize">{prediction.direction}</p>
-            </div>
-          </div>
-
-          <div>
-            <p className="text-xs text-muted-foreground uppercase">
-              Confianza
-            </p>
-            <p className="font-bold text-lg mt-2">
-              {prediction.probability}%
-            </p>
-          </div>
-
-          <div>
-            <p className="text-xs text-muted-foreground uppercase">R/R</p>
-            <p className="font-semibold text-sm mt-2">
-              1:{prediction.riskReward.toFixed(2)}
-            </p>
-          </div>
+          <StatCard
+            label="Riesgo/Beneficio"
+            value={`1:${prediction.riskReward.toFixed(2)}`}
+            icon={<Target className="w-4 h-4" />}
+            color={prediction.riskReward >= 2 ? 'success' : prediction.riskReward >= 1 ? 'warning' : 'danger'}
+          />
         </div>
-      </div>
+      </SectionCard>
 
-      {/* Resumen Ejecutivo */}
+      {/* Executive Summary */}
       <CollapsibleSection
-        title="📋 Resumen Ejecutivo"
+        title="Resumen Ejecutivo"
+        icon={<BarChart3 className="w-4 h-4" />}
         isOpen={expandedSections.summary}
         onToggle={() => toggleSection('summary')}
+        badge={`${prediction.probability}% confianza`}
       >
-        <div className="prose prose-sm max-w-none">
-          <MarkdownContent content={explanation.summary} />
+        <div className="prose prose-sm dark:prose-invert max-w-none">
+          <ReactMarkdown>{explanation.summary}</ReactMarkdown>
         </div>
       </CollapsibleSection>
 
-      {/* Análisis de Tendencia */}
+      {/* Trend Analysis */}
       <CollapsibleSection
-        title="📈 Análisis de Tendencia"
+        title="Análisis de Tendencia"
+        icon={<Activity className="w-4 h-4" />}
         isOpen={expandedSections.trend}
         onToggle={() => toggleSection('trend')}
       >
         <div className="space-y-4">
-          <MarkdownContent content={explanation.tendencyReason} />
-
-          {/* Cuadro de detalles técnicos */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
-            <TechBox
-              label="Fuerza"
-              value={analysis.trendAnalysis.strength}
-              unit="/100"
-            />
-            <TechBox label="ADX" value={analysis.trendAnalysis.adx.toFixed(2)} />
-            <TechBox
-              label="SMA 20"
-              value={analysis.trendAnalysis.sma[1]?.price.toFixed(2) || 'N/A'}
-            />
-            <TechBox
-              label="EMA 12"
-              value={analysis.trendAnalysis.ema[0]?.price.toFixed(2) || 'N/A'}
-            />
+          <div className="prose prose-sm dark:prose-invert max-w-none">
+            <ReactMarkdown>{explanation.tendencyReason}</ReactMarkdown>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <StatCard label="Fuerza" value={`${analysis.trendAnalysis.strength}/100`} color={analysis.trendAnalysis.strength > 70 ? 'success' : analysis.trendAnalysis.strength > 40 ? 'warning' : 'default'} />
+            <StatCard label="ADX" value={analysis.trendAnalysis.adx.toFixed(1)} color={analysis.trendAnalysis.adx > 25 ? 'info' : 'default'} />
+            <StatCard label="SMA 20" value={analysis.trendAnalysis.sma[1]?.price.toFixed(2) || 'N/A'} />
+            <StatCard label="EMA 12" value={analysis.trendAnalysis.ema[0]?.price.toFixed(2) || 'N/A'} />
           </div>
         </div>
       </CollapsibleSection>
 
-      {/* Patrones de Velas */}
+      {/* Candle Patterns */}
       <CollapsibleSection
-        title={`🕯️ Patrones de Velas (${analysis.patterns.length})`}
+        title="Patrones de Velas"
+        icon={<CandlestickChart className="w-4 h-4" />}
         isOpen={expandedSections.patterns}
         onToggle={() => toggleSection('patterns')}
+        badge={`${analysis.patterns.length} encontrados`}
       >
         <div className="space-y-3">
-          <MarkdownContent content={explanation.patternsReason} />
+          <div className="flex flex-wrap gap-2 mb-3">
+            {analysis.patterns.slice(0, 6).map((pattern: CandlePattern, idx: number) => {
+              const isBullish = pattern.type?.includes('bullish');
+              const isBearish = pattern.type?.includes('bearish');
+              return (
+                <span
+                  key={idx}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border ${
+                    isBullish
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                      : isBearish
+                      ? 'bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-400'
+                      : 'bg-slate-500/10 border-slate-500/30 text-slate-600 dark:text-slate-400'
+                  }`}
+                >
+                  {isBullish ? <TrendingUp className="w-3 h-3" /> : isBearish ? <TrendingDown className="w-3 h-3" /> : null}
+                  {pattern.name}
+                  <span className="opacity-60">({pattern.reliability}%)</span>
+                </span>
+              );
+            })}
+            {analysis.patterns.length > 6 && (
+              <span className="text-xs text-muted-foreground self-center">
+                +{analysis.patterns.length - 6} más
+              </span>
+            )}
+          </div>
+          <div className="prose prose-sm dark:prose-invert max-w-none">
+            <ReactMarkdown>{explanation.patternsReason}</ReactMarkdown>
+          </div>
         </div>
       </CollapsibleSection>
 
-      {/* Indicadores Técnicos */}
+      {/* Technical Indicators */}
       <CollapsibleSection
-        title="📊 Indicadores Técnicos"
+        title="Indicadores Técnicos"
+        icon={<BarChart3 className="w-4 h-4" />}
         isOpen={expandedSections.indicators}
         onToggle={() => toggleSection('indicators')}
       >
         <div className="space-y-4">
-          <MarkdownContent content={explanation.indicatorsReason} />
-
-          {/* Visualización de indicadores */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-4">
-            <IndicatorBox
-              name="RSI"
-              value={analysis.indicatorStatus.rsi.value}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <IndicatorCard
+              name="RSI (14)"
+              value={analysis.indicatorStatus.rsi.value?.toFixed(1)}
               status={analysis.indicatorStatus.rsi.status}
-              range="0-100"
+              type="rsi"
             />
-            <IndicatorBox
+            <IndicatorCard
               name="MACD"
-              value={analysis.indicatorStatus.macd.histogram}
+              value={analysis.indicatorStatus.macd.histogram?.toFixed(2)}
               status={analysis.indicatorStatus.macd.status}
+              type="macd"
             />
-            <IndicatorBox
-              name="Stochastic K"
-              value={analysis.indicatorStatus.stochastic.k}
+            <IndicatorCard
+              name="Stochastic %K"
+              value={analysis.indicatorStatus.stochastic.k?.toFixed(1)}
               status={analysis.indicatorStatus.stochastic.status}
-              range="0-100"
+              type="stochastic"
             />
-            <IndicatorBox
-              name="BB Position"
-              value={analysis.indicatorStatus.bollingerBands.position}
+            <IndicatorCard
+              name="Bollinger Pos."
+              value={analysis.indicatorStatus.bollingerBands.position?.replace('_', ' ')}
+              type="bb"
             />
-            <IndicatorBox
+            <IndicatorCard
               name="ATR"
-              value={analysis.indicatorStatus.atr}
+              value={analysis.indicatorStatus.atr?.toFixed(2)}
+              type="atr"
             />
-            <IndicatorBox
+            <IndicatorCard
               name="Volumen"
               value={analysis.indicatorStatus.volume.status}
+              type="volume"
             />
+          </div>
+          <div className="prose prose-sm dark:prose-invert max-w-none">
+            <ReactMarkdown>{explanation.indicatorsReason}</ReactMarkdown>
           </div>
         </div>
       </CollapsibleSection>
 
-      {/* Predicción Detallada */}
+      {/* Detailed Prediction */}
       <CollapsibleSection
-        title="🎯 Predicción Detallada"
+        title="Predicción Detallada"
+        icon={<Target className="w-4 h-4" />}
         isOpen={expandedSections.prediction}
         onToggle={() => toggleSection('prediction')}
       >
         <div className="space-y-4">
-          <MarkdownContent content={explanation.predictionsReason} />
-
-          {/* Objetivos y Stops */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-            <div className="rounded-lg bg-green-500/10 border border-green-500/30 p-4">
-              <p className="text-xs text-muted-foreground uppercase mb-2">
-                Objetivos de Precio
+          {/* Price Targets and Stop Loss */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4">
+              <p className="text-xs text-muted-foreground uppercase font-medium mb-2 flex items-center gap-1.5">
+                <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
+                Objetivos
               </p>
               <div className="space-y-1">
                 {prediction.targetPrice.map((target: number, idx: number) => (
-                  <p key={idx} className="font-semibold text-lg">
-                    {idx === 0 ? '🎯' : '🎯'} {target.toFixed(2)}
-                  </p>
+                  <div key={idx} className="flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center justify-center">
+                      {idx + 1}
+                    </span>
+                    <span className="font-semibold text-foreground">{target.toFixed(2)}</span>
+                  </div>
                 ))}
               </div>
             </div>
 
-            <div className="rounded-lg bg-red-500/10 border border-red-500/30 p-4">
-              <p className="text-xs text-muted-foreground uppercase mb-2">
+            <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-4">
+              <p className="text-xs text-muted-foreground uppercase font-medium mb-2 flex items-center gap-1.5">
+                <Shield className="w-3.5 h-3.5 text-red-500" />
                 Stop Loss
               </p>
-              <p className="font-semibold text-lg text-red-600">
-                🛑 {prediction.stopLoss.toFixed(2)}
-              </p>
+              <div className="flex items-center gap-2">
+                <span className="w-5 h-5 rounded-full bg-red-500/20 text-red-600 dark:text-red-400 text-xs font-bold flex items-center justify-center">
+                  S
+                </span>
+                <span className="font-semibold text-red-600 dark:text-red-400">
+                  {prediction.stopLoss.toFixed(2)}
+                </span>
+              </div>
             </div>
 
-            <div className="rounded-lg bg-blue-500/10 border border-blue-500/30 p-4">
-              <p className="text-xs text-muted-foreground uppercase mb-2">
+            <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-4">
+              <p className="text-xs text-muted-foreground uppercase font-medium mb-2 flex items-center gap-1.5">
+                <Activity className="w-3.5 h-3.5 text-blue-500" />
                 Relación R/R
               </p>
-              <p className="font-semibold text-lg">
+              <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                 1:{prediction.riskReward.toFixed(2)}
               </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {prediction.timeHorizon}
-              </p>
+              <p className="text-xs text-muted-foreground mt-1">{prediction.timeHorizon}</p>
             </div>
           </div>
 
-          {/* Escenarios alternativos */}
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-            <ScenarioBox
+          {/* Alternative Scenarios */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <ScenarioCard
               title="Escenario Alternativo"
               prediction={analysis.alternativePrediction}
-              type="alternative"
+              type={analysis.alternativePrediction?.direction === 'bullish' ? 'bullish' : 'bearish'}
             />
-            <ScenarioBox
+            <ScenarioCard
               title="Escenario Inverso"
               prediction={analysis.inversePrediction}
-              type="inverse"
+              type="warning"
             />
+          </div>
+
+          <div className="prose prose-sm dark:prose-invert max-w-none">
+            <ReactMarkdown>{explanation.predictionsReason}</ReactMarkdown>
           </div>
         </div>
       </CollapsibleSection>
 
-      {/* Factores de Riesgo */}
+      {/* Risk Factors */}
       <CollapsibleSection
-        title="⚠️ Factores de Riesgo"
+        title="Factores de Riesgo"
+        icon={<AlertTriangle className="w-4 h-4" />}
         isOpen={expandedSections.risk}
         onToggle={() => toggleSection('risk')}
+        badge={`${analysis.riskFactors?.length || 0} riesgos`}
       >
         <div className="space-y-2">
-          <MarkdownContent content={explanation.riskReason} />
+          <div className="prose prose-sm dark:prose-invert max-w-none">
+            <ReactMarkdown>{explanation.riskReason}</ReactMarkdown>
+          </div>
           {analysis.warnings && analysis.warnings.length > 0 && (
-            <div className="mt-4 p-3 rounded bg-amber-500/10 border border-amber-500/30">
-              <p className="text-sm font-semibold text-amber-700 mb-2">
-                Advertencias Importantes:
+            <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/20">
+              <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 mb-2 flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                Advertencias
               </p>
-              <ul className="text-sm text-amber-600 space-y-1">
+              <ul className="space-y-1">
                 {analysis.warnings.map((warning: string, idx: number) => (
-                  <li key={idx}>• {warning}</li>
+                  <li key={idx} className="text-xs text-amber-600/80 dark:text-amber-400/80 flex items-start gap-1.5">
+                    <span className="mt-0.5">•</span>
+                    {warning}
+                  </li>
                 ))}
               </ul>
             </div>
@@ -355,20 +368,47 @@ export function AutoAnalysisDisplay({
         </div>
       </CollapsibleSection>
 
-      {/* Impacto de Noticias */}
+      {/* News Impact */}
       {analysis.newsImpact && (
         <CollapsibleSection
-          title={`📰 Impacto de Noticias (${analysis.newsImpact.articleCount} artículos)`}
+          title="Impacto de Noticias"
+          icon={<Newspaper className="w-4 h-4" />}
           isOpen={expandedSections.news}
           onToggle={() => toggleSection('news')}
+          badge={`${analysis.newsImpact.articleCount} artículos`}
         >
           <div className="space-y-4">
-            <MarkdownContent content={explanation.newsReason} />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <StatCard
+                label="Dirección"
+                value={
+                  analysis.newsImpact.dominantDirection === 'bullish' ? 'Alcista' :
+                  analysis.newsImpact.dominantDirection === 'bearish' ? 'Bajista' : 'Neutral'
+                }
+                color={
+                  analysis.newsImpact.dominantDirection === 'bullish' ? 'success' :
+                  analysis.newsImpact.dominantDirection === 'bearish' ? 'danger' : 'default'
+                }
+              />
+              <StatCard label="Confianza" value={`${analysis.newsImpact.confidence}%`} color="info" />
+              <StatCard
+                label="Impacto"
+                value={
+                  analysis.newsImpact.impactLevel === 'high' ? 'Alto' :
+                  analysis.newsImpact.impactLevel === 'moderate' ? 'Moderado' : 'Bajo'
+                }
+                color={
+                  analysis.newsImpact.impactLevel === 'high' ? 'warning' :
+                  analysis.newsImpact.impactLevel === 'moderate' ? 'info' : 'default'
+                }
+              />
+              <StatCard label="Artículos" value={analysis.newsImpact.articleCount} />
+            </div>
 
-            {/* Score bar */}
-            <div className="mt-3">
-              <p className="text-xs text-muted-foreground mb-2">Sentimiento General</p>
-              <div className="relative h-4 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 rounded-full overflow-hidden">
+            {/* Sentiment bar */}
+            <div>
+              <p className="text-xs text-muted-foreground mb-1.5">Sentimiento General</p>
+              <div className="relative h-3 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 rounded-full overflow-hidden">
                 <div
                   className="absolute top-0 bottom-0 w-0.5 bg-white shadow-lg transition-all duration-500"
                   style={{
@@ -376,47 +416,19 @@ export function AutoAnalysisDisplay({
                   }}
                 />
               </div>
-              <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                <span>Negativo -1</span>
-                <span>Neutral 0</span>
-                <span>Positivo +1</span>
+              <div className="flex justify-between text-xs text-muted-foreground mt-0.5">
+                <span>Negativo</span>
+                <span>Neutral</span>
+                <span>Positivo</span>
               </div>
             </div>
 
-            {/* Stats grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
-              <div className="rounded bg-background p-3 border border-border">
-                <p className="text-xs text-muted-foreground font-medium">Dirección</p>
-                <p className={`text-sm font-semibold mt-1 ${
-                  analysis.newsImpact.dominantDirection === 'bullish' ? 'text-green-500' :
-                  analysis.newsImpact.dominantDirection === 'bearish' ? 'text-red-500' : 'text-foreground'
-                }`}>
-                  {analysis.newsImpact.dominantDirection === 'bullish' ? 'Alcista' :
-                   analysis.newsImpact.dominantDirection === 'bearish' ? 'Bajista' : 'Neutral'}
-                </p>
-              </div>
-              <div className="rounded bg-background p-3 border border-border">
-                <p className="text-xs text-muted-foreground font-medium">Confianza</p>
-                <p className="text-sm font-semibold mt-1">{analysis.newsImpact.confidence}%</p>
-              </div>
-              <div className="rounded bg-background p-3 border border-border">
-                <p className="text-xs text-muted-foreground font-medium">Impacto</p>
-                <p className={`text-sm font-semibold mt-1 ${
-                  analysis.newsImpact.impactLevel === 'high' ? 'text-orange-500' :
-                  analysis.newsImpact.impactLevel === 'moderate' ? 'text-yellow-500' : 'text-muted-foreground'
-                }`}>
-                  {analysis.newsImpact.impactLevel === 'high' ? 'Alto' :
-                   analysis.newsImpact.impactLevel === 'moderate' ? 'Moderado' : 'Bajo'}
-                </p>
-              </div>
-              <div className="rounded bg-background p-3 border border-border">
-                <p className="text-xs text-muted-foreground font-medium">Artículos</p>
-                <p className="text-sm font-semibold mt-1">{analysis.newsImpact.articleCount}</p>
-              </div>
+            <div className="prose prose-sm dark:prose-invert max-w-none">
+              <ReactMarkdown>{explanation.newsReason}</ReactMarkdown>
             </div>
 
             {includeNews && analysis.newsImpact.articleCount === 0 && (
-              <p className="text-xs text-muted-foreground italic mt-2">
+              <p className="text-xs text-muted-foreground italic">
                 No hay noticias recientes disponibles para este activo.
               </p>
             )}
@@ -424,163 +436,123 @@ export function AutoAnalysisDisplay({
         </CollapsibleSection>
       )}
 
-      {/* Análisis Detallado */}
-      <div className="rounded-lg border border-border bg-card p-4">
-        <p className="text-xs text-muted-foreground uppercase font-semibold mb-3">
-          Análisis Completo Detallado
-        </p>
-        <div className="prose prose-sm max-w-none">
-          <MarkdownContent content={analysis.detailedAnalysis} />
+      {/* Detailed Analysis */}
+      <SectionCard title="Análisis Completo" icon={<BarChart3 className="w-4 h-4" />}>
+        <div className="prose prose-sm dark:prose-invert max-w-none">
+          <ReactMarkdown>{analysis.detailedAnalysis}</ReactMarkdown>
         </div>
-      </div>
+      </SectionCard>
     </div>
   );
 }
 
-// ==================== Componentes Auxiliares ====================
+// ==================== Subcomponents ====================
 
 interface CollapsibleSectionProps {
   title: string;
+  icon?: React.ReactNode;
   isOpen: boolean;
   onToggle: () => void;
   children: React.ReactNode;
+  badge?: string;
 }
 
-function CollapsibleSection({
-  title,
-  isOpen,
-  onToggle,
-  children,
-}: CollapsibleSectionProps) {
+function CollapsibleSection({ title, icon, isOpen, onToggle, children, badge }: CollapsibleSectionProps) {
   return (
-    <div className="rounded-lg border border-border bg-card overflow-hidden">
+    <div className="rounded-lg border border-border bg-card overflow-hidden transition-shadow hover:shadow-sm">
       <button
         onClick={onToggle}
-        className="w-full p-4 flex items-center justify-between hover:bg-muted/50 transition-colors"
+        className="w-full px-4 py-3 flex items-center justify-between hover:bg-muted/30 transition-colors"
       >
-        <h3 className="font-semibold text-foreground">{title}</h3>
+        <div className="flex items-center gap-2">
+          {icon && <span className="text-muted-foreground">{icon}</span>}
+          <h3 className="font-semibold text-sm text-foreground">{title}</h3>
+          {badge && (
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground uppercase tracking-wider">
+              {badge}
+            </span>
+          )}
+        </div>
         {isOpen ? (
-          <ChevronUp className="w-5 h-5 text-muted-foreground" />
+          <ChevronUp className="w-4 h-4 text-muted-foreground" />
         ) : (
-          <ChevronDown className="w-5 h-5 text-muted-foreground" />
+          <ChevronDown className="w-4 h-4 text-muted-foreground" />
         )}
       </button>
-      {isOpen && <div className="border-t border-border p-4">{children}</div>}
+      {isOpen && <div className="border-t border-border px-4 py-3">{children}</div>}
     </div>
   );
 }
 
-interface TechBoxProps {
-  label: string;
-  value: string | number;
-  unit?: string;
-}
-
-function TechBox({ label, value, unit }: TechBoxProps) {
-  return (
-    <div className="rounded bg-background p-3">
-      <p className="text-xs text-muted-foreground font-medium">{label}</p>
-      <p className="text-lg font-semibold text-foreground mt-1">
-        {value}
-        {unit}
-      </p>
-    </div>
-  );
-}
-
-interface IndicatorBoxProps {
+interface IndicatorCardProps {
   name: string;
-  value?: string | number;
+  value?: string | number | null;
   status?: string;
-  range?: string;
+  type?: string;
 }
 
-function IndicatorBox({ name, value, status, range }: IndicatorBoxProps) {
-  const statusColor =
-    status === 'overbought'
-      ? 'text-red-500'
-      : status === 'oversold'
-      ? 'text-green-500'
-      : status === 'bullish'
-      ? 'text-green-500'
-      : status === 'bearish'
-      ? 'text-red-500'
-      : 'text-foreground';
+function IndicatorCard({ name, value, status, type }: IndicatorCardProps) {
+  const getStatusConfig = () => {
+    if (!status) return { color: 'text-foreground', bg: 'bg-background', border: 'border-border' };
+
+    if (status === 'overbought' || status === 'bearish')
+      return { color: 'text-red-600 dark:text-red-400', bg: 'bg-red-500/5', border: 'border-red-500/20' };
+    if (status === 'oversold' || status === 'bullish')
+      return { color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-500/5', border: 'border-emerald-500/20' };
+    return { color: 'text-foreground', bg: 'bg-background', border: 'border-border' };
+  };
+
+  const cfg = getStatusConfig();
 
   return (
-    <div className="rounded bg-background p-3 border border-border">
+    <div className={`rounded-lg border ${cfg.border} ${cfg.bg} p-3`}>
       <p className="text-xs text-muted-foreground font-medium">{name}</p>
-      <p className={`text-sm font-semibold mt-1 ${statusColor}`}>
-        {typeof value === 'number' ? value.toFixed(2) : value}
+      <p className={`text-sm font-bold mt-0.5 ${cfg.color}`}>
+        {value != null ? value : '—'}
       </p>
       {status && (
-        <p className="text-xs text-muted-foreground mt-1 capitalize">
-          {status}
-        </p>
-      )}
-      {range && (
-        <p className="text-xs text-muted-foreground">{range}</p>
+        <p className="text-[10px] text-muted-foreground mt-0.5 capitalize">{status}</p>
       )}
     </div>
   );
 }
 
-interface ScenarioBoxProps {
+interface ScenarioCardProps {
   title: string;
-  prediction: any;
-  type: 'alternative' | 'inverse';
+  prediction?: Prediction;
+  type: 'bullish' | 'bearish' | 'warning';
 }
 
-function ScenarioBox({ title, prediction, type }: ScenarioBoxProps) {
-  const bgColor =
-    type === 'alternative'
-      ? 'bg-blue-500/10 border-blue-500/30'
-      : 'bg-red-500/10 border-red-500/30';
+function ScenarioCard({ title, prediction, type }: ScenarioCardProps) {
+  if (!prediction) return null;
+
+  const configs = {
+    bullish: { border: 'border-emerald-500/20', bg: 'bg-emerald-500/5', text: 'text-emerald-600 dark:text-emerald-400' },
+    bearish: { border: 'border-red-500/20', bg: 'bg-red-500/5', text: 'text-red-600 dark:text-red-400' },
+    warning: { border: 'border-amber-500/20', bg: 'bg-amber-500/5', text: 'text-amber-600 dark:text-amber-400' },
+  };
+
+  const cfg = configs[type];
 
   return (
-    <div className={`rounded-lg border ${bgColor} p-3`}>
-      <p className="text-xs font-semibold text-muted-foreground mb-2">
-        {title}
-      </p>
-      <div className="space-y-1">
-        <p className="text-sm">
-          <span className="capitalize font-semibold">{prediction.direction}</span>
-          {' '}({prediction.probability}%)
-        </p>
-        <p className="text-xs text-muted-foreground">
-          Objetivo: {prediction.targetPrice[0]?.toFixed(2) || 'N/A'}
-        </p>
+    <div className={`rounded-lg border ${cfg.border} ${cfg.bg} p-3`}>
+      <p className="text-xs font-semibold text-muted-foreground mb-2">{title}</p>
+      <div className="flex items-center gap-2 mb-1">
+        {type === 'bullish' ? (
+          <TrendingUp className="w-4 h-4 text-emerald-500" />
+        ) : type === 'bearish' ? (
+          <TrendingDown className="w-4 h-4 text-red-500" />
+        ) : (
+          <AlertTriangle className="w-4 h-4 text-amber-500" />
+        )}
+        <span className="font-semibold capitalize text-foreground">{prediction.direction}</span>
+        <span className={`text-xs font-medium ${cfg.text}`}>({prediction.probability}%)</span>
       </div>
+      {prediction.targetPrice?.[0] != null && (
+        <p className="text-xs text-muted-foreground">
+          Objetivo: <span className="font-medium text-foreground">{prediction.targetPrice[0].toFixed(2)}</span>
+        </p>
+      )}
     </div>
   );
 }
-
-interface MarkdownContentProps {
-  content: string;
-}
-
-function MarkdownContent({ content }: MarkdownContentProps) {
-  // Convertir markdown simple a componentes React
-  return (
-    <div className="space-y-2 text-sm text-foreground leading-relaxed">
-      {content.split('\n').map((line, idx) => {
-        if (line.startsWith('**')) {
-          const text = line.replace(/\*\*/g, '');
-          return (
-            <p key={idx} className="font-semibold">
-              {text}
-            </p>
-          );
-        }
-        if (line.startsWith('#')) {
-          return <p key={idx} className="font-bold text-base">{line.replace(/#+\s/, '')}</p>;
-        }
-        if (line.trim() === '') {
-          return <div key={idx} className="h-2" />;
-        }
-        return <p key={idx}>{line}</p>;
-      })}
-    </div>
-  );
-}
-
