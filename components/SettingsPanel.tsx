@@ -2,11 +2,13 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useTheme } from 'next-themes';
-import { Settings, X, Trash2, Download, Moon, Sun, RotateCcw, AlertCircle } from 'lucide-react';
+import { Settings, X, Trash2, Download, Moon, Sun, RotateCcw, AlertCircle, LayoutPanelLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useWidgetStore } from '@/lib/widgetStore';
 
 export function SettingsPanel() {
   const { theme, setTheme } = useTheme();
+  const { editMode, setEditMode } = useWidgetStore();
   const [isOpen, setIsOpen] = useState(false);
   const [language, setLanguage] = useState('es');
   const panelRef = useRef<HTMLDivElement>(null);
@@ -148,6 +150,46 @@ export function SettingsPanel() {
                   Oscuro
                 </button>
               </div>
+            </div>
+
+            {/* Modo Edición */}
+            <div className="space-y-2 pt-4 border-t border-border">
+              <label className="text-sm font-medium text-foreground flex items-center gap-2">
+                <LayoutPanelLeft className="w-4 h-4" />
+                Editar Dashboard
+              </label>
+              <button
+                onClick={() => {
+                  setEditMode(!editMode);
+                  toast.success(editMode ? 'Modo edición desactivado' : 'Modo edición activado');
+                }}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  editMode
+                    ? 'bg-primary/15 text-primary ring-1 ring-primary/30'
+                    : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <LayoutPanelLeft className={`w-4 h-4 transition-transform duration-300 ${editMode ? 'rotate-12' : ''}`} />
+                  {editMode ? 'Modo edición activo' : 'Personalizar diseño'}
+                </span>
+                <span
+                  className={`relative w-9 h-5 rounded-full transition-colors duration-200 ${
+                    editMode ? 'bg-primary' : 'bg-muted-foreground/30'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform duration-200 shadow-sm ${
+                      editMode ? 'translate-x-4' : 'translate-x-0'
+                    }`}
+                  />
+                </span>
+              </button>
+              {editMode && (
+                <p className="text-xs text-primary/70 animate-fadeIn">
+                  Arrastra widgets para reordenar, redimensiona desde las esquinas
+                </p>
+              )}
             </div>
 
             {/* Idioma */}

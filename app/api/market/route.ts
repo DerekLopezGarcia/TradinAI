@@ -370,12 +370,11 @@ async function getNewsData(symbol: string) {
   let source: string;
 
   if (isCrypto(symbol)) {
-    const coinName = symbol.replace('USD', '').toLowerCase();
-    news = await newsService.getCryptoNews(coinName, 10);
-    source = 'NewsAPI (Crypto)';
+    news = await newsService.getCryptoNews(symbol, 10);
+    source = 'Multi-fuente (Yahoo Finance, Alpha Vantage)';
   } else {
     news = await newsService.getStockNews(symbol, 7);
-    source = 'Finnhub';
+    source = 'Multi-fuente (Finnhub, Yahoo Finance, Alpha Vantage)';
   }
 
   return {
@@ -459,7 +458,7 @@ async function getPriceData(symbol: string) {
   }
 
   // Stocks, índices, forex, commodities, futuros → Yahoo Finance primero
-  
+
   // ⚠️ ÍNDICES ESPECIALES: DXY y MIB sin datos disponibles en Yahoo Finance
   if (['DXY', 'MIB'].includes(symbol)) {
     console.warn(`⚠️ ÍNDICE ESPECIAL: ${symbol} - Sin datos disponibles`);
@@ -488,6 +487,42 @@ async function getPriceData(symbol: string) {
     };
   } catch (yahooErr) {
     console.warn(`Yahoo price failed for ${symbol}, trying Finnhub:`, yahooErr);
+  }
+
+  // Fallback 2: Alpaca Markets (stocks con API key configurada)
+  if (assetType === 'stock') {
+    const apiKey = process.env.ALPACA_API_KEY;
+    const secretKey = process.env.ALPACA_SECRET_KEY;
+    if (apiKey && secretKey) {
+      try {
+        const res = await fetch(
+          `https://data.alpaca.markets/v2/stocks/${symbol}/trades/latest`,
+          {
+            headers: {
+              'APCA-API-KEY-ID': apiKey,
+              'APCA-API-SECRET-KEY': secretKey,
+            },
+            signal: AbortSignal.timeout(8000),
+          }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (data.trade?.p) {
+            return {
+              symbol,
+              price: parseFloat(data.trade.p),
+              change: 0,
+              changePercent: 0,
+              source: 'Alpaca',
+              type: assetType,
+              timestamp: Math.floor(data.trade.t / 1000000),
+            };
+          }
+        }
+      } catch {
+        // silent
+      }
+    }
   }
 
   // Fallback: Finnhub (puede dar 403 en plan gratuito para algunos símbolos)

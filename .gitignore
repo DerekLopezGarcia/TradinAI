@@ -86,3 +86,8 @@ RAILWAY_SETUP.md
 QUICK_RAILWAY_START.md
 
 
+/graphify-out/
+/.husky/
+/.proxyai/
+/.opencode/
+/opencode.json

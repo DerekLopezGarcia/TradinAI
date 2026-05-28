@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Header } from '@/components/Header';
 import { NavBar } from '@/components/NavBar';
+import { Sidebar } from '@/components/Sidebar';
 import { RecommendationsPanel } from '@/components/RecommendationsPanel';
 import { ArrowLeft } from 'lucide-react';
 
@@ -14,14 +15,14 @@ export default function RecommendationsPage() {
 
   return (
     <div className="min-h-screen bg-background transition-colors duration-300">
-      <Header onMenuClick={() => {}} />
+      <Sidebar />
+      <Header />
       <NavBar selectedType={selectedType} onTypeChange={setSelectedType} searchQuery={searchQuery} onSearchChange={setSearchQuery} />
 
       <main className="p-4 md:p-6 space-y-6">
-        {/* Botón para volver a gráficos */}
         <button
           onClick={() => router.push('/')}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium dark:bg-primary dark:text-primary-foreground"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
         >
           <ArrowLeft className="w-4 h-4" />
           Volver a Gráficos

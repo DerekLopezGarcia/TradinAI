@@ -197,5 +197,102 @@ textarea:focus {
   display: none;
 }
 
+/* ============================================ */
+/* ANIMACIONES MODO EDICIÓN - Dashboard Modular */
+/* ============================================ */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideOutLeft {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(-100%); opacity: 0; }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes widgetEnter {
+  from { opacity: 0; transform: scale(0.9) translateY(-10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes widgetExit {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.9) translateY(-10px); }
+}
+
+@keyframes resizeHandlePulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.8; }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 200ms ease-out;
+}
+
+.animate-fadeInScale {
+  animation: fadeInScale 200ms ease-out;
+}
+
+.animate-slideInLeft {
+  animation: slideInLeft 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.animate-widgetEnter {
+  animation: widgetEnter 200ms ease-out;
+}
+
+.dashboard-grid-edit .react-grid-item {
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dashboard-grid-edit .react-grid-item:hover {
+  z-index: 10;
+}
+
+.dashboard-grid-edit .react-resizable-handle {
+  opacity: 0;
+  transition: opacity 200ms ease-out;
+}
+
+.dashboard-grid-edit .react-grid-item:hover .react-resizable-handle {
+  opacity: 1;
+}
+
+.react-resizable-handle::after {
+  content: '';
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid hsl(var(--muted-foreground));
+  border-bottom: 2px solid hsl(var(--muted-foreground));
+}
+
+/* Transición suave del main content cuando se abre/cierra el panel */
+main {
+  transition: margin-left 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
 
 

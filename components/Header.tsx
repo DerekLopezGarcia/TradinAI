@@ -8,13 +8,11 @@ import { TrendingUp, TrendingDown, Heart, Menu, Sparkles, Loader2 } from 'lucide
 import { ThemeToggle } from '@/components/theme-toggle';
 import { NotificationPanel } from '@/components/NotificationPanel';
 import { SettingsPanel } from '@/components/SettingsPanel';
+import { useWidgetStore } from '@/lib/widgetStore';
 
-interface HeaderProps {
-  onMenuClick: () => void;
-}
-
-export function Header({ onMenuClick }: HeaderProps) {
+export function Header() {
   const { selectedAsset, setSelectedAsset, assets, toggleFavorite } = useMarketStore();
+  const toggleSidebar = useWidgetStore((s) => s.toggleSidebar);
   const [isAssetDropdownOpen, setIsAssetDropdownOpen] = useState(false);
   const [isLoadingPrices, setIsLoadingPrices] = useState(false);
   const [failedAssets, setFailedAssets] = useState<Set<string>>(new Set());
@@ -110,8 +108,8 @@ export function Header({ onMenuClick }: HeaderProps) {
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
             <button
-              onClick={onMenuClick}
-              className="lg:hidden p-2 rounded-lg transition-colors hover:bg-muted"
+              onClick={toggleSidebar}
+              className="p-2 rounded-lg transition-colors hover:bg-muted"
             >
               <Menu className="w-5 h-5 text-foreground" />
             </button>
