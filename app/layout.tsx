@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import 'react-grid-layout/css/styles.css';
+import 'react-resizable/css/styles.css';
 import { ThemeProvider } from '@/components/theme-provider';
+import { WidgetsDnDProvider } from '@/components/WidgetsDnDProvider';
 import { Toaster } from 'react-hot-toast';
 
 export const metadata: Metadata = {
@@ -27,7 +30,9 @@ export default function RootLayout({
           enableSystem={false}
           disableTransitionOnChange={false}
         >
-          {children}
+          <WidgetsDnDProvider>
+            {children}
+          </WidgetsDnDProvider>
           <Toaster
             position="bottom-right"
             toastOptions={{

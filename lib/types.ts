@@ -191,3 +191,27 @@ export interface MarketCache {
   clear: (key?: string) => void;
 }
 
+// ==================== TIPOS PARA ORDER BOOK / PROFUNDIDAD DE MERCADO ====================
+
+export interface OrderBookLevel {
+  price: number;
+  size: number;
+  total: number;
+}
+
+export interface OrderBookSnapshot {
+  symbol: string;
+  bids: OrderBookLevel[];
+  asks: OrderBookLevel[];
+  timestamp: number;
+}
+
+export type ConnectionState = 'connecting' | 'connected' | 'disconnected' | 'error';
+
+export interface DepthUpdate {
+  symbol: string;
+  bids: [string, string][];
+  asks: [string, string][];
+  timestamp: number;
+}
+

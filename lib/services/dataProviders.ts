@@ -241,6 +241,65 @@ export class QuandlProvider implements IDataProvider {
 }
 
 // ============================================================================
+// PROVEEDOR: ALPACA MARKETS (Stocks e Índices)
+// ============================================================================
+
+export class AlpacaProvider implements IDataProvider {
+  name = 'Alpaca Markets';
+  priority = 85; // Entre TwelveData (90) y YahooFinance (70)
+  supportsTypes: AssetType[] = ['stock', 'index'];
+  supportsSymbols = new Set([
+    ...SYMBOL_CONFIG.stock,
+    ...SYMBOL_CONFIG.index
+  ]);
+
+  private apiKey = process.env.ALPACA_API_KEY;
+  private secretKey = process.env.ALPACA_SECRET_KEY;
+
+  canHandle(symbol: string, type: AssetType): boolean {
+    return !!(this.apiKey && this.secretKey && (type === 'stock' || type === 'index') && this.supportsSymbols.has(symbol));
+  }
+
+  async fetch(symbol: string, interval: string): Promise<CandleData[]> {
+    if (!this.apiKey || !this.secretKey) return [];
+
+    const tfMap: Record<string, string> = {
+      '1m': '1Min', '5m': '5Min', '15m': '15Min',
+      '1h': '1Hour', '4h': '4Hour', '1d': '1Day', '1w': '1Week',
+    };
+    const alpacaInterval = tfMap[interval] || '1Hour';
+
+    try {
+      const response = await fetch(
+        `https://data.alpaca.markets/v2/stocks/${symbol}/bars?timeframe=${alpacaInterval}&limit=200&adjustment=split`,
+        {
+          headers: {
+            'APCA-API-KEY-ID': this.apiKey,
+            'APCA-API-SECRET-KEY': this.secretKey,
+          },
+          signal: AbortSignal.timeout(10000),
+        }
+      );
+
+      if (!response.ok) return [];
+      const data = await response.json();
+      if (!data.bars?.length) return [];
+
+      return data.bars.map((bar: any) => ({
+        time: new Date(bar.t).getTime(),
+        open: parseFloat(bar.o),
+        high: parseFloat(bar.h),
+        low: parseFloat(bar.l),
+        close: parseFloat(bar.c),
+        volume: parseFloat(bar.v) || 0,
+      })).filter((c: any) => !isNaN(c.close) && c.close > 0);
+    } catch {
+      return [];
+    }
+  }
+}
+
+// ============================================================================
 // REGISTRO AUTOMÁTICO DE PROVEEDORES
 // ============================================================================
 
@@ -257,6 +316,7 @@ export function registerDefaultProviders() {
   try {
     providerManager.register(new BinanceProvider());
     providerManager.register(new TwelveDataProvider());
+    providerManager.register(new AlpacaProvider());
     providerManager.register(new YahooFinanceProvider());
     providerManager.register(new QuandlProvider());
     providerManager.register(new CoinGeckoProvider());
