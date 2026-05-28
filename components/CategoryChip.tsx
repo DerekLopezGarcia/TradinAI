@@ -39,8 +39,10 @@ export function CategoryChip({ typeConfig, isEditMode }: CategoryChipProps) {
   const { pinAsset, unpinAsset, reorderCategoryUp, reorderCategoryDown, toggleCategoryVisibility } = useAssetBarStore();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [pagination, setPagination] = useState(0);
   const loadedRef = useRef(false);
+  const mountedRef = useRef(false);
   const failedRef = useRef<Set<string>>(new Set());
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -75,13 +77,62 @@ export function CategoryChip({ typeConfig, isEditMode }: CategoryChipProps) {
 
   const filteredList = (): any[] => {
     const list = typeConfig.value === 'favorites'
-      ? assets.filter(a => a.isFavorite)
+      ? (() => {
+          const favorites = useMarketStore.getState().favorites;
+          if (favorites.length === 0) return [];
+          return favorites.map(sym => {
+            const existing = assets.find(a => a.symbol === sym);
+            return existing || { id: `fav_${sym}`, symbol: sym, name: sym, type: determinateAssetType(sym) as AssetType, price: 0, change: 0, changePercent: 0, isFavorite: true };
+          });
+        })()
       : typeConfig.isScanner
         ? getScannerAssets(typeConfig.label)
         : assets.filter(a => a.type === typeConfig.value);
     return list;
   };
 
+  // Preload ALL favorites on mount (creates Asset entries if missing)
+  useEffect(() => {
+    const preloadFavorites = async () => {
+      setInitialLoading(true);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => setInitialLoading(false), 15000);
+      try {
+        const store = useMarketStore.getState();
+        const symbols = store.favorites.filter(s => !store.assets.find(a => a.symbol === s));
+        const batchSize = 5;
+        for (let i = 0; i < symbols.length; i += batchSize) {
+          const batch = symbols.slice(i, i + batchSize);
+          await Promise.allSettled(batch.map(async (symbol) => {
+            if (!validateSymbol(symbol)) return;
+            try {
+              const params = createSafeParams({ symbol: symbol.toUpperCase(), type: 'price' });
+              const res = await fetch(`/api/market?${params.toString()}`, { signal: controller.signal });
+              if (!res.ok) return;
+              const d = await res.json();
+              if (d?.price !== undefined && d?.price !== null && !isNaN(Number(d.price))) {
+                const { addOrUpdateAssetPrice } = useMarketStore.getState();
+                addOrUpdateAssetPrice(
+                  symbol, symbol,
+                  parseFloat(String(d.price)),
+                  parseFloat(String(d.change ?? 0)),
+                  parseFloat(String(d.changePercent ?? 0)),
+                  determinateAssetType(symbol)
+                );
+              }
+            } catch { /* individual fetch failure ok */ }
+          }));
+        }
+      } finally {
+        clearTimeout(timeoutId);
+        setInitialLoading(false);
+      }
+    };
+    preloadFavorites();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Fetch prices when dropdown opens (uses store.getState() for fresh data)
   useEffect(() => {
     if (!open) {
       loadedRef.current = false;
@@ -97,27 +148,29 @@ export function CategoryChip({ typeConfig, isEditMode }: CategoryChipProps) {
       const timeoutId = setTimeout(() => setLoading(false), 5000);
       const currentFailed = new Set<string>();
       failedRef.current = currentFailed;
+      const store = useMarketStore.getState();
 
       try {
         if (typeConfig.value === 'favorites') {
-          const favs = assets.filter(a => a.isFavorite);
-          await Promise.allSettled(favs.slice(0, 3).map(async (asset) => {
-            if (!validateSymbol(asset.symbol)) { currentFailed.add(asset.symbol); return; }
-            const params = createSafeParams({ symbol: asset.symbol.toUpperCase(), type: 'price' });
+          const favSymbols = store.favorites;
+          await Promise.allSettled(favSymbols.map(async (symbol) => {
+            if (!validateSymbol(symbol)) { currentFailed.add(symbol); return; }
+            const params = createSafeParams({ symbol: symbol.toUpperCase(), type: 'price' });
             const controller = new AbortController();
             const tid = setTimeout(() => controller.abort(), 2000);
             try {
               const res = await fetch(`/api/market?${params.toString()}`, { signal: controller.signal });
               clearTimeout(tid);
-              if (!res.ok) { currentFailed.add(asset.symbol); return; }
+              if (!res.ok) { currentFailed.add(symbol); return; }
               const d = await res.json();
               if (d?.price !== undefined && d?.price !== null && d?.price !== '') {
                 const price = parseFloat(String(d.price));
                 if (!isNaN(price)) {
-                  updateAssetPrice(asset.symbol, price, parseFloat(String(d.change ?? 0)), parseFloat(String(d.changePercent ?? 0)));
-                } else { currentFailed.add(asset.symbol); }
-              } else { currentFailed.add(asset.symbol); }
-            } catch { clearTimeout(tid); currentFailed.add(asset.symbol); }
+                  const { addOrUpdateAssetPrice } = useMarketStore.getState();
+                  addOrUpdateAssetPrice(symbol, symbol, price, parseFloat(String(d.change ?? 0)), parseFloat(String(d.changePercent ?? 0)), determinateAssetType(symbol));
+                } else { currentFailed.add(symbol); }
+              } else { currentFailed.add(symbol); }
+            } catch { clearTimeout(tid); currentFailed.add(symbol); }
           }));
         } else if (typeConfig.isScanner) {
           const symbols = getAssetsByCategory(typeConfig.label);
@@ -126,12 +179,11 @@ export function CategoryChip({ typeConfig, isEditMode }: CategoryChipProps) {
             if (!validateSymbol(sym)) { currentFailed.add(sym); continue; }
             const cached = priceCache.get(sym);
             if (cached) {
-              addOrUpdateAssetPrice(sym, sym, cached.price, cached.change, cached.changePercent, 'crypto');
+              store.addOrUpdateAssetPrice(sym, sym, cached.price, cached.change, cached.changePercent, 'crypto');
             } else { toFetch.push(sym); }
           }
-          const batchSize = 3;
-          for (let i = 0; i < toFetch.length; i += batchSize) {
-            const batch = toFetch.slice(i, i + batchSize);
+          for (let i = 0; i < toFetch.length; i += 3) {
+            const batch = toFetch.slice(i, i + 3);
             await Promise.allSettled(batch.map(async (symbol) => {
               const params = createSafeParams({ symbol: symbol.toUpperCase(), type: 'price' });
               const controller = new AbortController();
@@ -147,12 +199,13 @@ export function CategoryChip({ typeConfig, isEditMode }: CategoryChipProps) {
                     const change = parseFloat(String(d.change ?? 0));
                     const changePercent = parseFloat(String(d.changePercent ?? 0));
                     priceCache.set(symbol, price, change, changePercent);
+                    const { addOrUpdateAssetPrice } = useMarketStore.getState();
                     addOrUpdateAssetPrice(symbol, symbol, price, change, changePercent, determinateAssetType(symbol));
                   } else { currentFailed.add(symbol); }
                 } else { currentFailed.add(symbol); }
               } catch { clearTimeout(tid); currentFailed.add(symbol); }
             }));
-            if (i + batchSize < toFetch.length) await new Promise(r => setTimeout(r, 500));
+            if (i + 3 < toFetch.length) await new Promise(r => setTimeout(r, 500));
           }
         }
       } finally {
@@ -226,9 +279,9 @@ export function CategoryChip({ typeConfig, isEditMode }: CategoryChipProps) {
         </div>
       )}
 
-      {open && (
+          {open && (
         <div className="absolute top-full left-0 mt-1 w-56 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden flex flex-col">
-          {loading && !loadedRef.current ? (
+          {(loading && !loadedRef.current) || (initialLoading && typeConfig.value === 'favorites' && list.some(a => a.price === 0)) ? (
             <div className="flex items-center justify-center py-6 gap-2 text-muted-foreground text-sm">
               <Loader2 className="w-4 h-4 animate-spin" />
               Cargando precios...
