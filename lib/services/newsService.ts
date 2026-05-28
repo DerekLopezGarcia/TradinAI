@@ -1,6 +1,7 @@
 import { NewsItem, Sentiment } from '@/lib/types';
 import { YahooFinanceNewsProvider } from './yahooFinanceNewsProvider';
 import { AlphaVantageNewsProvider } from './alphaVantageNewsProvider';
+import { newsSentimentService } from './newsSentimentService';
 
 class NewsService {
   private finnhubApiKey: string;
@@ -19,23 +20,14 @@ class NewsService {
     this.alphaVantageProvider = new AlphaVantageNewsProvider();
   }
 
-  private analyzeSentiment(text: string): Sentiment {
-    const lowerText = text.toLowerCase();
-    const positiveWords = [
-      'sube', 'gana', 'crece', 'récord', 'alcista', 'compra', 'bullish',
-      'rally', 'boom', 'éxito', 'ganancias', 'aprueban', 'acuerdo',
-      'optimismo', 'positivo', 'prosperidad', 'avance', 'mejora',
-    ];
-    const negativeWords = [
-      'baja', 'pierde', 'caída', 'crisis', 'bajista', 'vende', 'bearish',
-      'crash', 'pánico', 'fracaso', 'pérdidas', 'rechazo', 'conflicto',
-      'pesimismo', 'negativo', 'desplome', 'declive', 'colapso',
-    ];
-    const positiveCount = positiveWords.filter(word => lowerText.includes(word)).length;
-    const negativeCount = negativeWords.filter(word => lowerText.includes(word)).length;
-    if (positiveCount > negativeCount) return 'positive';
-    if (negativeCount > positiveCount) return 'negative';
-    return 'neutral';
+  private analyzeSentiment(text: string): { sentiment: Sentiment; sentimentScore: number; sentimentConfidence: number; sentimentStrength: 'strong' | 'moderate' | 'weak' } {
+    const result = newsSentimentService.analyzeSentiment(text);
+    return {
+      sentiment: result.sentiment,
+      sentimentScore: result.score,
+      sentimentConfidence: result.confidence,
+      sentimentStrength: result.strength,
+    };
   }
 
   private getFromCache(key: string): NewsItem[] | null {
@@ -78,7 +70,7 @@ class NewsService {
             source: item.source || 'Finnhub',
             url: item.url || '',
             timestamp: (item.datetime || Math.floor(Date.now() / 1000)) * 1000,
-            sentiment: this.analyzeSentiment((item.headline || '') + ' ' + (item.summary || '')),
+            ...this.analyzeSentiment((item.headline || '') + ' ' + (item.summary || '')),
             relevantAssets: [symbol],
             imageUrl: item.image || undefined,
           }))

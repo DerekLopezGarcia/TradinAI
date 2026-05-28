@@ -22,11 +22,13 @@ export interface AnalysisExplanation {
     indicatorsReason: string;
     predictionsReason: string;
     riskReason: string;
+    newsReason: string;
     summary: string;
   };
   isLoading: boolean;
   error: string | null;
-  runAnalysis: (symbol: string, timeframe: TimeFrame, candleData: CandleData[], analysisDepth?: 'basic' | 'standard' | 'comprehensive') => Promise<void>;
+  newsImpact: any;
+  runAnalysis: (symbol: string, timeframe: TimeFrame, candleData: CandleData[], analysisDepth?: 'basic' | 'standard' | 'comprehensive', includeNews?: boolean) => Promise<void>;
 }
 
 /**
@@ -37,15 +39,18 @@ export function useAutoAnalysis(
   symbol: string,
   timeframe: TimeFrame,
   candleData: CandleData[],
-  analysisDepth: 'basic' | 'standard' | 'comprehensive' = 'standard'
+  analysisDepth: 'basic' | 'standard' | 'comprehensive' = 'standard',
+  includeNews: boolean = false
 ): AnalysisExplanation {
   const [analysis, setAnalysis] = useState<any>(null);
+  const [newsImpact, setNewsImpact] = useState<any>(null);
   const [explanation, setExplanation] = useState({
     tendencyReason: '',
     patternsReason: '',
     indicatorsReason: '',
     predictionsReason: '',
     riskReason: '',
+    newsReason: '',
     summary: ''
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -78,6 +83,9 @@ export function useAutoAnalysis(
       // Explicación de riesgos
       const riskReason = generateRiskExplanation(riskFactors);
 
+      // Explicación de noticias
+      const newsReason = generateNewsExplanation(analysisResult.newsImpact);
+
       // Resumen ejecutivo
       const summary = generateExecutiveSummary(
         trend,
@@ -92,6 +100,7 @@ export function useAutoAnalysis(
         indicatorsReason,
         predictionsReason,
         riskReason,
+        newsReason,
         summary
       });
     } catch (err) {
@@ -105,7 +114,8 @@ export function useAutoAnalysis(
     sym: string,
     tf: TimeFrame,
     data: CandleData[],
-    depth: 'basic' | 'standard' | 'comprehensive' = 'standard'
+    depth: 'basic' | 'standard' | 'comprehensive' = 'standard',
+    newsEnabled: boolean = false
   ) => {
     if (!data || data.length < 20) {
       setError('Se requieren al menos 20 velas para análisis');
@@ -116,18 +126,36 @@ export function useAutoAnalysis(
     setError(null);
 
     try {
+      // Fetch news if requested
+      let relatedNews;
+      if (newsEnabled) {
+        try {
+          const params = new URLSearchParams({ symbol: sym, type: 'news' });
+          const res = await fetch(`/api/market?${params.toString()}`);
+          if (res.ok) {
+            const newsData = await res.json();
+            relatedNews = newsData.news || [];
+          }
+        } catch (e) {
+          console.warn('News fetch failed:', e);
+        }
+      }
+
       const result = await analyzeCandles({
         symbol: sym,
         timeframe: tf,
         candles: data,
-        analysisDepth: depth
+        analysisDepth: depth,
+        relatedNews,
       });
 
       setAnalysis(result);
+      setNewsImpact(result.newsImpact || null);
       generateExplanation(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error en análisis');
       setAnalysis(null);
+      setNewsImpact(null);
     } finally {
       setIsLoading(false);
     }
@@ -138,6 +166,7 @@ export function useAutoAnalysis(
     explanation,
     isLoading,
     error,
+    newsImpact,
     runAnalysis
   };
 }
@@ -336,6 +365,34 @@ function generateRiskExplanation(riskFactors: string[]): string {
   riskFactors.forEach((risk, idx) => {
     explanation += `${idx + 1}. ⚠️ ${risk}\n`;
   });
+
+  return explanation;
+}
+
+function generateNewsExplanation(newsImpact: any): string {
+  if (!newsImpact) return '';
+
+  let explanation = `**IMPACTO DE NOTICIAS**\n\n`;
+
+  const directionLabel = newsImpact.dominantDirection === 'bullish' ? 'alcista' : newsImpact.dominantDirection === 'bearish' ? 'bajista' : 'neutral';
+  const scoreEmoji = newsImpact.overallSentimentScore > 0.3 ? '🟢' : newsImpact.overallSentimentScore < -0.3 ? '🔴' : '🟡';
+
+  explanation += `${scoreEmoji} **Sentimiento General**: ${newsImpact.overallSentimentScore.toFixed(2)} (${directionLabel})\n`;
+  explanation += `📊 **Confianza**: ${newsImpact.confidence}%\n`;
+  explanation += `💥 **Nivel de Impacto**: ${newsImpact.impactLevel.toUpperCase()}\n`;
+  explanation += `📰 **Artículos Analizados**: ${newsImpact.articleCount}\n\n`;
+
+  if (newsImpact.dominantDirection === 'bullish' && newsImpact.impactLevel === 'high') {
+    explanation += `Las noticias recientes refuerzan significativamente la tesis alcista. `;
+    explanation += `El sentimiento positivo general sugiere que los fundamentos respaldan el movimiento.\n`;
+  } else if (newsImpact.dominantDirection === 'bearish' && newsImpact.impactLevel === 'high') {
+    explanation += `Las noticias recientes refuerzan significativamente la tesis bajista. `;
+    explanation += `El sentimiento negativo general sugiere presión fundamental a la baja.\n`;
+  } else if (newsImpact.dominantDirection !== 'neutral') {
+    explanation += `Las noticias proporcionan un sesgo ${directionLabel} adicional al análisis técnico.\n`;
+  } else {
+    explanation += `Las noticias no muestran un sesgo claro. El mercado está digiriendo información mixta.\n`;
+  }
 
   return explanation;
 }

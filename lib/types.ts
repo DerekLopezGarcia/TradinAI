@@ -54,6 +54,9 @@ export interface NewsItem {
   url: string;
   timestamp: number;
   sentiment: Sentiment;
+  sentimentScore?: number;
+  sentimentConfidence?: number;
+  sentimentStrength?: 'strong' | 'moderate' | 'weak';
   relevantAssets: string[];
   imageUrl?: string;
 }

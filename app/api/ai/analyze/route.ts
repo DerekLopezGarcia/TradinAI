@@ -15,7 +15,8 @@ import { analyzeCandles, CandleAnalysisInput } from '@/lib/services/candleAnalys
  *     ...
  *   ],
  *   "analysisDepth": "comprehensive",  // opcional: "basic" | "standard" | "comprehensive"
- *   "tradingStyle": "swing"             // opcional: "scalping" | "day_trading" | "swing" | "position"
+ *   "tradingStyle": "swing",            // opcional: "scalping" | "day_trading" | "swing" | "position"
+ *   "includeNews": true                 // opcional: incluir análisis de noticias
  * }
  */
 export async function POST(request: NextRequest) {
@@ -23,7 +24,7 @@ export async function POST(request: NextRequest) {
   
   try {
     const body = await request.json();
-    const { symbol, timeframe, candles, analysisDepth = 'standard', tradingStyle = 'swing' } = body;
+    const { symbol, timeframe, candles, analysisDepth = 'standard', tradingStyle = 'swing', includeNews = false } = body;
 
     // Validar entrada
     if (!symbol || !timeframe || !Array.isArray(candles) || candles.length === 0) {
@@ -72,13 +73,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Fetch news if requested
+    let relatedNews;
+    if (includeNews) {
+      const { newsService } = await import('@/lib/services/newsService');
+      const isCrypto = symbol.endsWith('USD') || symbol.endsWith('USDT');
+      try {
+        relatedNews = isCrypto
+          ? await newsService.getCryptoNews(symbol, 10)
+          : await newsService.getStockNews(symbol, 7);
+      } catch (e) {
+        console.warn('News fetch failed for analysis:', e);
+        relatedNews = [];
+      }
+    }
+
     // Ejecutar análisis
     const analysisInput: CandleAnalysisInput = {
       symbol,
       timeframe: timeframe as any,
       candles,
       analysisDepth: analysisDepth as any,
-      tradingStyle: tradingStyle as any
+      tradingStyle: tradingStyle as any,
+      relatedNews,
     };
 
     const analysis = await analyzeCandles(analysisInput);

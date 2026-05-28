@@ -16,18 +16,21 @@ interface AutoAnalysisDisplayProps {
   symbol: string;
   timeframe: TimeFrame;
   candleData: CandleData[];
+  includeNews?: boolean;
 }
 
 export function AutoAnalysisDisplay({
   symbol,
   timeframe,
   candleData,
+  includeNews = false,
 }: AutoAnalysisDisplayProps) {
-  const { analysis, explanation, isLoading, error, runAnalysis } = useAutoAnalysis(
+  const { analysis, explanation, isLoading, error, newsImpact, runAnalysis } = useAutoAnalysis(
     symbol,
     timeframe,
     candleData,
-    'comprehensive'
+    'comprehensive',
+    includeNews
   );
 
   const [expandedSections, setExpandedSections] = useState({
@@ -36,6 +39,7 @@ export function AutoAnalysisDisplay({
     indicators: true,
     prediction: true,
     risk: false,
+    news: true,
     summary: true,
   });
 
@@ -47,7 +51,7 @@ export function AutoAnalysisDisplay({
   };
 
   const handleRunAnalysis = async () => {
-    await runAnalysis(symbol, timeframe, candleData, 'comprehensive');
+    await runAnalysis(symbol, timeframe, candleData, 'comprehensive', includeNews);
   };
 
   if (error) {
@@ -350,6 +354,75 @@ export function AutoAnalysisDisplay({
           )}
         </div>
       </CollapsibleSection>
+
+      {/* Impacto de Noticias */}
+      {analysis.newsImpact && (
+        <CollapsibleSection
+          title={`📰 Impacto de Noticias (${analysis.newsImpact.articleCount} artículos)`}
+          isOpen={expandedSections.news}
+          onToggle={() => toggleSection('news')}
+        >
+          <div className="space-y-4">
+            <MarkdownContent content={explanation.newsReason} />
+
+            {/* Score bar */}
+            <div className="mt-3">
+              <p className="text-xs text-muted-foreground mb-2">Sentimiento General</p>
+              <div className="relative h-4 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 rounded-full overflow-hidden">
+                <div
+                  className="absolute top-0 bottom-0 w-0.5 bg-white shadow-lg transition-all duration-500"
+                  style={{
+                    left: `${((analysis.newsImpact.overallSentimentScore + 1) / 2) * 100}%`,
+                  }}
+                />
+              </div>
+              <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                <span>Negativo -1</span>
+                <span>Neutral 0</span>
+                <span>Positivo +1</span>
+              </div>
+            </div>
+
+            {/* Stats grid */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+              <div className="rounded bg-background p-3 border border-border">
+                <p className="text-xs text-muted-foreground font-medium">Dirección</p>
+                <p className={`text-sm font-semibold mt-1 ${
+                  analysis.newsImpact.dominantDirection === 'bullish' ? 'text-green-500' :
+                  analysis.newsImpact.dominantDirection === 'bearish' ? 'text-red-500' : 'text-foreground'
+                }`}>
+                  {analysis.newsImpact.dominantDirection === 'bullish' ? 'Alcista' :
+                   analysis.newsImpact.dominantDirection === 'bearish' ? 'Bajista' : 'Neutral'}
+                </p>
+              </div>
+              <div className="rounded bg-background p-3 border border-border">
+                <p className="text-xs text-muted-foreground font-medium">Confianza</p>
+                <p className="text-sm font-semibold mt-1">{analysis.newsImpact.confidence}%</p>
+              </div>
+              <div className="rounded bg-background p-3 border border-border">
+                <p className="text-xs text-muted-foreground font-medium">Impacto</p>
+                <p className={`text-sm font-semibold mt-1 ${
+                  analysis.newsImpact.impactLevel === 'high' ? 'text-orange-500' :
+                  analysis.newsImpact.impactLevel === 'moderate' ? 'text-yellow-500' : 'text-muted-foreground'
+                }`}>
+                  {analysis.newsImpact.impactLevel === 'high' ? 'Alto' :
+                   analysis.newsImpact.impactLevel === 'moderate' ? 'Moderado' : 'Bajo'}
+                </p>
+              </div>
+              <div className="rounded bg-background p-3 border border-border">
+                <p className="text-xs text-muted-foreground font-medium">Artículos</p>
+                <p className="text-sm font-semibold mt-1">{analysis.newsImpact.articleCount}</p>
+              </div>
+            </div>
+
+            {includeNews && analysis.newsImpact.articleCount === 0 && (
+              <p className="text-xs text-muted-foreground italic mt-2">
+                No hay noticias recientes disponibles para este activo.
+              </p>
+            )}
+          </div>
+        </CollapsibleSection>
+      )}
 
       {/* Análisis Detallado */}
       <div className="rounded-lg border border-border bg-card p-4">

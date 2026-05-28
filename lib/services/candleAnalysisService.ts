@@ -45,7 +45,7 @@
  * OBJETIVO: Reducir falsos positivos de 40% a <25% (precisión >75%)
  */
 
-import { TimeFrame, CandleData } from '@/lib/types';
+import { TimeFrame, CandleData, NewsItem } from '@/lib/types';
 import { 
   calculateSMA,
   calculateEMA, 
@@ -66,6 +66,16 @@ export interface CandleAnalysisInput {
   analysisDepth?: 'basic' | 'standard' | 'comprehensive';
   tradingStyle?: 'scalping' | 'day_trading' | 'swing' | 'position';
   riskTolerance?: 'conservative' | 'moderate' | 'aggressive';
+  relatedNews?: NewsItem[];
+}
+
+export interface NewsImpact {
+  overallSentimentScore: number;
+  confidence: number;
+  dominantDirection: 'bullish' | 'bearish' | 'neutral';
+  impactLevel: 'high' | 'moderate' | 'low';
+  topKeywords: string[];
+  articleCount: number;
 }
 
 export interface CandlePattern {
@@ -136,8 +146,9 @@ export interface CandleAnalysisResponse {
   
   // Información adicional
   riskFactors: string[];
-  shortAnalysis: string; // 2-3 oraciones
-  detailedAnalysis: string; // Análisis completo
+  shortAnalysis: string;
+  detailedAnalysis: string;
+  newsImpact?: NewsImpact;
   warnings: string[];
 }
 
@@ -210,12 +221,46 @@ export class CandleAnalyzer {
   private symbol: string;
   private timeframe: TimeFrame;
   private analysisDepth: 'basic' | 'standard' | 'comprehensive';
+  private relatedNews: NewsItem[];
+  private newsImpact?: NewsImpact;
 
   constructor(input: CandleAnalysisInput) {
     this.candles = input.candles;
     this.symbol = input.symbol;
     this.timeframe = input.timeframe;
     this.analysisDepth = input.analysisDepth || 'standard';
+    this.relatedNews = input.relatedNews || [];
+  }
+
+  private computeNewsImpact(): NewsImpact | undefined {
+    if (this.relatedNews.length === 0) return undefined;
+
+    const withScore = this.relatedNews.filter(n => n.sentimentScore !== undefined);
+    if (withScore.length === 0) return undefined;
+
+    const avgScore = withScore.reduce((sum, n) => sum + (n.sentimentScore || 0), 0) / withScore.length;
+    const avgConfidence = withScore.reduce((sum, n) => sum + (n.sentimentConfidence || 0), 0) / withScore.length;
+    const strongCount = withScore.filter(n => n.sentimentStrength === 'strong').length;
+    const totalCount = this.relatedNews.length;
+
+    let dominantDirection: 'bullish' | 'bearish' | 'neutral';
+    if (avgScore > 0.2) dominantDirection = 'bullish';
+    else if (avgScore < -0.2) dominantDirection = 'bearish';
+    else dominantDirection = 'neutral';
+
+    let impactLevel: 'high' | 'moderate' | 'low';
+    if (totalCount >= 3 && avgConfidence > 60 && Math.abs(avgScore) > 0.3) impactLevel = 'high';
+    else if (totalCount >= 1 && avgConfidence > 30) impactLevel = 'moderate';
+    else impactLevel = 'low';
+
+    return {
+      overallSentimentScore: parseFloat(avgScore.toFixed(4)),
+      confidence: parseFloat(avgConfidence.toFixed(1)),
+      dominantDirection,
+      impactLevel,
+      topKeywords: [],
+      articleCount: totalCount,
+    };
   }
 
   /**
@@ -244,6 +289,9 @@ export class CandleAnalyzer {
     // T1.1 Fase 2: Indicadores en Web Workers, tendencia/patrones/niveles síncronos
     const [trendAnalysis, patterns, indicatorStatus, keyLevels] =
       await this.analyzeInParallel(closes, highs, lows, volumes);
+
+    // Compute news impact if relatedNews provided
+    this.newsImpact = this.computeNewsImpact();
 
     // Predicciones (dependen de análisis previos, así que van después)
     const mainPrediction = this.generatePrediction(
@@ -319,6 +367,7 @@ export class CandleAnalyzer {
       riskFactors,
       shortAnalysis,
       detailedAnalysis,
+      newsImpact: this.newsImpact,
       warnings: [
         'Los análisis técnicos son probabilidades, no certezas',
         'El rendimiento pasado no garantiza resultados futuros',
@@ -1262,6 +1311,12 @@ export class CandleAnalyzer {
     const bullishPatterns = patterns.filter(p => p.type === 'bullish_reversal');
     count += bullishPatterns.length * 1.5;
 
+    // News sentiment adjustment
+    if (this.newsImpact) {
+      if (this.newsImpact.dominantDirection === 'bullish' && this.newsImpact.impactLevel === 'high') count += 2;
+      else if (this.newsImpact.dominantDirection === 'bullish') count += 1;
+    }
+
     return count;
   }
 
@@ -1279,6 +1334,12 @@ export class CandleAnalyzer {
 
     const bearishPatterns = patterns.filter(p => p.type === 'bearish_reversal');
     count += bearishPatterns.length * 1.5;
+
+    // News sentiment adjustment
+    if (this.newsImpact) {
+      if (this.newsImpact.dominantDirection === 'bearish' && this.newsImpact.impactLevel === 'high') count += 2;
+      else if (this.newsImpact.dominantDirection === 'bearish') count += 1;
+    }
 
     return count;
   }
@@ -1356,6 +1417,14 @@ export class CandleAnalyzer {
     analysis += `- Soportes: ${keyLevels.supports.map(s => s.toFixed(2)).join(', ')}\n`;
     analysis += `- Resistencias: ${keyLevels.resistances.map(r => r.toFixed(2)).join(', ')}\n`;
 
+    if (this.newsImpact) {
+      analysis += `\n### Impacto de Noticias\n`;
+      analysis += `- Sentimiento general: ${this.newsImpact.overallSentimentScore.toFixed(2)} (${this.newsImpact.dominantDirection})\n`;
+      analysis += `- Confianza: ${this.newsImpact.confidence}%\n`;
+      analysis += `- Impacto: ${this.newsImpact.impactLevel}\n`;
+      analysis += `- Artículos analizados: ${this.newsImpact.articleCount}\n`;
+    }
+
     return analysis;
   }
 
@@ -1395,6 +1464,19 @@ export class CandleAnalyzer {
     }
     if (patterns.filter(p => p.type === 'bearish_reversal').length > 2) {
       risks.push('Múltiples patrones de reversión bajista - Mayor presión vendedora');
+    }
+
+    // News-based risk factors
+    if (this.newsImpact) {
+      if (this.newsImpact.impactLevel === 'high') {
+        risks.push(`Alto impacto noticioso (${this.newsImpact.articleCount} artículos) - Eventos de mercado significativos en desarrollo`);
+      }
+      if (this.newsImpact.overallSentimentScore < -0.3) {
+        risks.push('Sentimiento de noticias negativo - Presión bajista adicional por factores fundamentales');
+      }
+      if (this.newsImpact.overallSentimentScore > 0.3) {
+        risks.push('Sentimiento de noticias positivo - Respaldo fundamental que puede reforzar tendencia actual');
+      }
     }
 
     return risks;

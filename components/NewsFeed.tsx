@@ -80,13 +80,42 @@ export function NewsFeed({ symbol }: NewsFeedProps) {
                   <ExternalLink className="w-4 h-4 text-muted-foreground flex-shrink-0 opacity-0 group-hover:opacity-100" />
                 </div>
                 <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{item.description}</p>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 mb-1">
                   <span className={`text-[10px] px-2 py-0.5 rounded border ${getSentimentColor(item.sentiment)}`}>
                     {item.sentiment === 'positive' ? '📈' : item.sentiment === 'negative' ? '📉' : '➡️'}
                     {' '}{item.sentiment}
                   </span>
+                  {item.sentimentStrength && (
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                      item.sentimentStrength === 'strong' ? 'bg-blue-500/10 text-blue-600' :
+                      item.sentimentStrength === 'moderate' ? 'bg-yellow-500/10 text-yellow-600' :
+                      'bg-gray-500/10 text-gray-500'
+                    }`}>
+                      {item.sentimentStrength === 'strong' ? 'Fuerte' :
+                       item.sentimentStrength === 'moderate' ? 'Moderado' : 'Débil'}
+                    </span>
+                  )}
                   <span className="text-[10px] text-muted-foreground">{item.source}</span>
                 </div>
+                {(item.sentimentScore !== undefined || item.sentimentConfidence !== undefined) && (
+                  <div className="flex items-center gap-3">
+                    {item.sentimentScore !== undefined && (
+                      <div className="flex-1 max-w-[120px]">
+                        <div className="relative h-1.5 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 rounded-full overflow-hidden">
+                          <div
+                            className="absolute top-0 bottom-0 w-0.5 bg-white shadow-sm transition-all"
+                            style={{ left: `${((item.sentimentScore + 1) / 2) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                    {item.sentimentConfidence !== undefined && (
+                      <span className="text-[10px] text-muted-foreground">
+                        {item.sentimentConfidence}% confianza
+                      </span>
+                    )}
+                  </div>
+                )}
               </a>
             ))}
           </div>
