@@ -9,10 +9,12 @@ import { TrendingUp, TrendingDown, Heart, Sparkles, Loader2 } from 'lucide-react
 import { ThemeToggle } from '@/components/theme-toggle';
 import { NotificationPanel } from '@/components/NotificationPanel';
 import { SettingsPanel } from '@/components/SettingsPanel';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 
 export function Header() {
   const { selectedAsset, setSelectedAsset, assets, toggleFavorite } = useMarketStore();
+  const { t } = useTranslation();
   const [isAssetDropdownOpen, setIsAssetDropdownOpen] = useState(false);
   const [isLoadingPrices, setIsLoadingPrices] = useState(false);
   const [failedAssets, setFailedAssets] = useState<Set<string>>(new Set());
@@ -132,7 +134,7 @@ export function Header() {
               </div>
               <div>
                 <h1 className="text-xl font-bold text-foreground">TradinAI</h1>
-                <p className="text-xs text-muted-foreground">Análisis con IA</p>
+                <p className="text-xs text-muted-foreground">{t('header.subtitle')}</p>
               </div>
             </div>
           </div>
@@ -140,7 +142,7 @@ export function Header() {
           <div className="flex items-center gap-2">
             <Link href="/recommendations" className="px-4 py-2 rounded-lg bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-medium text-sm hover:opacity-90 transition-opacity flex items-center gap-2">
               <Sparkles className="w-4 h-4" />
-              Recomendaciones
+              {t('header.recommendations')}
             </Link>
             <ThemeToggle />
             <NotificationPanel />
@@ -170,7 +172,7 @@ export function Header() {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Buscar activo..."
+                    placeholder={t('header.search')}
                     className="w-full px-3 py-1.5 text-sm bg-muted/50 border border-border rounded-lg focus:outline-none focus:ring-1 focus:ring-primary text-foreground placeholder:text-muted-foreground"
                   />
                 </div>
@@ -178,10 +180,10 @@ export function Header() {
                   {isLoadingPrices ? (
                     <div className="flex items-center justify-center py-6 gap-2 text-muted-foreground text-sm">
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      Cargando precios...
+                      {t('header.loadingPrices')}
                     </div>
                   ) : filteredAssets.length === 0 ? (
-                    <div className="text-center py-6 text-muted-foreground text-sm">Sin resultados</div>
+                    <div className="text-center py-6 text-muted-foreground text-sm">{t('header.noResults')}</div>
                   ) : (
                     <div style={{ height: `${assetVirtualizer.getTotalSize()}px`, position: 'relative' }}>
                       {assetVirtualizer.getVirtualItems().map((virtualItem) => {
@@ -207,7 +209,7 @@ export function Header() {
                             <div className="flex items-center gap-2 shrink-0 ml-2">
                               <div className="text-right">
                                 {isFailed ? (
-                                  <div className="text-xs text-destructive font-medium">No cargó</div>
+                                  <div className="text-xs text-destructive font-medium">{t('header.failed')}</div>
                                 ) : (
                                   <>
                                     <div className="text-sm font-medium text-foreground">${asset.price.toFixed(2)}</div>
@@ -236,11 +238,11 @@ export function Header() {
 
           <div className="flex items-center gap-4">
             <div>
-              <p className="text-xs text-muted-foreground">Precio</p>
+              <p className="text-xs text-muted-foreground">{t('common.price')}</p>
               <p className="text-2xl font-bold text-foreground">${displayAsset?.price?.toFixed(2) ?? '0.00'}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Cambio</p>
+              <p className="text-xs text-muted-foreground">{t('common.change')}</p>
               <p className={`text-lg font-bold flex items-center gap-1 ${isPositive ? 'price-up' : 'price-down'}`}>
                 {isPositive ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
                 {isPositive ? '+' : ''}{displayAsset?.change?.toFixed(2) ?? '0.00'}

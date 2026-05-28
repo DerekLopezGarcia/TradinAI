@@ -65,7 +65,7 @@ class NewsService {
       return Array.isArray(data)
         ? data.map((item: any) => ({
             id: item.id?.toString() || Math.random().toString(),
-            title: item.headline || 'Sin título',
+            title: item.headline || 'news.untitled',
             description: item.summary || '',
             source: item.source || 'Finnhub',
             url: item.url || '',

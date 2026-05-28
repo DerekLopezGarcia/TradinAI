@@ -7,6 +7,7 @@
 import React from 'react';
 import { IntradayPrediction } from '@/lib/services/intradayPredictionService';
 import { TrendingUp, TrendingDown, AlertCircle } from 'lucide-react';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 interface IntradayPredictionDisplayProps {
   prediction: IntradayPrediction | null;
@@ -19,6 +20,8 @@ export function IntradayPredictionDisplay({
   loading,
   error
 }: IntradayPredictionDisplayProps) {
+  const { t } = useTranslation();
+
   if (loading) {
     return (
       <div className="p-4 bg-slate-50 dark:bg-slate-900/50 rounded-lg">
@@ -107,7 +110,7 @@ export function IntradayPredictionDisplay({
           <div className="bg-white/50 dark:bg-slate-800/50 p-2 rounded">
             <p className="text-xs text-slate-600 dark:text-slate-400">Momentum</p>
             <p className="text-xs font-medium text-slate-900 dark:text-white capitalize">
-              {prediction.factors.momentum.replace(/_/g, ' ')}
+              {t(`intraday.factor.${prediction.factors.momentum}`)}
             </p>
           </div>
 
@@ -115,7 +118,7 @@ export function IntradayPredictionDisplay({
           <div className="bg-white/50 dark:bg-slate-800/50 p-2 rounded">
             <p className="text-xs text-slate-600 dark:text-slate-400">Trend</p>
             <p className="text-xs font-medium text-slate-900 dark:text-white capitalize">
-              {prediction.factors.trend.replace(/_/g, ' ')}
+              {t(`intraday.factor.${prediction.factors.trend}`)}
             </p>
           </div>
 
@@ -123,7 +126,7 @@ export function IntradayPredictionDisplay({
           <div className="bg-white/50 dark:bg-slate-800/50 p-2 rounded">
             <p className="text-xs text-slate-600 dark:text-slate-400">Volatility</p>
             <p className="text-xs font-medium text-slate-900 dark:text-white capitalize">
-              {prediction.factors.volatility.replace(/_/g, ' ')}
+              {t(`intraday.factor.${prediction.factors.volatility}`)}
             </p>
           </div>
 
@@ -162,7 +165,7 @@ export function IntradayPredictionDisplay({
 
         {/* Market Time Context */}
         <div className="text-xs text-slate-500 dark:text-slate-400 italic">
-          {prediction.factors.timeOfDay}
+          {t(prediction.factors.timeOfDay)}
         </div>
       </div>
     </div>

@@ -30,7 +30,7 @@ const registry = new Map<string, WidgetRegistration>();
 
 export function registerWidget(def: WidgetRegistration): void {
   if (registry.has(def.id)) {
-    console.warn(`Widget "${def.id}" ya está registrado. Se sobrescribe.`);
+    console.warn(`Widget "${def.id}" already registered. Overwriting.`);
   }
   registry.set(def.id, def);
 }

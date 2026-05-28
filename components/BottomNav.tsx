@@ -3,15 +3,17 @@
 import { LayoutDashboard, Sparkles, Settings } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-
-const NAV_ITEMS = [
-  { href: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { href: '/recommendations', icon: Sparkles, label: 'Recomendaciones' },
-  { href: '/settings', icon: Settings, label: 'Ajustes' },
-];
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 export function BottomNav() {
+  const { t } = useTranslation();
   const pathname = usePathname();
+
+  const NAV_ITEMS = [
+    { href: '/', icon: LayoutDashboard, label: t('nav.dashboard') },
+    { href: '/recommendations', icon: Sparkles, label: t('nav.recommendations') },
+    { href: '/settings', icon: Settings, label: t('nav.settings') },
+  ];
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border lg:hidden">

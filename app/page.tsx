@@ -10,9 +10,11 @@ import { WidgetsPanel } from '@/components/WidgetsPanel';
 import { DashboardGrid } from '@/components/DashboardGrid';
 import { X, Zap } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 export default function Home() {
   const { selectedAsset, selectedTimeframe, updateAssetPrice } = useMarketStore();
+  const { t } = useTranslation();
   const { editMode } = useWidgetStore();
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -53,7 +55,7 @@ export default function Home() {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-6" />
-          <p className="text-primary text-lg font-semibold">Inicializando...</p>
+          <p className="text-primary text-lg font-semibold">{t('page.initializing')}</p>
         </div>
       </div>
     );
@@ -92,7 +94,7 @@ export default function Home() {
             <div className="flex items-center gap-3">
               <Zap className="w-5 h-5 text-destructive" />
               <div>
-                <p className="font-semibold text-destructive">Error</p>
+                <p className="font-semibold text-destructive">{t('page.error')}</p>
                 <p className="text-sm text-destructive/80">{error}</p>
               </div>
             </div>
@@ -104,7 +106,7 @@ export default function Home() {
 
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-foreground">Dashboard</h2>
+            <h2 className="text-2xl font-bold text-foreground">{t('page.dashboard')}</h2>
             <p className="text-sm text-muted-foreground">
               {selectedAsset.symbol} · ${selectedAsset.price.toFixed(2)}&nbsp;
               <span className={selectedAsset.changePercent >= 0 ? 'price-up' : 'price-down'}>

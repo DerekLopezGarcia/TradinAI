@@ -49,21 +49,21 @@ export const MARKET_HOURS: Record<string, MarketHours> = {
   'VIX': { name: 'VIX', type: 'index', timezone: 'NYSE', openTime: { hour: 13, minute: 30 }, closeTime: { hour: 20, minute: 0 }, isOpen24: false },
 
   // Forex - Abiertas casi 24/7 (con cierre el fin de semana)
-  'EURUSD': { name: 'Euro/Dólar', type: 'forex', timezone: 'UTC', openTime: { hour: 0, minute: 0 }, closeTime: { hour: 24, minute: 0 }, isOpen24: true },
-  'GBPUSD': { name: 'Libra/Dólar', type: 'forex', timezone: 'UTC', openTime: { hour: 0, minute: 0 }, closeTime: { hour: 24, minute: 0 }, isOpen24: true },
-  'JPYUSD': { name: 'Yen/Dólar', type: 'forex', timezone: 'UTC', openTime: { hour: 0, minute: 0 }, closeTime: { hour: 24, minute: 0 }, isOpen24: true },
-  'CHFUSD': { name: 'Franco/Dólar', type: 'forex', timezone: 'UTC', openTime: { hour: 0, minute: 0 }, closeTime: { hour: 24, minute: 0 }, isOpen24: true },
-  'AUDUSD': { name: 'Dólar Australiano/USD', type: 'forex', timezone: 'UTC', openTime: { hour: 0, minute: 0 }, closeTime: { hour: 24, minute: 0 }, isOpen24: true },
-  'CADMXN': { name: 'Dólar Canadiense/Peso', type: 'forex', timezone: 'UTC', openTime: { hour: 0, minute: 0 }, closeTime: { hour: 24, minute: 0 }, isOpen24: true },
+  'EURUSD': { name: 'Euro/Dollar', type: 'forex', timezone: 'UTC', openTime: { hour: 0, minute: 0 }, closeTime: { hour: 24, minute: 0 }, isOpen24: true },
+  'GBPUSD': { name: 'Pound/Dollar', type: 'forex', timezone: 'UTC', openTime: { hour: 0, minute: 0 }, closeTime: { hour: 24, minute: 0 }, isOpen24: true },
+  'JPYUSD': { name: 'Yen/Dollar', type: 'forex', timezone: 'UTC', openTime: { hour: 0, minute: 0 }, closeTime: { hour: 24, minute: 0 }, isOpen24: true },
+  'CHFUSD': { name: 'Franc/Dollar', type: 'forex', timezone: 'UTC', openTime: { hour: 0, minute: 0 }, closeTime: { hour: 24, minute: 0 }, isOpen24: true },
+  'AUDUSD': { name: 'Australian Dollar/USD', type: 'forex', timezone: 'UTC', openTime: { hour: 0, minute: 0 }, closeTime: { hour: 24, minute: 0 }, isOpen24: true },
+  'CADMXN': { name: 'Canadian Dollar/Peso', type: 'forex', timezone: 'UTC', openTime: { hour: 0, minute: 0 }, closeTime: { hour: 24, minute: 0 }, isOpen24: true },
 
   // Materias Primas (horarios de NYSE extendido)
-  'XAUUSD': { name: 'Oro', type: 'commodity', timezone: 'NYSE', openTime: { hour: 13, minute: 30 }, closeTime: { hour: 20, minute: 0 }, isOpen24: false },
-  'XAGUSD': { name: 'Plata', type: 'commodity', timezone: 'NYSE', openTime: { hour: 13, minute: 30 }, closeTime: { hour: 20, minute: 0 }, isOpen24: false },
-  'XPTUSD': { name: 'Platino', type: 'commodity', timezone: 'NYSE', openTime: { hour: 13, minute: 30 }, closeTime: { hour: 20, minute: 0 }, isOpen24: false },
-  'XPDUSD': { name: 'Paladio', type: 'commodity', timezone: 'NYSE', openTime: { hour: 13, minute: 30 }, closeTime: { hour: 20, minute: 0 }, isOpen24: false },
-  'COPPER': { name: 'Cobre', type: 'commodity', timezone: 'NYSE', openTime: { hour: 13, minute: 30 }, closeTime: { hour: 20, minute: 0 }, isOpen24: false },
-  'CRUDE': { name: 'Petróleo', type: 'commodity', timezone: 'NYSE', openTime: { hour: 13, minute: 30 }, closeTime: { hour: 20, minute: 0 }, isOpen24: false },
-  'NATGAS': { name: 'Gas Natural', type: 'commodity', timezone: 'NYSE', openTime: { hour: 13, minute: 30 }, closeTime: { hour: 20, minute: 0 }, isOpen24: false },
+  'XAUUSD': { name: 'Gold', type: 'commodity', timezone: 'NYSE', openTime: { hour: 13, minute: 30 }, closeTime: { hour: 20, minute: 0 }, isOpen24: false },
+  'XAGUSD': { name: 'Silver', type: 'commodity', timezone: 'NYSE', openTime: { hour: 13, minute: 30 }, closeTime: { hour: 20, minute: 0 }, isOpen24: false },
+  'XPTUSD': { name: 'Platinum', type: 'commodity', timezone: 'NYSE', openTime: { hour: 13, minute: 30 }, closeTime: { hour: 20, minute: 0 }, isOpen24: false },
+  'XPDUSD': { name: 'Palladium', type: 'commodity', timezone: 'NYSE', openTime: { hour: 13, minute: 30 }, closeTime: { hour: 20, minute: 0 }, isOpen24: false },
+  'COPPER': { name: 'Copper', type: 'commodity', timezone: 'NYSE', openTime: { hour: 13, minute: 30 }, closeTime: { hour: 20, minute: 0 }, isOpen24: false },
+  'CRUDE': { name: 'Crude Oil', type: 'commodity', timezone: 'NYSE', openTime: { hour: 13, minute: 30 }, closeTime: { hour: 20, minute: 0 }, isOpen24: false },
+  'NATGAS': { name: 'Natural Gas', type: 'commodity', timezone: 'NYSE', openTime: { hour: 13, minute: 30 }, closeTime: { hour: 20, minute: 0 }, isOpen24: false },
 };
 
 class MarketHoursService {

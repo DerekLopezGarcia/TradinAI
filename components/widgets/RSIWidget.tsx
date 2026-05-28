@@ -6,8 +6,10 @@ import { useMarketData } from '@/app/hooks/useMarketData';
 import { calculateRSI } from '@/lib/indicators';
 import { useTheme } from 'next-themes';
 import type { WidgetProps } from '@/lib/widgetRegistry';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 export function RSIWidget({ symbol, timeframe }: WidgetProps) {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const { data, loading, error } = useMarketData(symbol, timeframe);
   const { resolvedTheme } = useTheme();
@@ -81,9 +83,9 @@ export function RSIWidget({ symbol, timeframe }: WidgetProps) {
     : '#8b5cf6';
 
   const rsiLabel = currentRsi === null ? ''
-    : currentRsi >= 70 ? 'Sobrecompra'
-    : currentRsi <= 30 ? 'Sobreventa'
-    : 'Normal';
+    : currentRsi >= 70 ? t('rsi.overbought')
+    : currentRsi <= 30 ? t('rsi.oversold')
+    : t('rsi.normal');
 
   if (loading) {
     return (
@@ -104,7 +106,7 @@ export function RSIWidget({ symbol, timeframe }: WidgetProps) {
   if (rsiData.length === 0) {
     return (
       <div className="h-full flex items-center justify-center">
-        <p className="text-muted-foreground text-xs">Sin datos suficientes para RSI</p>
+        <p className="text-muted-foreground text-xs">{t('rsi.noData')}</p>
       </div>
     );
   }

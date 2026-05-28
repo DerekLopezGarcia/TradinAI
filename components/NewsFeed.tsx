@@ -4,12 +4,14 @@ import { useState, useEffect, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { NewsItem } from '@/lib/types';
 import { Zap, ExternalLink } from 'lucide-react';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 interface NewsFeedProps {
   symbol?: string;
 }
 
 export function NewsFeed({ symbol }: NewsFeedProps) {
+  const { t } = useTranslation();
   const [news, setNews] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -61,8 +63,8 @@ export function NewsFeed({ symbol }: NewsFeedProps) {
   return (
     <div className="flex flex-col h-full">
       <div className="px-4 py-3 border-b border-border">
-        <h3 className="font-semibold text-sm">Noticias</h3>
-        <p className="text-xs text-muted-foreground">{symbol ? `Sobre ${symbol}` : 'Mercados'}</p>
+        <h3 className="font-semibold text-sm">{t('news.title')}</h3>
+        <p className="text-xs text-muted-foreground">{symbol ? t('news.about', { symbol }) : t('news.markets')}</p>
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto max-h-[300px]">
@@ -71,7 +73,7 @@ export function NewsFeed({ symbol }: NewsFeedProps) {
             <Zap className="w-5 h-5 animate-pulse text-muted-foreground" />
           </div>
         ) : news.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground text-sm">Sin noticias</div>
+          <div className="text-center py-8 text-muted-foreground text-sm">{t('news.noNews')}</div>
         ) : (
           <div className="relative" style={{ height: `${rowVirtualizer.getTotalSize()}px` }}>
             {rowVirtualizer.getVirtualItems().map((virtualItem) => {
@@ -87,7 +89,7 @@ export function NewsFeed({ symbol }: NewsFeedProps) {
                 >
                 <div className="flex items-start justify-between gap-2 mb-1">
                   <h4 className="text-sm font-medium line-clamp-2 group-hover:text-primary transition-colors">
-                    {item.title}
+                    {t(item.title)}
                   </h4>
                   <ExternalLink className="w-4 h-4 text-muted-foreground flex-shrink-0 opacity-0 group-hover:opacity-100" />
                 </div>
@@ -103,8 +105,8 @@ export function NewsFeed({ symbol }: NewsFeedProps) {
                       item.sentimentStrength === 'moderate' ? 'bg-yellow-500/10 text-yellow-600' :
                       'bg-gray-500/10 text-gray-500'
                     }`}>
-                      {item.sentimentStrength === 'strong' ? 'Fuerte' :
-                       item.sentimentStrength === 'moderate' ? 'Moderado' : 'Débil'}
+                      {item.sentimentStrength === 'strong' ? t('news.strong') :
+                       item.sentimentStrength === 'moderate' ? t('news.moderate') : t('news.weak')}
                     </span>
                   )}
                   <span className="text-[10px] text-muted-foreground">{item.source}</span>
@@ -123,7 +125,7 @@ export function NewsFeed({ symbol }: NewsFeedProps) {
                     )}
                     {item.sentimentConfidence !== undefined && (
                       <span className="text-[10px] text-muted-foreground">
-                        {item.sentimentConfidence}% confianza
+                        {t('news.confidence', { confidence: item.sentimentConfidence })}
                       </span>
                     )}
                   </div>

@@ -13,14 +13,18 @@
 import { useState, useCallback, useEffect } from 'react';
 import { CandleData, TimeFrame } from '@/lib/types';
 import {
-  analyzeCandles,
   CandleAnalysisResponse,
+  CandleAnalyzer,
+  CandleAnalysisInput,
   CandlePattern,
-  TrendAnalysis,
   IndicatorStatus,
+  KeyLevels,
   Prediction,
+  TrendAnalysis,
   NewsImpact,
+  analyzeCandles,
 } from '@/lib/services/candleAnalysisService';
+import { t } from '@/lib/i18n/t';
 
 export interface AnalysisExplanation {
   analysis: CandleAnalysisResponse | null;
@@ -55,7 +59,7 @@ export function useAutoAnalysis(
   const [newsImpact, setNewsImpact] = useState<NewsImpact | null>(null);
   const [hasRun, setHasRun] = useState(false);
 
-  // Ejecutar análisis automáticamente cuando haya datos suficientes
+  // Run analysis automatically when enough data is available
   useEffect(() => {
     if (autoRun && candleData.length >= 20 && !hasRun && !analysis) {
       runAnalysis(symbol, timeframe, candleData, analysisDepth, includeNews);
@@ -122,8 +126,8 @@ export function useAutoAnalysis(
         summary
       });
     } catch (err) {
-      console.error('Error generando explicación:', err);
-      setError('Error generando explicación del análisis');
+      console.error('Error generating explanation:', err);
+      setError('Error generating analysis explanation');
     }
   }, []);
 
@@ -136,7 +140,7 @@ export function useAutoAnalysis(
     newsEnabled: boolean = false
   ) => {
     if (!data || data.length < 20) {
-      setError('Se requieren al menos 20 velas para análisis');
+      setError('At least 20 candles are required for analysis');
       return;
     }
 
@@ -171,7 +175,7 @@ export function useAutoAnalysis(
       setNewsImpact(result.newsImpact || null);
       generateExplanation(result);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error en análisis');
+      setError(err instanceof Error ? err.message : 'Analysis error');
       setAnalysis(null);
       setNewsImpact(null);
     } finally {
@@ -189,199 +193,197 @@ export function useAutoAnalysis(
   };
 }
 
-// ==================== Funciones de Generación de Explicaciones ====================
+// ==================== Explanation Generation Functions ====================
+
+function translateDirection(dir: string): string {
+  const m: Record<string, string> = {
+    alcista: 'Bullish', bajista: 'Bearish', lateral: 'Lateral',
+    bullish: 'Bullish', bearish: 'Bearish',
+    arriba: 'above', abajo: 'below',
+  };
+  return m[dir] ?? dir;
+}
 
 function generateTrendExplanation(trendAnalysis: TrendAnalysis, trend: string): string {
   const { direction, structure, strength, adx, sma, ema } = trendAnalysis;
+  const trendDisplay = translateDirection(trend);
+  let explanation = t('explain.trendHeader', { trend: trendDisplay.toUpperCase() }) + '\n\n';
+  explanation += t('explain.marketStructure', { structure }) + '\n\n';
 
-  let explanation = `**ANÁLISIS DE TENDENCIA (${trend.toUpperCase()})**\n\n`;
-
-  explanation += `📊 **Estructura del Mercado**: ${structure}\n\n`;
-
-  explanation += `La estructura mostrada indica un mercado `;
   if (trend === 'alcista') {
-    explanation += `**alcista fuerte** donde los máximos y mínimos van subiendo secuencialmente. `;
-    explanation += `Esto significa que los compradores mantienen el control y están empujando el precio hacia arriba.\n\n`;
+    explanation += t('explain.trendDescBullish') + '\n\n';
   } else if (trend === 'bajista') {
-    explanation += `**bajista fuerte** donde los máximos y mínimos van bajando secuencialmente. `;
-    explanation += `Esto indica que los vendedores tienen control y están presionando el precio hacia abajo.\n\n`;
+    explanation += t('explain.trendDescBearish') + '\n\n';
   } else {
-    explanation += `**lateral o sin tendencia clara**. El mercado está indeciso entre compradores y vendedores.\n\n`;
+    explanation += t('explain.trendDescLateral') + '\n\n';
   }
 
-  explanation += `💪 **Fuerza de la Tendencia**: ${strength}/100\n`;
+  explanation += t('explain.trendStrength', { strength }) + '\n';
   if (strength > 75) {
-    explanation += `Una fuerza muy alta (${strength}%) indica una tendencia **muy sólida** que probablemente continuará. `;
+    explanation += t('explain.trendStrengthHigh', { strength }) + '\n\n';
   } else if (strength > 50) {
-    explanation += `Una fuerza moderada (${strength}%) sugiere una tendencia **establecida pero no extrema**. `;
+    explanation += t('explain.trendStrengthModerate', { strength }) + '\n\n';
   } else {
-    explanation += `Una fuerza baja (${strength}%) indica una tendencia **débil** que podría cambiar pronto. `;
+    explanation += t('explain.trendStrengthLow', { strength }) + '\n\n';
   }
-  explanation += `\n\n`;
 
-  explanation += `📈 **ADX (Fuerza Direccional)**: ${adx.toFixed(2)}\n`;
+  explanation += t('explain.trendAdx', { adx: adx.toFixed(2) }) + '\n';
   if (adx > 25) {
-    explanation += `ADX > 25 confirma que hay una **tendencia fuerte y confiable**. Los movimientos del precio son más predecibles.\n\n`;
+    explanation += t('explain.trendAdxStrong') + '\n\n';
   } else if (adx > 20) {
-    explanation += `ADX entre 20-25 sugiere una **tendencia moderada** que está estableciéndose.\n\n`;
+    explanation += t('explain.trendAdxModerate') + '\n\n';
   } else {
-    explanation += `ADX < 20 indica un **mercado lateral** sin tendencia definida. Es un período de consolidación.\n\n`;
+    explanation += t('explain.trendAdxWeak') + '\n\n';
   }
 
-  explanation += `🎯 **Medias Móviles**:\n`;
+  explanation += t('explain.trendMA') + '\n';
   sma.forEach((m: { period: number; price: number; direction: string }) => {
-    const relation = m.direction === 'arriba' ? '📈 por encima' : '📉 por debajo';
-    explanation += `- SMA ${m.period}: Precio ${relation} (${m.price.toFixed(2)})\n`;
+    const relation = t(m.direction === 'arriba' ? 'explain.trendSmaAbove' : 'explain.trendSmaBelow');
+    explanation += t('explain.trendSmaLine', { period: m.period, relation, price: m.price.toFixed(2) }) + '\n';
   });
 
   return explanation;
 }
 
 function generatePatternsExplanation(patterns: CandlePattern[]): string {
-  let explanation = `**PATRONES DE VELAS IDENTIFICADOS**\n\n`;
+  let explanation = t('explain.patternsHeader') + '\n\n';
 
   if (patterns.length === 0) {
-    explanation += `No se identificaron patrones significativos en el período analizado.\n`;
-    explanation += `El mercado podría estar en fase de consolidación.\n`;
+    explanation += t('explain.patternsEmpty') + '\n';
     return explanation;
   }
 
   patterns.slice(0, 5).forEach((pattern, idx) => {
-    explanation += `${idx + 1}. **${pattern.name.toUpperCase()}** (${pattern.type.replace('_', ' ')})\n`;
-    explanation += `   - ${pattern.description}\n`;
-    explanation += `   - Confiabilidad: ${pattern.reliability}%\n`;
+    const type = pattern.type.replace('_', ' ');
+    explanation += `${idx + 1}. **${pattern.name.toUpperCase()}** (${type})\n`;
+    explanation += `   - ${t(pattern.description)}\n`;
+    explanation += `   - ${t('analysis.confidence')}: ${pattern.reliability}%\n`;
 
     if (pattern.type === 'bullish_reversal') {
-      explanation += `   - 🔼 Señal: Potencial **cambio a alcista** o continuación del alza\n`;
+      explanation += `   - ${t('explain.patternSignalBullish')}\n`;
     } else if (pattern.type === 'bearish_reversal') {
-      explanation += `   - 🔽 Señal: Potencial **cambio a bajista** o continuación de la baja\n`;
+      explanation += `   - ${t('explain.patternSignalBearish')}\n`;
     } else if (pattern.type === 'continuation') {
-      explanation += `   - ➡️ Señal: Probable **continuación** de la tendencia actual\n`;
+      explanation += `   - ${t('explain.patternSignalContinue')}\n`;
     } else {
-      explanation += `   - ❓ Señal: Indica **indecisión** del mercado\n`;
+      explanation += `   - ${t('explain.patternSignalIndecision')}\n`;
     }
 
-    explanation += `\n`;
+    explanation += '\n';
   });
 
   return explanation;
 }
 
 function generateIndicatorsExplanation(indicators: IndicatorStatus): string {
-  let explanation = `**ANÁLISIS DE INDICADORES TÉCNICOS**\n\n`;
+  let explanation = t('explain.indicatorsHeader') + '\n\n';
 
-  // RSI
-  explanation += `📊 **RSI (Índice de Fuerza Relativa)**\n`;
-  explanation += `Valor: ${indicators.rsi.value.toFixed(2)}\n`;
+  explanation += t('explain.indicatorsRsi') + '\n';
+  explanation += t('explain.indicatorsRsiValue', { value: indicators.rsi.value.toFixed(2) }) + '\n';
   if (indicators.rsi.status === 'overbought') {
-    explanation += `⚠️ **SOBRECOMPRA**: RSI > 70 indica que el activo está sobrevaluado. `;
-    explanation += `Los compradores han sido muy agresivos y es probable una corrección a la baja.\n`;
+    explanation += t('explain.indicatorsRsiOverbought') + '\n';
   } else if (indicators.rsi.status === 'oversold') {
-    explanation += `✅ **SOBREVENTA**: RSI < 30 indica que el activo está subvaluado. `;
-    explanation += `Los vendedores han sido muy agresivos y es probable un rebote al alza.\n`;
+    explanation += t('explain.indicatorsRsiOversold') + '\n';
   } else {
-    explanation += `⚖️ **NEUTRAL**: RSI en zona normal (30-70) indica equilibrio entre compradores y vendedores.\n`;
+    explanation += t('explain.indicatorsRsiNeutral') + '\n';
   }
-  explanation += `\n`;
+  explanation += '\n';
 
-  // MACD
-  explanation += `📈 **MACD (Convergencia-Divergencia de Medias Móviles)**\n`;
-  explanation += `Valor: ${indicators.macd.value.toFixed(4)} | Signal: ${indicators.macd.signal.toFixed(4)} | Histogram: ${indicators.macd.histogram.toFixed(4)}\n`;
+  explanation += t('explain.indicatorsMacd') + '\n';
+  explanation += t('explain.indicatorsMacdValue', {
+    value: indicators.macd.value.toFixed(4),
+    signal: indicators.macd.signal.toFixed(4),
+    histogram: indicators.macd.histogram.toFixed(4),
+  }) + '\n';
   if (indicators.macd.status === 'bullish') {
-    explanation += `🟢 **BULLISH**: MACD está por encima de su línea de señal. Esto indica **momentum alcista**. `;
-    explanation += `Es una señal de compra cuando ocurre.\n`;
+    explanation += t('explain.indicatorsMacdBullish') + '\n';
   } else {
-    explanation += `🔴 **BEARISH**: MACD está por debajo de su línea de señal. Esto indica **momentum bajista**. `;
-    explanation += `Es una señal de venta cuando ocurre.\n`;
+    explanation += t('explain.indicatorsMacdBearish') + '\n';
   }
-  explanation += `\n`;
+  explanation += '\n';
 
-  // Bollinger Bands
-  explanation += `📊 **Bollinger Bands (Bandas de Volatilidad)**\n`;
-  explanation += `Banda Superior: ${indicators.bollingerBands.upper.toFixed(2)}\n`;
-  explanation += `Banda Media: ${indicators.bollingerBands.middle.toFixed(2)}\n`;
-  explanation += `Banda Inferior: ${indicators.bollingerBands.lower.toFixed(2)}\n`;
-  explanation += `Posición: ${indicators.bollingerBands.position}\n`;
-
+  explanation += t('explain.indicatorsBollinger') + '\n';
+  explanation += t('explain.indicatorsBollingerValue', {
+    upper: indicators.bollingerBands.upper.toFixed(2),
+    middle: indicators.bollingerBands.middle.toFixed(2),
+    lower: indicators.bollingerBands.lower.toFixed(2),
+    position: indicators.bollingerBands.position,
+  }) + '\n';
   if (indicators.bollingerBands.position === 'above_upper') {
-    explanation += `📍 El precio está **por encima de la banda superior**, lo que indica **sobrecompra extrema**. `;
-    explanation += `Es probable una corrección o consolidación.\n`;
+    explanation += t('explain.indicatorsBollingerAbove') + '\n';
   } else if (indicators.bollingerBands.position === 'below_lower') {
-    explanation += `📍 El precio está **por debajo de la banda inferior**, lo que indica **sobreventa extrema**. `;
-    explanation += `Es probable un rebote hacia arriba.\n`;
+    explanation += t('explain.indicatorsBollingerBelow') + '\n';
   } else {
-    explanation += `📍 El precio está **dentro de las bandas**, lo que indica un **rango normal de volatilidad**.\n`;
+    explanation += t('explain.indicatorsBollingerInside') + '\n';
   }
-  explanation += `\n`;
+  explanation += '\n';
 
-  // Stochastic
-  explanation += `🔄 **Stochastic (Oscilador Estocástico)**\n`;
-  explanation += `%K: ${indicators.stochastic.k.toFixed(2)} | %D: ${indicators.stochastic.d.toFixed(2)}\n`;
-  explanation += `Estado: ${indicators.stochastic.status}\n`;
+  explanation += t('explain.indicatorsStochastic') + '\n';
+  explanation += t('explain.indicatorsStochasticValue', {
+    k: indicators.stochastic.k.toFixed(2),
+    d: indicators.stochastic.d.toFixed(2),
+    status: indicators.stochastic.status,
+  }) + '\n';
   if (indicators.stochastic.status === 'overbought') {
-    explanation += `El Stochastic está en zona de sobrecompra (>80). Anticipa correcciones bajistas.\n`;
+    explanation += t('explain.indicatorsStochasticOverbought') + '\n';
   } else if (indicators.stochastic.status === 'oversold') {
-    explanation += `El Stochastic está en zona de sobreventa (<20). Anticipa rebotes alcistas.\n`;
+    explanation += t('explain.indicatorsStochasticOversold') + '\n';
   } else {
-    explanation += `El Stochastic está en zona neutral, sin señales extremas.\n`;
+    explanation += t('explain.indicatorsStochasticNeutral') + '\n';
   }
-  explanation += `\n`;
+  explanation += '\n';
 
-  // ATR
-  explanation += `📏 **ATR (Rango Promedio Real)**\n`;
-  explanation += `Volatilidad: ${indicators.atr.toFixed(4)}\n`;
-  explanation += `Un ATR alto indica **volatilidad elevada** (movimientos grandes). `;
-  explanation += `Un ATR bajo indica **volatilidad baja** (movimientos pequeños).\n`;
+  explanation += t('explain.indicatorsAtr') + '\n';
+  explanation += t('explain.indicatorsAtrValue', { atr: indicators.atr.toFixed(4) }) + '\n';
+  explanation += t('explain.indicatorsAtrHigh') + ' ';
+  explanation += t('explain.indicatorsAtrLow') + '\n';
 
   return explanation;
 }
 
 function generatePredictionExplanation(prediction: Prediction): string {
-  let explanation = `**PREDICCIÓN Y OBJETIVOS**\n\n`;
+  const dirDisplay = translateDirection(prediction.direction);
+  const rw = prediction.riskReward.toFixed(2);
 
-  explanation += `🎯 **Dirección Predicha**: ${prediction.direction.toUpperCase()}\n`;
-  explanation += `📊 **Probabilidad**: ${prediction.probability}%\n`;
-  explanation += `💪 **Nivel de Confianza**: ${prediction.confidenceLevel.toUpperCase()}\n\n`;
+  let explanation = t('explain.predictionHeader') + '\n\n';
+  explanation += t('explain.predictionDirection', { direction: dirDisplay }) + '\n';
+  explanation += t('explain.predictionProbability', { probability: prediction.probability }) + '\n';
+  explanation += t('explain.predictionConfidence', { confidence: prediction.confidenceLevel.toUpperCase() }) + '\n\n';
+  explanation += t('explain.predictionAnalysis', { direction: dirDisplay, probability: prediction.probability }) + '\n\n';
 
-  explanation += `Basado en todos los análisis anteriores (tendencia, patrones, indicadores), `;
-  explanation += `el sistema predice un movimiento **${prediction.direction}** con un ${prediction.probability}% de probabilidad.\n\n`;
-
-  explanation += `🎯 **Objetivos de Precio**:\n`;
+  explanation += t('explain.predictionTargets') + '\n';
   prediction.targetPrice.forEach((target: number, idx: number) => {
-    explanation += `${idx + 1}. Objetivo: ${target.toFixed(2)} (Ganancia potencial)\n`;
+    explanation += t('explain.predictionTarget', { idx: idx + 1, target: target.toFixed(2) }) + '\n';
   });
 
-  explanation += `\n🛑 **Stop Loss**: ${prediction.stopLoss.toFixed(2)}\n`;
-  explanation += `Si el precio cae por debajo de este nivel, la predicción se anula.\n\n`;
+  explanation += '\n' + t('explain.predictionStopLoss', { value: prediction.stopLoss.toFixed(2) }) + '\n';
+  explanation += t('explain.predictionStopLossNote') + '\n\n';
 
-  explanation += `📈 **Relación Riesgo/Beneficio**: ${prediction.riskReward.toFixed(2)}\n`;
+  explanation += t('explain.predictionRR', { value: rw }) + '\n';
   if (prediction.riskReward > 2) {
-    explanation += `Una relación R/R de ${prediction.riskReward.toFixed(2)} es **excelente**. `;
-    explanation += `Por cada unidad de riesgo, ganamos ${prediction.riskReward.toFixed(2)} unidades.\n`;
+    explanation += t('explain.predictionRRExcellent', { value: rw }) + '\n';
   } else if (prediction.riskReward > 1) {
-    explanation += `Una relación R/R de ${prediction.riskReward.toFixed(2)} es **buena**. `;
-    explanation += `El riesgo/beneficio es favorable.\n`;
+    explanation += t('explain.predictionRRGood', { value: rw }) + '\n';
   } else {
-    explanation += `Una relación R/R de ${prediction.riskReward.toFixed(2)} es **pobre**. `;
-    explanation += `El riesgo es mayor que el beneficio potencial.\n`;
+    explanation += t('explain.predictionRRPoor', { value: rw }) + '\n';
   }
 
-  explanation += `\n⏱️ **Horizonte Temporal**: ${prediction.timeHorizon}\n`;
-  explanation += `Se espera que este análisis sea válido por el período mencionado.\n`;
+  explanation += '\n' + t('explain.predictionHorizon', { horizon: prediction.timeHorizon }) + '\n';
+  explanation += t('explain.predictionHorizonNote') + '\n';
 
   return explanation;
 }
 
 function generateRiskExplanation(riskFactors: string[]): string {
-  let explanation = `**FACTORES DE RIESGO Y ADVERTENCIAS**\n\n`;
+  let explanation = t('explain.riskHeader') + '\n\n';
 
   if (riskFactors.length === 0) {
-    explanation += `No se identificaron factores de riesgo mayores en este análisis.\n`;
+    explanation += t('explain.riskEmpty') + '\n';
     return explanation;
   }
 
   riskFactors.forEach((risk, idx) => {
-    explanation += `${idx + 1}. ⚠️ ${risk}\n`;
+    explanation += `${idx + 1}. ⚠️ ${t(risk)}\n`;
   });
 
   return explanation;
@@ -390,26 +392,25 @@ function generateRiskExplanation(riskFactors: string[]): string {
 function generateNewsExplanation(newsImpact: NewsImpact | undefined): string {
   if (!newsImpact) return '';
 
-  let explanation = `**IMPACTO DE NOTICIAS**\n\n`;
+  let explanation = t('explain.newsHeader') + '\n\n';
 
-  const directionLabel = newsImpact.dominantDirection === 'bullish' ? 'alcista' : newsImpact.dominantDirection === 'bearish' ? 'bajista' : 'neutral';
+  const directionLabel = translateDirection(newsImpact.dominantDirection === 'bullish' ? 'alcista' :
+    newsImpact.dominantDirection === 'bearish' ? 'bajista' : 'lateral');
   const scoreEmoji = newsImpact.overallSentimentScore > 0.3 ? '🟢' : newsImpact.overallSentimentScore < -0.3 ? '🔴' : '🟡';
 
-  explanation += `${scoreEmoji} **Sentimiento General**: ${newsImpact.overallSentimentScore.toFixed(2)} (${directionLabel})\n`;
-  explanation += `📊 **Confianza**: ${newsImpact.confidence}%\n`;
-  explanation += `💥 **Nivel de Impacto**: ${newsImpact.impactLevel.toUpperCase()}\n`;
-  explanation += `📰 **Artículos Analizados**: ${newsImpact.articleCount}\n\n`;
+  explanation += t('explain.newsSentiment', { emoji: scoreEmoji, score: newsImpact.overallSentimentScore.toFixed(2), direction: directionLabel }) + '\n';
+  explanation += t('explain.newsConfidence', { confidence: newsImpact.confidence }) + '\n';
+  explanation += t('explain.newsImpact', { impact: newsImpact.impactLevel.toUpperCase() }) + '\n';
+  explanation += t('explain.newsArticles', { count: newsImpact.articleCount }) + '\n\n';
 
   if (newsImpact.dominantDirection === 'bullish' && newsImpact.impactLevel === 'high') {
-    explanation += `Las noticias recientes refuerzan significativamente la tesis alcista. `;
-    explanation += `El sentimiento positivo general sugiere que los fundamentos respaldan el movimiento.\n`;
+    explanation += t('explain.newsBullishHigh') + '\n';
   } else if (newsImpact.dominantDirection === 'bearish' && newsImpact.impactLevel === 'high') {
-    explanation += `Las noticias recientes refuerzan significativamente la tesis bajista. `;
-    explanation += `El sentimiento negativo general sugiere presión fundamental a la baja.\n`;
+    explanation += t('explain.newsBearishHigh') + '\n';
   } else if (newsImpact.dominantDirection !== 'neutral') {
-    explanation += `Las noticias proporcionan un sesgo ${directionLabel} adicional al análisis técnico.\n`;
+    explanation += t('explain.newsDirection', { direction: directionLabel }) + '\n';
   } else {
-    explanation += `Las noticias no muestran un sesgo claro. El mercado está digiriendo información mixta.\n`;
+    explanation += t('explain.newsNeutral') + '\n';
   }
 
   return explanation;
@@ -421,24 +422,25 @@ function generateExecutiveSummary(
   prediction: Prediction,
   summary: CandleAnalysisResponse['summary']
 ): string {
-  let text = `**RESUMEN EJECUTIVO**\n\n`;
+  const dirDisplay = translateDirection(prediction.direction);
+  const trendDisplay = translateDirection(trend);
 
-  text += `🔹 **Tendencia**: ${trend.toUpperCase()}\n`;
-  text += `🔹 **Sesgo**: ${summary.bias}\n`;
-  text += `🔹 **Sentimiento**: ${summary.overallSentiment}\n`;
-  text += `🔹 **Patrones**: ${patterns.length} identificados\n`;
-  text += `🔹 **Predicción**: ${prediction.direction.toUpperCase()} con ${prediction.probability}% de confianza\n\n`;
+  let text = t('explain.summaryHeader') + '\n\n';
+  text += t('explain.summaryTrend', { trend: trendDisplay.toUpperCase() }) + '\n';
+  text += t('explain.summaryBias', { bias: summary.bias }) + '\n';
+  text += t('explain.summarySentiment', { sentiment: t(summary.overallSentiment) }) + '\n';
+  text += t('explain.summaryPatterns', { count: patterns.length }) + '\n';
+  text += t('explain.summaryPrediction', { direction: dirDisplay.toUpperCase(), probability: prediction.probability }) + '\n\n';
 
-  text += `**En síntesis**: El mercado muestra una tendencia **${trend}** con `;
+  text += t('explain.summarySynthesis', { trend: trendDisplay }) + ' ';
 
   if (patterns.length > 2) {
-    text += `múltiples patrones alcistas confirmativos y `;
+    text += t('explain.summarySynthesisMultiPattern') + ' ';
   } else if (patterns.length > 0) {
-    text += `algunos patrones significativos y `;
+    text += t('explain.summarySynthesisSomePattern') + ' ';
   }
 
-  text += `indicadores que sugieren un movimiento ${prediction.direction}. `;
-  text += `La predicción tiene una confianza de **${prediction.confidenceLevel}** basada en el análisis técnico completo.\n`;
+  text += t('explain.summarySynthesisEnd', { direction: dirDisplay, confidence: prediction.confidenceLevel }) + '\n';
 
   return text;
 }

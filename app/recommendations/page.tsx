@@ -6,8 +6,10 @@ import { Header } from '@/components/Header';
 import { NavBar } from '@/components/NavBar';
 import { RecommendationsPanel } from '@/components/RecommendationsPanel';
 import { ArrowLeft } from 'lucide-react';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 export default function RecommendationsPage() {
+  const { t } = useTranslation();
   const router = useRouter();
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -23,7 +25,7 @@ export default function RecommendationsPage() {
           className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
         >
           <ArrowLeft className="w-4 h-4" />
-          Volver a Gráficos
+          {t('page.backToCharts')}
         </button>
 
         <RecommendationsPanel />

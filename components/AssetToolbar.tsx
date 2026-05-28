@@ -7,7 +7,30 @@ import { ALL_ASSET_TYPES } from '@/lib/assetTypeRegistry';
 import { QuickAccessChip } from '@/components/QuickAccessChip';
 import { CategoryChip } from '@/components/CategoryChip';
 import { useMarketStore } from '@/lib/store';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import { validateSymbol, createSafeParams } from '@/lib/services/validationService';
+
+const CATEGORY_LABEL_MAP: Record<string, string> = {
+  'Favoritos': 'category.favorites',
+  'Criptomonedas': 'category.crypto',
+  'Acciones': 'category.stocks',
+  'Índices': 'category.indices',
+  'Forex': 'category.forex',
+  'Commodities': 'category.commodities',
+  'Tecnología': 'category.technology',
+  'Bancos': 'category.banks',
+  'Consumo': 'category.consumer',
+  'Salud': 'category.health',
+  'Energía': 'category.energy',
+  'Inmobiliario': 'category.realEstate',
+  'Utilities': 'category.utilities',
+  'Telecomunicaciones': 'category.telecom',
+  'Industriales': 'category.industrials',
+};
+
+function getCategoryLabel(t: (k: string) => string, label: string): string {
+  return CATEGORY_LABEL_MAP[label] ? t(CATEGORY_LABEL_MAP[label]) : label;
+}
 
 interface AssetToolbarProps {
   selectedType: string | null;
@@ -25,6 +48,7 @@ function determinateAssetType(symbol: string): string {
 }
 
 export function AssetToolbar({ selectedType, onTypeChange }: AssetToolbarProps) {
+  const { t } = useTranslation();
   const {
     pinnedAssets, categoryOrder, hiddenCategories,
     toolbarEditMode, setToolbarEditMode, unpinAsset, toggleCategoryVisibility,
@@ -103,18 +127,18 @@ export function AssetToolbar({ selectedType, onTypeChange }: AssetToolbarProps) 
 
       {hiddenCategories.length > 0 && toolbarEditMode && (
         <div className="flex items-center gap-1 ml-1 pl-2 border-l border-border/50">
-          <span className="text-[10px] text-muted-foreground">Ocultas:</span>
+          <span className="text-[10px] text-muted-foreground">{t('toolbar.hidden')}</span>
           {hiddenCategories.map((v) => {
-            const t = ALL_ASSET_TYPES.find((c) => c.value === v);
-            if (!t) return null;
+            const cfg = ALL_ASSET_TYPES.find((c) => c.value === v);
+            if (!cfg) return null;
             return (
               <button
                 key={v}
                 onClick={() => toggleCategoryVisibility(v)}
                 className="px-2 py-0.5 rounded bg-muted/30 text-[10px] text-muted-foreground hover:bg-muted/60 transition-colors"
-                title="Mostrar categoría"
+                title={t('toolbar.showCategory')}
               >
-                {t.icon} {t.label}
+                {cfg.icon} {getCategoryLabel(t, cfg.label)}
               </button>
             );
           })}
@@ -126,8 +150,8 @@ export function AssetToolbar({ selectedType, onTypeChange }: AssetToolbarProps) 
         className={`p-1.5 rounded-lg transition-colors ${
           toolbarEditMode ? 'bg-primary text-primary-foreground' : 'bg-muted/50 hover:bg-muted text-muted-foreground'
         }`}
-        title={toolbarEditMode ? 'Terminar edición' : 'Personalizar barra'}
-        aria-label={toolbarEditMode ? 'Terminar edición' : 'Personalizar barra'}
+        title={toolbarEditMode ? t('toolbar.finishEditing') : t('toolbar.customizeBar')}
+        aria-label={toolbarEditMode ? t('toolbar.finishEditing') : t('toolbar.customizeBar')}
       >
         {toolbarEditMode ? <Check className="w-3.5 h-3.5" /> : <Edit3 className="w-3.5 h-3.5" />}
       </button>

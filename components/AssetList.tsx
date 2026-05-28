@@ -3,6 +3,7 @@
 import React from 'react';
 import { Asset } from '@/lib/types';
 import { Heart, TrendingUp, TrendingDown } from 'lucide-react';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 interface AssetListProps {
   assets: Asset[];
@@ -19,14 +20,15 @@ export function AssetList({
   onToggleFavorite,
   groupByType = false,
 }: AssetListProps) {
+  const { t } = useTranslation();
   const getTypeLabel = (type: string) => {
     switch (type) {
       case 'stock':
-        return '📈 Acciones';
+        return t('assetList.stocks');
       case 'crypto':
-        return '🪙 Criptomonedas';
+        return t('assetList.crypto');
       case 'forex':
-        return '💱 Forex';
+        return t('assetList.forex');
       default:
         return type;
     }
@@ -94,6 +96,7 @@ function AssetListItem({
   onSelect,
   onToggleFavorite,
 }: AssetListItemProps) {
+  const { t } = useTranslation();
   const isPositive = asset.changePercent >= 0;
 
   return (
@@ -130,7 +133,7 @@ function AssetListItem({
               onToggleFavorite(asset.symbol);
             }}
             className="p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted/20 rounded"
-            title={asset.isFavorite ? 'Remover de favoritos' : 'Agregar a favoritos'}
+            title={asset.isFavorite ? t('assetList.removeFav') : t('assetList.addFav')}
           >
             <Heart
               className={`w-4 h-4 ${

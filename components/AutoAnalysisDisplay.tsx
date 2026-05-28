@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { CandleData, TimeFrame } from '@/lib/types';
 import { useAutoAnalysis } from '@/app/hooks/useAutoAnalysis';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { CandlePattern, Prediction } from '@/lib/services/candleAnalysisService';
 import {
   ChevronDown,
@@ -30,6 +31,12 @@ import {
   SectionCard,
 } from './AnalysisState';
 
+const directionLabels: Record<string, string> = {
+  bullish: 'sentiment.bullish',
+  bajista: 'sentiment.bearish',
+  lateral: 'sentiment.neutral',
+};
+
 interface AutoAnalysisDisplayProps {
   symbol: string;
   timeframe: TimeFrame;
@@ -43,6 +50,7 @@ export function AutoAnalysisDisplay({
   candleData,
   includeNews = true,
 }: AutoAnalysisDisplayProps) {
+  const { t } = useTranslation();
   const { analysis, explanation, isLoading, error, newsImpact, runAnalysis } = useAutoAnalysis(
     symbol,
     timeframe,
@@ -75,7 +83,7 @@ export function AutoAnalysisDisplay({
   }
 
   if (isLoading) {
-    return <AnalysisLoading message={`Analizando ${symbol} (${timeframe})...`} />;
+    return <AnalysisLoading message={t('analysis.loading', { symbol, timeframe })} />;
   }
 
   if (!analysis) {
@@ -93,7 +101,7 @@ export function AutoAnalysisDisplay({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-            Análisis Técnico
+            {t('analysis.technical')}
           </span>
           <SentimentBadge
             type={trend}
@@ -106,32 +114,32 @@ export function AutoAnalysisDisplay({
           className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-xs font-medium shadow-sm"
         >
           <Zap className="w-3.5 h-3.5" />
-          {isLoading ? 'Analizando...' : 'Actualizar'}
+          {isLoading ? t('analysis.analyzing') : t('analysis.update')}
         </button>
       </div>
 
       {/* Summary Dashboard */}
       <SectionCard
-        title="Resumen Rápido"
+        title={t('analysis.quickSummary')}
         icon={<BarChart3 className="w-4 h-4" />}
       >
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <StatCard
-            label="Tendencia"
+            label={t('analysis.trend')}
             value={trend.charAt(0).toUpperCase() + trend.slice(1)}
             icon={isUptrend ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
             color={isUptrend ? 'success' : 'danger'}
           />
           <StatCard
-            label="Sentimiento"
-            value={analysis.summary.overallSentiment}
+            label={t('analysis.sentiment')}
+            value={t(analysis.summary.overallSentiment)}
             color={isUptrend ? 'success' : 'danger'}
           />
           <div className="rounded-lg border border-border bg-background p-3">
             <ConfidenceGauge value={prediction.probability} size="sm" />
           </div>
           <StatCard
-            label="Riesgo/Beneficio"
+            label={t('analysis.riskReward')}
             value={`1:${prediction.riskReward.toFixed(2)}`}
             icon={<Target className="w-4 h-4" />}
             color={prediction.riskReward >= 2 ? 'success' : prediction.riskReward >= 1 ? 'warning' : 'danger'}
@@ -141,11 +149,11 @@ export function AutoAnalysisDisplay({
 
       {/* Executive Summary */}
       <CollapsibleSection
-        title="Resumen Ejecutivo"
+        title={t('analysis.executiveSummary')}
         icon={<BarChart3 className="w-4 h-4" />}
         isOpen={expandedSections.summary}
         onToggle={() => toggleSection('summary')}
-        badge={`${prediction.probability}% confianza`}
+        badge={t('analysis.confidenceLabel', { value: prediction.probability })}
       >
         <div className="prose prose-sm dark:prose-invert max-w-none">
           <ReactMarkdown>{explanation.summary}</ReactMarkdown>
@@ -154,7 +162,7 @@ export function AutoAnalysisDisplay({
 
       {/* Trend Analysis */}
       <CollapsibleSection
-        title="Análisis de Tendencia"
+        title={t('analysis.trendAnalysis')}
         icon={<Activity className="w-4 h-4" />}
         isOpen={expandedSections.trend}
         onToggle={() => toggleSection('trend')}
@@ -164,21 +172,21 @@ export function AutoAnalysisDisplay({
             <ReactMarkdown>{explanation.tendencyReason}</ReactMarkdown>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatCard label="Fuerza" value={`${analysis.trendAnalysis.strength}/100`} color={analysis.trendAnalysis.strength > 70 ? 'success' : analysis.trendAnalysis.strength > 40 ? 'warning' : 'default'} />
-            <StatCard label="ADX" value={analysis.trendAnalysis.adx.toFixed(1)} color={analysis.trendAnalysis.adx > 25 ? 'info' : 'default'} />
-            <StatCard label="SMA 20" value={analysis.trendAnalysis.sma[1]?.price.toFixed(2) || 'N/A'} />
-            <StatCard label="EMA 12" value={analysis.trendAnalysis.ema[0]?.price.toFixed(2) || 'N/A'} />
+            <StatCard label={t('analysis.strength')} value={`${analysis.trendAnalysis.strength}/100`} color={analysis.trendAnalysis.strength > 70 ? 'success' : analysis.trendAnalysis.strength > 40 ? 'warning' : 'default'} />
+            <StatCard label={t('analysis.adx')} value={analysis.trendAnalysis.adx.toFixed(1)} color={analysis.trendAnalysis.adx > 25 ? 'info' : 'default'} />
+            <StatCard label={t('analysis.sma20')} value={analysis.trendAnalysis.sma[1]?.price.toFixed(2) || t('analysis.noDataValue')} />
+            <StatCard label={t('analysis.ema12')} value={analysis.trendAnalysis.ema[0]?.price.toFixed(2) || t('analysis.noDataValue')} />
           </div>
         </div>
       </CollapsibleSection>
 
       {/* Candle Patterns */}
       <CollapsibleSection
-        title="Patrones de Velas"
+        title={t('analysis.candlePatterns')}
         icon={<CandlestickChart className="w-4 h-4" />}
         isOpen={expandedSections.patterns}
         onToggle={() => toggleSection('patterns')}
-        badge={`${analysis.patterns.length} encontrados`}
+        badge={t('analysis.found', { count: analysis.patterns.length })}
       >
         <div className="space-y-3">
           <div className="flex flex-wrap gap-2 mb-3">
@@ -204,7 +212,7 @@ export function AutoAnalysisDisplay({
             })}
             {analysis.patterns.length > 6 && (
               <span className="text-xs text-muted-foreground self-center">
-                +{analysis.patterns.length - 6} más
+                {t('analysis.more', { count: analysis.patterns.length - 6 })}
               </span>
             )}
           </div>
@@ -216,7 +224,7 @@ export function AutoAnalysisDisplay({
 
       {/* Technical Indicators */}
       <CollapsibleSection
-        title="Indicadores Técnicos"
+        title={t('analysis.technicalIndicators')}
         icon={<BarChart3 className="w-4 h-4" />}
         isOpen={expandedSections.indicators}
         onToggle={() => toggleSection('indicators')}
@@ -236,13 +244,13 @@ export function AutoAnalysisDisplay({
               type="macd"
             />
             <IndicatorCard
-              name="Stochastic %K"
+               name={t('indicator.stochK')}
               value={analysis.indicatorStatus.stochastic.k?.toFixed(1)}
               status={analysis.indicatorStatus.stochastic.status}
               type="stochastic"
             />
             <IndicatorCard
-              name="Bollinger Pos."
+               name={`${t('indicator.bb')} Pos.`}
               value={analysis.indicatorStatus.bollingerBands.position?.replace('_', ' ')}
               type="bb"
             />
@@ -252,7 +260,7 @@ export function AutoAnalysisDisplay({
               type="atr"
             />
             <IndicatorCard
-              name="Volumen"
+               name={t('common.volume')}
               value={analysis.indicatorStatus.volume.status}
               type="volume"
             />
@@ -265,7 +273,7 @@ export function AutoAnalysisDisplay({
 
       {/* Detailed Prediction */}
       <CollapsibleSection
-        title="Predicción Detallada"
+        title={t('analysis.detailedPrediction')}
         icon={<Target className="w-4 h-4" />}
         isOpen={expandedSections.prediction}
         onToggle={() => toggleSection('prediction')}
@@ -276,7 +284,7 @@ export function AutoAnalysisDisplay({
             <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4">
               <p className="text-xs text-muted-foreground uppercase font-medium mb-2 flex items-center gap-1.5">
                 <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
-                Objetivos
+                {t('analysis.targets')}
               </p>
               <div className="space-y-1">
                 {prediction.targetPrice.map((target: number, idx: number) => (
@@ -293,7 +301,7 @@ export function AutoAnalysisDisplay({
             <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-4">
               <p className="text-xs text-muted-foreground uppercase font-medium mb-2 flex items-center gap-1.5">
                 <Shield className="w-3.5 h-3.5 text-red-500" />
-                Stop Loss
+                {t('analysis.stopLoss')}
               </p>
               <div className="flex items-center gap-2">
                 <span className="w-5 h-5 rounded-full bg-red-500/20 text-red-600 dark:text-red-400 text-xs font-bold flex items-center justify-center">
@@ -308,7 +316,7 @@ export function AutoAnalysisDisplay({
             <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-4">
               <p className="text-xs text-muted-foreground uppercase font-medium mb-2 flex items-center gap-1.5">
                 <Activity className="w-3.5 h-3.5 text-blue-500" />
-                Relación R/R
+                {t('analysis.riskRewardRatio')}
               </p>
               <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                 1:{prediction.riskReward.toFixed(2)}
@@ -320,12 +328,12 @@ export function AutoAnalysisDisplay({
           {/* Alternative Scenarios */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <ScenarioCard
-              title="Escenario Alternativo"
+              title={t('analysis.alternativeScenario')}
               prediction={analysis.alternativePrediction}
               type={analysis.alternativePrediction?.direction === 'bullish' ? 'bullish' : 'bearish'}
             />
             <ScenarioCard
-              title="Escenario Inverso"
+              title={t('analysis.inverseScenario')}
               prediction={analysis.inversePrediction}
               type="warning"
             />
@@ -339,11 +347,11 @@ export function AutoAnalysisDisplay({
 
       {/* Risk Factors */}
       <CollapsibleSection
-        title="Factores de Riesgo"
+        title={t('analysis.riskFactors')}
         icon={<AlertTriangle className="w-4 h-4" />}
         isOpen={expandedSections.risk}
         onToggle={() => toggleSection('risk')}
-        badge={`${analysis.riskFactors?.length || 0} riesgos`}
+        badge={t('analysis.risks', { count: analysis.riskFactors?.length || 0 })}
       >
         <div className="space-y-2">
           <div className="prose prose-sm dark:prose-invert max-w-none">
@@ -353,13 +361,13 @@ export function AutoAnalysisDisplay({
             <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/20">
               <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 mb-2 flex items-center gap-1.5">
                 <AlertTriangle className="w-3.5 h-3.5" />
-                Advertencias
+                {t('analysis.warnings')}
               </p>
               <ul className="space-y-1">
                 {analysis.warnings.map((warning: string, idx: number) => (
                   <li key={idx} className="text-xs text-amber-600/80 dark:text-amber-400/80 flex items-start gap-1.5">
                     <span className="mt-0.5">•</span>
-                    {warning}
+                    {t(warning)}
                   </li>
                 ))}
               </ul>
@@ -371,43 +379,43 @@ export function AutoAnalysisDisplay({
       {/* News Impact */}
       {analysis.newsImpact && (
         <CollapsibleSection
-          title="Impacto de Noticias"
+          title={t('analysis.newsImpact')}
           icon={<Newspaper className="w-4 h-4" />}
           isOpen={expandedSections.news}
           onToggle={() => toggleSection('news')}
-          badge={`${analysis.newsImpact.articleCount} artículos`}
+          badge={t('analysis.articles', { count: analysis.newsImpact.articleCount })}
         >
           <div className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <StatCard
-                label="Dirección"
+                label={t('analysis.direction')}
                 value={
-                  analysis.newsImpact.dominantDirection === 'bullish' ? 'Alcista' :
-                  analysis.newsImpact.dominantDirection === 'bearish' ? 'Bajista' : 'Neutral'
+                  analysis.newsImpact.dominantDirection === 'bullish' ? t('analysis.bullish') :
+                  analysis.newsImpact.dominantDirection === 'bearish' ? t('analysis.bearish') : t('analysis.neutralDir')
                 }
                 color={
                   analysis.newsImpact.dominantDirection === 'bullish' ? 'success' :
                   analysis.newsImpact.dominantDirection === 'bearish' ? 'danger' : 'default'
                 }
               />
-              <StatCard label="Confianza" value={`${analysis.newsImpact.confidence}%`} color="info" />
+              <StatCard label={t('analysis.confidence')} value={`${analysis.newsImpact.confidence}%`} color="info" />
               <StatCard
-                label="Impacto"
+                label={t('analysis.impact')}
                 value={
-                  analysis.newsImpact.impactLevel === 'high' ? 'Alto' :
-                  analysis.newsImpact.impactLevel === 'moderate' ? 'Moderado' : 'Bajo'
+                  analysis.newsImpact.impactLevel === 'high' ? t('analysis.impactHigh') :
+                  analysis.newsImpact.impactLevel === 'moderate' ? t('analysis.impactModerate') : t('analysis.impactLow')
                 }
                 color={
                   analysis.newsImpact.impactLevel === 'high' ? 'warning' :
                   analysis.newsImpact.impactLevel === 'moderate' ? 'info' : 'default'
                 }
               />
-              <StatCard label="Artículos" value={analysis.newsImpact.articleCount} />
+              <StatCard label={t('analysis.articlesCount')} value={analysis.newsImpact.articleCount} />
             </div>
 
             {/* Sentiment bar */}
             <div>
-              <p className="text-xs text-muted-foreground mb-1.5">Sentimiento General</p>
+              <p className="text-xs text-muted-foreground mb-1.5">{t('analysis.overallSentiment')}</p>
               <div className="relative h-3 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 rounded-full overflow-hidden">
                 <div
                   className="absolute top-0 bottom-0 w-0.5 bg-white shadow-lg transition-all duration-500"
@@ -417,9 +425,9 @@ export function AutoAnalysisDisplay({
                 />
               </div>
               <div className="flex justify-between text-xs text-muted-foreground mt-0.5">
-                <span>Negativo</span>
-                <span>Neutral</span>
-                <span>Positivo</span>
+                <span>{t('analysis.negative')}</span>
+                <span>{t('analysis.neutralDir')}</span>
+                <span>{t('analysis.positive')}</span>
               </div>
             </div>
 
@@ -429,7 +437,7 @@ export function AutoAnalysisDisplay({
 
             {includeNews && analysis.newsImpact.articleCount === 0 && (
               <p className="text-xs text-muted-foreground italic">
-                No hay noticias recientes disponibles para este activo.
+                {t('analysis.noNews')}
               </p>
             )}
           </div>
@@ -437,7 +445,7 @@ export function AutoAnalysisDisplay({
       )}
 
       {/* Detailed Analysis */}
-      <SectionCard title="Análisis Completo" icon={<BarChart3 className="w-4 h-4" />}>
+      <SectionCard title={t('analysis.fullAnalysis')} icon={<BarChart3 className="w-4 h-4" />}>
         <div className="prose prose-sm dark:prose-invert max-w-none">
           <ReactMarkdown>{analysis.detailedAnalysis}</ReactMarkdown>
         </div>
@@ -524,6 +532,7 @@ interface ScenarioCardProps {
 }
 
 function ScenarioCard({ title, prediction, type }: ScenarioCardProps) {
+  const { t } = useTranslation();
   if (!prediction) return null;
 
   const configs = {
@@ -545,12 +554,12 @@ function ScenarioCard({ title, prediction, type }: ScenarioCardProps) {
         ) : (
           <AlertTriangle className="w-4 h-4 text-amber-500" />
         )}
-        <span className="font-semibold capitalize text-foreground">{prediction.direction}</span>
+        <span className="font-semibold capitalize text-foreground">{t(directionLabels[prediction.direction] || 'sentiment.neutral')}</span>
         <span className={`text-xs font-medium ${cfg.text}`}>({prediction.probability}%)</span>
       </div>
       {prediction.targetPrice?.[0] != null && (
         <p className="text-xs text-muted-foreground">
-          Objetivo: <span className="font-medium text-foreground">{prediction.targetPrice[0].toFixed(2)}</span>
+          {t('analysis.objective')}: <span className="font-medium text-foreground">{prediction.targetPrice[0].toFixed(2)}</span>
         </p>
       )}
     </div>

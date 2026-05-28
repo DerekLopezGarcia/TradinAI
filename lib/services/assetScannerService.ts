@@ -249,7 +249,7 @@ async function scanAsset(
       trendStrength,
     };
   } catch (error) {
-    console.error(`Error escaneando ${symbol}:`, error);
+    console.error(`Error scanning ${symbol}:`, error);
     return null;
   }
 }

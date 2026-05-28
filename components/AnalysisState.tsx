@@ -2,12 +2,14 @@
 
 import React from 'react';
 import { AlertCircle, Loader2, Zap, TrendingUp, TrendingDown, Minus, BarChart3 } from 'lucide-react';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 interface AnalysisLoadingProps {
   message?: string;
 }
 
-export function AnalysisLoading({ message = 'Analizando mercado...' }: AnalysisLoadingProps) {
+export function AnalysisLoading({ message }: AnalysisLoadingProps) {
+  const { t } = useTranslation();
   return (
     <div className="rounded-lg border border-border bg-card p-6">
       <div className="flex flex-col items-center justify-center space-y-4 py-8">
@@ -16,7 +18,7 @@ export function AnalysisLoading({ message = 'Analizando mercado...' }: AnalysisL
           <BarChart3 className="w-5 h-5 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
         </div>
         <div className="text-center space-y-2">
-          <p className="text-sm font-medium text-foreground">{message}</p>
+          <p className="text-sm font-medium text-foreground">{message || t('analysis.loadingDefault')}</p>
           <div className="flex items-center justify-center gap-1.5">
             <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
             <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -35,6 +37,7 @@ interface AnalysisErrorProps {
 }
 
 export function AnalysisError({ message, onRetry }: AnalysisErrorProps) {
+  const { t } = useTranslation();
   return (
     <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-6">
       <div className="flex flex-col items-center text-center space-y-3">
@@ -42,7 +45,7 @@ export function AnalysisError({ message, onRetry }: AnalysisErrorProps) {
           <AlertCircle className="w-8 h-8 text-destructive" />
         </div>
         <div>
-          <h3 className="font-semibold text-destructive mb-1">Error en Análisis</h3>
+          <h3 className="font-semibold text-destructive mb-1">{t('analysis.errorTitle')}</h3>
           <p className="text-sm text-destructive/80 max-w-md">{message}</p>
         </div>
         {onRetry && (
@@ -51,7 +54,7 @@ export function AnalysisError({ message, onRetry }: AnalysisErrorProps) {
             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border border-border bg-card hover:bg-muted transition-colors"
           >
             <Loader2 className="w-4 h-4" />
-            Reintentar
+            {t('common.retry')}
           </button>
         )}
       </div>
@@ -66,6 +69,7 @@ interface AnalysisEmptyProps {
 }
 
 export function AnalysisEmpty({ symbol, onRunAnalysis, isLoading }: AnalysisEmptyProps) {
+  const { t } = useTranslation();
   return (
     <div className="rounded-lg border border-border bg-card p-8">
       <div className="flex flex-col items-center text-center space-y-4">
@@ -73,9 +77,9 @@ export function AnalysisEmpty({ symbol, onRunAnalysis, isLoading }: AnalysisEmpt
           <BarChart3 className="w-10 h-10 text-primary/60" />
         </div>
         <div className="space-y-1">
-          <h3 className="font-semibold text-foreground">Análisis Técnico</h3>
+          <h3 className="font-semibold text-foreground">{t('analysis.emptyTitle')}</h3>
           <p className="text-sm text-muted-foreground max-w-sm">
-            Haz clic en el botón para analizar {symbol} y obtener predicciones, patrones y recomendaciones basadas en inteligencia técnica.
+            {t('analysis.emptyDescription', { symbol })}
           </p>
         </div>
         <button
@@ -84,7 +88,7 @@ export function AnalysisEmpty({ symbol, onRunAnalysis, isLoading }: AnalysisEmpt
           className="inline-flex items-center gap-2 px-6 py-2.5 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium shadow-lg shadow-primary/20"
         >
           <Zap className="w-4 h-4" />
-          {isLoading ? 'Analizando...' : 'Ejecutar Análisis'}
+          {isLoading ? t('analysis.analyzing') : t('analysis.run')}
         </button>
       </div>
     </div>
@@ -97,6 +101,7 @@ interface SentimentBadgeProps {
 }
 
 export function SentimentBadge({ type, size = 'md' }: SentimentBadgeProps) {
+  const { t } = useTranslation();
   const isBullish = type === 'bullish' || type === 'alcista';
   const isBearish = type === 'bearish' || type === 'bajista';
 
@@ -107,10 +112,10 @@ export function SentimentBadge({ type, size = 'md' }: SentimentBadgeProps) {
   };
 
   const config = isBullish
-    ? { bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', text: 'text-emerald-600 dark:text-emerald-400', icon: TrendingUp, label: 'Alcista' }
+    ? { bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', text: 'text-emerald-600 dark:text-emerald-400', icon: TrendingUp, label: t('sentiment.bullish') }
     : isBearish
-    ? { bg: 'bg-red-500/10', border: 'border-red-500/30', text: 'text-red-600 dark:text-red-400', icon: TrendingDown, label: 'Bajista' }
-    : { bg: 'bg-slate-500/10', border: 'border-slate-500/30', text: 'text-slate-600 dark:text-slate-400', icon: Minus, label: 'Neutral' };
+    ? { bg: 'bg-red-500/10', border: 'border-red-500/30', text: 'text-red-600 dark:text-red-400', icon: TrendingDown, label: t('sentiment.bearish') }
+    : { bg: 'bg-slate-500/10', border: 'border-slate-500/30', text: 'text-slate-600 dark:text-slate-400', icon: Minus, label: t('sentiment.neutral') };
 
   const Icon = config.icon;
 
@@ -128,6 +133,7 @@ interface ConfidenceGaugeProps {
 }
 
 export function ConfidenceGauge({ value, size = 'md' }: ConfidenceGaugeProps) {
+  const { t } = useTranslation();
   const clamped = Math.max(0, Math.min(100, value));
   const color = clamped >= 70 ? 'bg-emerald-500' : clamped >= 50 ? 'bg-amber-500' : 'bg-red-500';
   const textColor = clamped >= 70 ? 'text-emerald-600 dark:text-emerald-400' : clamped >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400';
@@ -135,7 +141,7 @@ export function ConfidenceGauge({ value, size = 'md' }: ConfidenceGaugeProps) {
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">Confianza</span>
+        <span className="text-xs text-muted-foreground">{t('analysis.confidence')}</span>
         <span className={`text-sm font-bold ${textColor}`}>{Math.round(clamped)}%</span>
       </div>
       <div className={`w-full bg-muted rounded-full overflow-hidden ${size === 'sm' ? 'h-1.5' : 'h-2'}`}>

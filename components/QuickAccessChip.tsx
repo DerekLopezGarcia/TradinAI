@@ -2,6 +2,7 @@
 
 import { X } from 'lucide-react';
 import { useMarketStore } from '@/lib/store';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 interface QuickAccessChipProps {
   symbol: string;
@@ -10,6 +11,7 @@ interface QuickAccessChipProps {
 }
 
 export function QuickAccessChip({ symbol, onUnpin, onSelect }: QuickAccessChipProps) {
+  const { t } = useTranslation();
   const assets = useMarketStore((s) => s.assets);
   const asset = assets.find((a) => a.symbol === symbol);
 
@@ -33,7 +35,7 @@ export function QuickAccessChip({ symbol, onUnpin, onSelect }: QuickAccessChipPr
       <button
         onClick={(e) => { e.stopPropagation(); onUnpin(symbol); }}
         className="p-0.5 rounded hover:bg-muted opacity-0 group-hover:opacity-100 transition-opacity ml-0.5"
-        aria-label={`Desanclar ${symbol}`}
+        aria-label={t('quickAccess.unpin', { symbol })}
       >
         <X className="w-3 h-3 text-muted-foreground" />
       </button>

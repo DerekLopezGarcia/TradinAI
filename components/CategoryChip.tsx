@@ -9,6 +9,7 @@ import { priceCache } from '@/lib/services/priceCache';
 import { validateSymbol, createSafeParams } from '@/lib/services/validationService';
 import { errorLoggingService } from '@/lib/services/errorLoggingService';
 import { useAssetBarStore } from '@/lib/assetBarStore';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { AssetType } from '@/lib/types';
 import type { AssetTypeConfig } from '@/lib/assetTypeRegistry';
 
@@ -33,9 +34,32 @@ function determinateAssetType(symbol: string): AssetType {
   return 'stock';
 }
 
+const CATEGORY_LABEL_MAP: Record<string, string> = {
+  'Favoritos': 'category.favorites',
+  'Criptomonedas': 'category.crypto',
+  'Acciones': 'category.stocks',
+  'Índices': 'category.indices',
+  'Forex': 'category.forex',
+  'Commodities': 'category.commodities',
+  'Tecnología': 'category.technology',
+  'Bancos': 'category.banks',
+  'Consumo': 'category.consumer',
+  'Salud': 'category.health',
+  'Energía': 'category.energy',
+  'Inmobiliario': 'category.realEstate',
+  'Utilities': 'category.utilities',
+  'Telecomunicaciones': 'category.telecom',
+  'Industriales': 'category.industrials',
+};
+
+function getCategoryLabel(t: (k: string) => string, label: string): string {
+  return CATEGORY_LABEL_MAP[label] ? t(CATEGORY_LABEL_MAP[label]) : label;
+}
+
 export function CategoryChip({ typeConfig, isEditMode }: CategoryChipProps) {
   const router = useRouter();
   const { assets, toggleFavorite, setSelectedAsset, updateAssetPrice, addOrUpdateAssetPrice } = useMarketStore();
+  const { t } = useTranslation();
   const { pinAsset, unpinAsset, reorderCategoryUp, reorderCategoryDown, toggleCategoryVisibility } = useAssetBarStore();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -261,7 +285,7 @@ export function CategoryChip({ typeConfig, isEditMode }: CategoryChipProps) {
           <GripVertical className="w-3 h-3 text-muted-foreground cursor-grab" />
         )}
         <span>{typeConfig.icon}</span>
-        <span>{typeConfig.label}</span>
+        <span>{getCategoryLabel(t, typeConfig.label)}</span>
         <span className="text-xs opacity-70">({list.length})</span>
         {loading
           ? <Loader2 className="w-3 h-3 animate-spin ml-0.5" />
@@ -271,9 +295,9 @@ export function CategoryChip({ typeConfig, isEditMode }: CategoryChipProps) {
 
       {isEditMode && (
         <div className="flex gap-0.5 mt-0.5">
-          <button onClick={() => reorderCategoryUp(typeConfig.value)} className="p-0.5 rounded hover:bg-muted text-muted-foreground text-[10px]" title="Mover arriba">▲</button>
-          <button onClick={() => reorderCategoryDown(typeConfig.value)} className="p-0.5 rounded hover:bg-muted text-muted-foreground text-[10px]" title="Mover abajo">▼</button>
-          <button onClick={() => toggleCategoryVisibility(typeConfig.value)} className="p-0.5 rounded hover:bg-muted text-muted-foreground text-[10px]" title="Ocultar categoría">
+          <button onClick={() => reorderCategoryUp(typeConfig.value)} className="p-0.5 rounded hover:bg-muted text-muted-foreground text-[10px]" title={t('category.moveUp')}>▲</button>
+          <button onClick={() => reorderCategoryDown(typeConfig.value)} className="p-0.5 rounded hover:bg-muted text-muted-foreground text-[10px]" title={t('category.moveDown')}>▼</button>
+          <button onClick={() => toggleCategoryVisibility(typeConfig.value)} className="p-0.5 rounded hover:bg-muted text-muted-foreground text-[10px]" title={t('category.hideCategory')}>
             <EyeOff className="w-3 h-3" />
           </button>
         </div>
@@ -284,13 +308,13 @@ export function CategoryChip({ typeConfig, isEditMode }: CategoryChipProps) {
           {(loading && !loadedRef.current) || (initialLoading && typeConfig.value === 'favorites' && list.some(a => a.price === 0)) ? (
             <div className="flex items-center justify-center py-6 gap-2 text-muted-foreground text-sm">
               <Loader2 className="w-4 h-4 animate-spin" />
-              Cargando precios...
+              {t('category.loadingPrices')}
             </div>
           ) : (
             <>
               <div className="max-h-64 overflow-y-auto py-1">
                 {list.length === 0 ? (
-                  <p className="text-xs text-muted-foreground px-3 py-3">Sin resultados</p>
+                  <p className="text-xs text-muted-foreground px-3 py-3">{t('category.noResults')}</p>
                 ) : (
                   paginatedList.map((asset: any) => {
                     const isFailed = failedRef.current.has(asset.symbol);
@@ -305,7 +329,7 @@ export function CategoryChip({ typeConfig, isEditMode }: CategoryChipProps) {
                             {isFailed ? (
                               <div className="flex items-center gap-1">
                                 <AlertCircle className="w-4 h-4 text-destructive" />
-                                <p className="text-xs text-destructive font-medium">Sin datos</p>
+                                <p className="text-xs text-destructive font-medium">{t('category.noData')}</p>
                               </div>
                             ) : asset.price > 0 ? (
                               <>
@@ -319,7 +343,7 @@ export function CategoryChip({ typeConfig, isEditMode }: CategoryChipProps) {
                             )}
                           </div>
                           <button onClick={(e) => { e.stopPropagation(); pinAsset(asset.symbol); }}
-                            className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-muted transition-all" title="Fijar acceso rápido"
+                            className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-muted transition-all" title={t('category.pin')}
                           >
                             <Pin className="w-3 h-3 text-muted-foreground" />
                           </button>

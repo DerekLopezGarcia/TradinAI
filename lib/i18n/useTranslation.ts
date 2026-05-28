@@ -1,21 +1,18 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import esMessages from './locales/es.json';
+import enMessages from './locales/en.json';
 
-type Locale = 'es' | 'en';
+export type Locale = 'es' | 'en';
 
 const STORAGE_KEY = 'trading-ia-locale';
 const DEFAULT_LOCALE: Locale = 'es';
 
-const messagesCache = new Map<Locale, Record<string, string>>();
-
-function loadMessages(locale: Locale): Record<string, string> {
-  try {
-    return require(`./locales/${locale}.json`);
-  } catch {
-    return {};
-  }
-}
+const allMessages: Record<Locale, Record<string, string>> = {
+  es: esMessages,
+  en: enMessages,
+};
 
 function interpolate(template: string, values?: Record<string, string | number>): string {
   if (!values) return template;
@@ -27,8 +24,10 @@ function interpolate(template: string, values?: Record<string, string | number>)
 
 export function getStoredLocale(): Locale {
   if (typeof window === 'undefined') return DEFAULT_LOCALE;
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored === 'en' || stored === 'es') return stored;
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored === 'en' || stored === 'es') return stored;
+  } catch { /* localStorage not available */ }
   return DEFAULT_LOCALE;
 }
 
@@ -41,19 +40,20 @@ export function useTranslation() {
 
   const setLocale = useCallback((newLocale: Locale) => {
     setLocaleState(newLocale);
-    localStorage.setItem(STORAGE_KEY, newLocale);
+    try {
+      localStorage.setItem(STORAGE_KEY, newLocale);
+    } catch { /* localStorage not available */ }
   }, []);
 
   const t = useCallback(
     (key: string, values?: Record<string, string | number>): string => {
-      const messages = loadMessages(locale);
-      const template = messages[key];
+      const messages = allMessages[locale];
+      const template = messages?.[key];
       if (!template) {
-        if (process.env.NODE_ENV === 'development') {
-          console.warn(`[i18n] Missing translation key: "${key}" for locale "${locale}"`);
+        const fallback = allMessages['es']?.[key];
+        if (!fallback && process.env.NODE_ENV === 'development') {
+          console.warn(`[i18n] Missing translation key: "${key}"`);
         }
-        const fallbackMessages = loadMessages('es');
-        const fallback = fallbackMessages[key];
         return fallback ? interpolate(fallback, values) : key;
       }
       return interpolate(template, values);
@@ -61,5 +61,5 @@ export function useTranslation() {
     [locale]
   );
 
-  return { t, locale, setLocale };
+  return { t, locale, setLocale, isEnglish: locale === 'en' };
 }

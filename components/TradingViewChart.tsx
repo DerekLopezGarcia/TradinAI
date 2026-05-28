@@ -18,6 +18,7 @@ import { CandleData } from '@/lib/types';
 import { calculateRSI, calculateSMA, calculateEMA, calculateADX, calculateStochastic, calculateBollingerBands } from '@/lib/indicators';
 import { useTheme } from 'next-themes';
 import { marketHoursService } from '@/lib/services/marketHoursService';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 interface TradingViewChartProps {
   data: CandleData[];
@@ -33,11 +34,14 @@ export function TradingViewChart({
   data,
   symbol,
   interval = '1h',
-  showVolume = true,
-  showRSI = true,
+  showVolume = false,
+  showRSI = false,
   showBollinger = false,
   onIndicatorsUpdate,
 }: TradingViewChartProps) {
+  const { t } = useTranslation();
+  const { resolvedTheme } = useTheme();
+
   const containerRef    = useRef<HTMLDivElement>(null);
   const chartRef        = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -55,8 +59,6 @@ export function TradingViewChart({
   const prevLastTimeRef = useRef<number>(0);
   const initialZoomDone = useRef<boolean>(false);
   const userInteractedRef = useRef<boolean>(false);
-
-  const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
 
   const [chartReady, setChartReady] = useState(false);
@@ -448,7 +450,7 @@ export function TradingViewChart({
         lineWidth: 2,
         lineStyle: LineStyle.Dashed,
         axisLabelVisible: false,
-        title: `Apertura: ${marketHours.openTime.hour.toString().padStart(2, '0')}:${marketHours.openTime.minute.toString().padStart(2, '0')} UTC`,
+        title: `${t('tradingView.marketOpen')}: ${marketHours.openTime.hour.toString().padStart(2, '0')}:${marketHours.openTime.minute.toString().padStart(2, '0')} UTC`,
       });
 
       candleSeries.createPriceLine({
@@ -457,7 +459,7 @@ export function TradingViewChart({
         lineWidth: 2,
         lineStyle: LineStyle.Dashed,
         axisLabelVisible: false,
-        title: `Cierre: ${marketHours.closeTime.hour.toString().padStart(2, '0')}:${marketHours.closeTime.minute.toString().padStart(2, '0')} UTC`,
+        title: `${t('tradingView.marketClose')}: ${marketHours.closeTime.hour.toString().padStart(2, '0')}:${marketHours.closeTime.minute.toString().padStart(2, '0')} UTC`,
       });
     } catch (err) {
       console.error('[TradingViewChart] Error adding market hours lines:', err);
@@ -684,10 +686,10 @@ export function TradingViewChart({
     : rsiValue <= 30 ? '#26a69a'
     : '#818cf8';
   const rsiLabel = rsiValue === null ? ''
-    : rsiValue >= 70 ? ' · Sobrecompra'
-    : rsiValue <= 30 ? ' · Sobreventa'
-    : rsiValue > 50  ? ' · Alcista'
-    : ' · Bajista';
+    : rsiValue >= 70 ? ` · ${t('tradingView.overbought')}`
+    : rsiValue <= 30 ? ` · ${t('tradingView.oversold')}`
+    : rsiValue > 50  ? ` · ${t('tradingView.bullish')}`
+    : ` · ${t('tradingView.bearish')}`;
 
   return (
     <div className="bg-[#0d1117] rounded-xl border border-slate-800 overflow-hidden" suppressHydrationWarning>
@@ -719,7 +721,7 @@ export function TradingViewChart({
             </div>
           </>
         )}
-        {!hasData && <span className="text-slate-500 text-[11px] ml-2">Cargando datos…</span>}
+        {!hasData && <span className="text-slate-500 text-[11px] ml-2">{t('tradingView.loadingData')}</span>}
       </div>
 
       <div className="relative">
@@ -728,7 +730,7 @@ export function TradingViewChart({
           <div className="absolute inset-0 flex items-center justify-center bg-[#0d1117]">
             <div className="text-center space-y-3">
               <div className="w-10 h-10 border-2 border-[#26a69a] border-t-transparent rounded-full animate-spin mx-auto" />
-              <p className="text-slate-400 text-sm">Cargando datos de mercado…</p>
+              <p className="text-slate-400 text-sm">{t('tradingView.loadingMarketData')}</p>
             </div>
           </div>
         )}
@@ -745,7 +747,7 @@ export function TradingViewChart({
             ) : (
               <span className="flex items-center gap-1.5 text-slate-500">
                 <span className="w-3 h-3 border border-slate-500 border-t-transparent rounded-full animate-spin inline-block" />
-                Calculando RSI…
+                {t('tradingView.calculatingRsi')}
               </span>
             )}
             <div className="ml-auto flex items-center gap-3 text-slate-600">
@@ -766,7 +768,7 @@ export function TradingViewChart({
               <div className="absolute inset-0 flex items-center justify-center bg-[#0d1117]/90">
                 <div className="flex items-center gap-2 text-slate-500 text-[11px]">
                   <span className="w-4 h-4 border border-slate-500 border-t-transparent rounded-full animate-spin inline-block" />
-                  Calculando RSI…
+                  {t('tradingView.calculatingRsi')}
                 </div>
               </div>
             )}
@@ -780,13 +782,13 @@ export function TradingViewChart({
             <span className="w-1.5 h-3 rounded-sm bg-[#26a69a]" />
             <span className="w-1.5 h-3 rounded-sm bg-[#ef5350]" />
           </span>
-          <span className="text-slate-300 font-medium text-xs">Alcista/Bajista</span>
+          <span className="text-slate-300 font-medium text-xs">{t('tradingView.legendBullBear')}</span>
         </div>
 
         {showVolume && (
           <div className="flex items-center gap-1.5">
             <span className="w-3 h-3 bg-slate-600/50 rounded-sm" />
-            <span className="text-slate-300 font-medium text-xs">Volumen</span>
+            <span className="text-slate-300 font-medium text-xs">{t('tradingView.legendVolume')}</span>
           </div>
         )}
 

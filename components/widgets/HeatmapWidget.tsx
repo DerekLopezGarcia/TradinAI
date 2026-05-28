@@ -6,6 +6,7 @@ import { useOrderBook } from '@/app/hooks/useOrderBook';
 import { useStockDepth } from '@/app/hooks/useStockDepth';
 import type { WidgetProps } from '@/lib/widgetRegistry';
 import type { OrderBookSnapshot, ConnectionState, OrderBookLevel } from '@/lib/types';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 function isCrypto(symbol: string): boolean {
   return symbol.endsWith('USD') || symbol.endsWith('USDT');
@@ -47,6 +48,7 @@ function StockSpreadView({ snapshot, spread, midPrice }: {
   spread: number;
   midPrice: number;
 }) {
+  const { t } = useTranslation();
   const bid = snapshot.bids[0];
   const ask = snapshot.asks[0];
   const spreadPct = midPrice > 0 ? (spread / midPrice) * 100 : 0;
@@ -55,12 +57,12 @@ function StockSpreadView({ snapshot, spread, midPrice }: {
     <div className="h-full flex flex-col items-center justify-center gap-4 p-4">
       <div className="flex items-center gap-8 w-full max-w-xs">
         <div className="flex-1 text-center">
-          <div className="text-xs text-muted-foreground font-mono mb-1">COMPRA</div>
+          <div className="text-xs text-muted-foreground font-mono mb-1">{t('heatmap.buy')}</div>
           <div className="text-2xl font-bold font-mono text-green-400">
             {formatPrice(bid?.price ?? 0)}
           </div>
           <div className="text-xs text-muted-foreground font-mono mt-1">
-            Vol: {fmtSize(bid?.size ?? 0)}
+            {t('heatmap.volumeShort')}: {fmtSize(bid?.size ?? 0)}
           </div>
         </div>
         <div className="flex flex-col items-center gap-1">
@@ -69,17 +71,17 @@ function StockSpreadView({ snapshot, spread, midPrice }: {
             {formatPrice(midPrice)}
           </div>
           <div className="text-[10px] font-mono text-muted-foreground">
-            Spread: {formatPrice(spread)} ({spreadPct.toFixed(3)}%)
+            {t('heatmap.spread')} {formatPrice(spread)} ({spreadPct.toFixed(3)}%)
           </div>
           <div className="w-0.5 h-8 bg-border" />
         </div>
         <div className="flex-1 text-center">
-          <div className="text-xs text-muted-foreground font-mono mb-1">VENTA</div>
+          <div className="text-xs text-muted-foreground font-mono mb-1">{t('heatmap.sell')}</div>
           <div className="text-2xl font-bold font-mono text-red-400">
             {formatPrice(ask?.price ?? 0)}
           </div>
           <div className="text-xs text-muted-foreground font-mono mt-1">
-            Vol: {fmtSize(ask?.size ?? 0)}
+            {t('heatmap.volumeShort')}: {fmtSize(ask?.size ?? 0)}
           </div>
         </div>
       </div>
@@ -116,11 +118,12 @@ interface TooltipData {
 
 // ==================== CRYPTO DEPTH HEATMAP ====================
 
-function drawHeatmap({ svg, snapshot, w, h, onTooltip }: {
+function drawHeatmap({ svg, snapshot, w, h, onTooltip, tr }: {
   svg: SVGSVGElement;
   snapshot: OrderBookSnapshot;
   w: number; h: number;
   onTooltip: (d: TooltipData | null) => void;
+  tr: (key: string) => string;
 }): void {
   const iw = w - M.left - M.right;
   const ih = h - M.top - M.bottom;
@@ -368,14 +371,14 @@ function drawHeatmap({ svg, snapshot, w, h, onTooltip }: {
     grad.append('stop').attr('offset', '100%').attr('stop-color', askColor(1));
 
     const legLabels = legend.selectAll<SVGTextElement, string>('text.label')
-      .data(['Bajo', 'Alto'])
+      .data([tr('heatmap.low'), tr('heatmap.high')])
       .join('text')
       .attr('class', 'label')
-      .attr('text-anchor', (d) => d === 'Bajo' ? 'end' : 'start')
+      .attr('text-anchor', (d) => d === tr('heatmap.low') ? 'end' : 'start')
       .attr('dominant-baseline', 'central')
       .attr('fill', '#71717a').attr('font-size', 9)
       .attr('font-family', 'ui-monospace, monospace')
-      .attr('x', (d) => d === 'Bajo' ? legendX - 4 : legendX + legendW + 4)
+      .attr('x', (d) => d === tr('heatmap.low') ? legendX - 4 : legendX + legendW + 4)
       .attr('y', legendY)
       .text((d) => d);
 
@@ -388,30 +391,31 @@ function drawHeatmap({ svg, snapshot, w, h, onTooltip }: {
       .attr('rx', 3).attr('ry', 3);
 
     const bidLabel = legend.selectAll<SVGTextElement, string>('text.side-bid')
-      .data(['← COMPRA'])
+      .data([tr('heatmap.buy')])
       .join('text')
       .attr('class', 'side-bid')
       .attr('x', centerX - 40).attr('y', M.top + 10)
       .attr('text-anchor', 'end').attr('fill', '#22c55e')
       .attr('font-size', 10).attr('font-weight', 600)
       .attr('font-family', 'ui-monospace, monospace').attr('opacity', 0.7)
-      .text('← COMPRA');
+      .text(tr('heatmap.buy'));
 
     const askLabel = legend.selectAll<SVGTextElement, string>('text.side-ask')
-      .data(['VENTA →'])
+      .data([tr('heatmap.sell')])
       .join('text')
       .attr('class', 'side-ask')
       .attr('x', centerX + 40).attr('y', M.top + 10)
       .attr('text-anchor', 'start').attr('fill', '#ef4444')
       .attr('font-size', 10).attr('font-weight', 600)
       .attr('font-family', 'ui-monospace, monospace').attr('opacity', 0.7)
-      .text('VENTA →');
+      .text(tr('heatmap.sell'));
   }
 }
 
 // ==================== MAIN WIDGET ====================
 
 export function HeatmapWidget({ symbol }: WidgetProps) {
+  const { t } = useTranslation();
   const crypto = useMemo(() => isCrypto(symbol), [symbol]);
 
   const cryptoDepth = useOrderBook(crypto ? symbol : '');
@@ -456,6 +460,7 @@ export function HeatmapWidget({ symbol }: WidgetProps) {
       w: dimensions.w,
       h: dimensions.h,
       onTooltip: setTooltip,
+      tr: t,
     });
   }, [snapshot, dimensions, crypto]);
 
@@ -479,7 +484,7 @@ export function HeatmapWidget({ symbol }: WidgetProps) {
   const clipY = Math.max(0, Math.min((tooltip?.y ?? 0), dimensions.h - 100));
 
   return (
-    <div className="h-full flex flex-col overflow-hidden" role="region" aria-label={`Market depth ${symbol}`}>
+    <div className="h-full flex flex-col overflow-hidden" role="region" aria-label={t('heatmap.regionAria', { symbol })}>
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/50 shrink-0">
         <div className="flex items-center gap-2">
           <span className={`w-2 h-2 rounded-full shrink-0 ${statusColor[connectionState]}`} aria-hidden />
@@ -487,22 +492,22 @@ export function HeatmapWidget({ symbol }: WidgetProps) {
             {crypto ? symbol.replace('USD', '') : symbol}
           </span>
           <span className="text-xs text-muted-foreground font-mono">
-            Mid: <span className="text-foreground">{formatPrice(midPrice)}</span>
+            {t('heatmap.mid')}: <span className="text-foreground">{formatPrice(midPrice)}</span>
           </span>
           <span className="text-xs text-muted-foreground font-mono">
-            Spread: <span className="text-foreground">{formatPrice(spread)}</span>
+            {t('heatmap.spread')} <span className="text-foreground">{formatPrice(spread)}</span>
           </span>
         </div>
         <div className="flex items-center gap-4 text-xs font-mono">
-          <span className="text-green-400">B: {fmtSize(bidTotal)}</span>
-          <span className="text-red-400">A: {fmtSize(askTotal)}</span>
+          <span className="text-green-400">{t('heatmap.bid')}: {fmtSize(bidTotal)}</span>
+          <span className="text-red-400">{t('heatmap.ask')}: {fmtSize(askTotal)}</span>
           {crypto && (
             <button
               onClick={resetZoom}
               className="px-2 py-0.5 text-[10px] bg-muted hover:bg-muted/80 rounded transition-colors"
-              aria-label="Reset zoom to spread"
+              aria-label={t('heatmap.resetAria')}
             >
-              Reset
+              {t('heatmap.reset')}
             </button>
           )}
         </div>
@@ -512,11 +517,11 @@ export function HeatmapWidget({ symbol }: WidgetProps) {
         {isLoading && !snapshot ? (
           <div className="h-full flex items-center justify-center" role="status" aria-label="Loading data">
             <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-            <span className="sr-only">Loading depth data...</span>
+            <span className="sr-only">{t('heatmap.loading')}</span>
           </div>
         ) : error && !snapshot ? (
           <div className="h-full flex items-center justify-center p-4">
-            <p className="text-destructive text-xs text-center">{error}</p>
+            <p className="text-destructive text-xs text-center">{t(error)}</p>
           </div>
         ) : !crypto && snapshot ? (
           <StockSpreadView snapshot={snapshot} spread={spread} midPrice={midPrice} />
@@ -525,7 +530,7 @@ export function HeatmapWidget({ symbol }: WidgetProps) {
             ref={svgRef}
             className="w-full h-full"
             role="img"
-            aria-label={`Order book ${symbol}`}
+            aria-label={t('heatmap.regionAria', { symbol })}
             tabIndex={0}
             aria-live="polite"
           />
@@ -542,11 +547,11 @@ export function HeatmapWidget({ symbol }: WidgetProps) {
             role="tooltip"
           >
             <div className={`font-bold font-mono ${tooltip.side === 'bid' ? 'text-green-400' : 'text-red-400'}`}>
-              {tooltip.side === 'bid' ? '◀ BUY' : 'SELL ▶'}
+              {tooltip.side === 'bid' ? `◀ ${t('heatmap.buy')}` : `${t('heatmap.sell')} ▶`}
             </div>
             <div className="text-foreground font-mono mt-0.5">{formatPrice(tooltip.price)}</div>
-            <div className="text-muted-foreground font-mono">Vol: {fmtSize(tooltip.size)}</div>
-            <div className="text-muted-foreground font-mono">Cum: {fmtSize(tooltip.total)}</div>
+            <div className="text-muted-foreground font-mono">{t('heatmap.volumeShort')}: {fmtSize(tooltip.size)}</div>
+            <div className="text-muted-foreground font-mono">{t('heatmap.cumulativeShort')}: {fmtSize(tooltip.total)}</div>
           </div>
         )}
       </div>

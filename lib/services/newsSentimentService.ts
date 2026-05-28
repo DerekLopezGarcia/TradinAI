@@ -62,7 +62,7 @@ export class NewsSentimentService {
     'unstable': 1, 'doubt': 1, 'concern': 1, 'delay': 1, 'deteriorate': 1,
   };
 
-  // PALABRAS CLAVE EN ESPANOL
+  // SPANISH KEYWORDS
   private readonly POSITIVE_WORDS_ES: Record<string, number> = {
     'sube': 3, 'rally': 3, 'explosivo': 3, 'record': 3,
     'boom': 3, 'alcista': 3, 'bullish': 3, 'excelente': 3, 'extraordinario': 3,

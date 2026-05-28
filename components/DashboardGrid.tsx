@@ -6,6 +6,7 @@ import { useWidgetStore, WIDGET_DEFINITIONS } from '@/lib/widgetStore';
 import { WidgetWrapper } from '@/components/WidgetWrapper';
 import { getWidgetComponent } from '@/lib/widgetRegistry';
 import type { TimeFrame } from '@/lib/types';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 interface DashboardGridProps {
   symbol: string;
@@ -13,6 +14,7 @@ interface DashboardGridProps {
 }
 
 export function DashboardGrid({ symbol, timeframe }: DashboardGridProps) {
+  const { t } = useTranslation();
   const { enabledWidgets, layouts, setLayouts, editMode } = useWidgetStore();
   const { width, containerRef, mounted } = useContainerWidth();
   const enabledDefs = WIDGET_DEFINITIONS.filter((w) => enabledWidgets.includes(w.id));
@@ -22,8 +24,8 @@ export function DashboardGrid({ symbol, timeframe }: DashboardGridProps) {
       <div className="flex items-center justify-center h-64 text-muted-foreground">
         <p className="text-lg">
           {editMode
-            ? 'Arrastra widgets desde el panel lateral para comenzar'
-            : 'Activa el modo edición para agregar widgets'}
+            ? t('dashboard.emptyWidgets')
+            : t('dashboard.enableEdit')}
         </p>
       </div>
     );
@@ -70,7 +72,7 @@ export function DashboardGrid({ symbol, timeframe }: DashboardGridProps) {
                     <Component symbol={symbol} timeframe={timeframe} />
                   ) : (
                     <div className="p-4 text-sm text-muted-foreground">
-                      Widget &quot;{widget.id}&quot; no encontrado
+                      {t('dashboard.widgetNotFound', { id: widget.id })}
                     </div>
                   )}
                 </WidgetWrapper>

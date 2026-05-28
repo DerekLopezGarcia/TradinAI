@@ -49,7 +49,7 @@ export class YahooFinanceNewsProvider implements NewsProvider {
 
       if (!title && !link) continue;
 
-      const decodedTitle = this.decodeHtmlEntities(title) || 'Sin título';
+      const decodedTitle = this.decodeHtmlEntities(title) || 'news.untitled';
       const decodedDesc = this.decodeHtmlEntities(description) || '';
 
       items.push({
@@ -111,6 +111,8 @@ export class YahooFinanceNewsProvider implements NewsProvider {
       'optimismo', 'positivo', 'prosperidad', 'avance', 'mejora',
       'up', 'gain', 'rise', 'surge', 'record', 'bull', 'profit',
       'growth', 'strong', 'upgrade', 'beat', 'outperform',
+      'success', 'approve', 'agreement', 'optimism', 'positive',
+      'breakthrough', 'partnership', 'expansion', 'innovation',
     ];
     const negativeWords = [
       'baja', 'pierde', 'caída', 'crisis', 'bajista', 'vende', 'bearish',
@@ -118,6 +120,8 @@ export class YahooFinanceNewsProvider implements NewsProvider {
       'pesimismo', 'negativo', 'desplome', 'declive', 'colapso',
       'down', 'fall', 'drop', 'decline', 'loss', 'bear', 'sell',
       'crash', 'weak', 'miss', 'downgrade', 'risk', 'recession',
+      'panic', 'failure', 'conflict', 'pessimism', 'negative',
+      'lawsuit', 'investigation', 'layoff', 'warning', 'debt',
     ];
 
     const positiveCount = positiveWords.filter(word => lowerText.includes(word)).length;

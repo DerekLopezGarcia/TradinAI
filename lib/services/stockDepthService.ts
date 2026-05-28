@@ -70,7 +70,7 @@ class StockDepthService {
       }
       const quote: AlpacaQuote = await res.json();
       if (quote.bidPrice === 0 && quote.askPrice === 0) {
-        return { error: 'Mercado cerrado o sin cotizaciones disponibles' };
+        return { error: 'stockDepth.errorClosed' };
       }
       return {
         snapshot: {
@@ -85,7 +85,7 @@ class StockDepthService {
         },
       };
     } catch (err) {
-      return { error: err instanceof Error ? err.message : 'Error de conexión' };
+      return { error: err instanceof Error ? err.message : 'stockDepth.errorConnection' };
     }
   }
 

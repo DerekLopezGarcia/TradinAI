@@ -6,8 +6,10 @@ import { useMarketData } from '@/app/hooks/useMarketData';
 import { Tooltip, IndicatorLegend } from '@/components/IndicatorTooltip';
 import { calculateRSI, calculateSMA, calculateEMA, calculateADX, calculateStochastic } from '@/lib/indicators';
 import type { WidgetProps } from '@/lib/widgetRegistry';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 export function IndicatorsWidget({ symbol, timeframe }: WidgetProps) {
+  const { t } = useTranslation();
   const { data, loading } = useMarketData(symbol, timeframe);
   const [showBollinger, setShowBollinger] = useState(false);
 
@@ -51,8 +53,8 @@ export function IndicatorsWidget({ symbol, timeframe }: WidgetProps) {
   }
 
   const indicatorItems = [
-    { label: 'SMA(20)', value: indicators.sma, tooltip: 'Media Móvil Simple (20 períodos).' },
-    { label: 'EMA(20)', value: indicators.ema, tooltip: 'Media Móvil Exponencial (20 períodos).' },
+    { label: t('indicators.sma'), value: indicators.sma, tooltip: t('indicator.sma') + ' (20).' },
+    { label: t('indicators.ema'), value: indicators.ema, tooltip: t('indicator.ema') + ' (20).' },
   ];
 
   return (
@@ -69,7 +71,7 @@ export function IndicatorsWidget({ symbol, timeframe }: WidgetProps) {
           </div>
         ))}
         <div className="flex items-center justify-between p-2 bg-muted/30 rounded">
-          <Tooltip content="RSI(14). <30 sobreventa, >70 sobrecompra.">
+          <Tooltip content={t('indicator.rsiTooltip')}>
             <span className="text-xs text-muted-foreground">RSI(14)</span>
           </Tooltip>
           <span
@@ -86,7 +88,7 @@ export function IndicatorsWidget({ symbol, timeframe }: WidgetProps) {
           </span>
         </div>
         <div className="flex items-center justify-between p-2 bg-muted/30 rounded">
-          <Tooltip content="ADX(14). Mide fuerza de tendencia.">
+          <Tooltip content={t('indicator.adxTooltip')}>
             <span className="text-xs text-muted-foreground">ADX(14)</span>
           </Tooltip>
           <span
@@ -104,7 +106,7 @@ export function IndicatorsWidget({ symbol, timeframe }: WidgetProps) {
           </span>
         </div>
         <div className="flex items-center justify-between p-2 bg-muted/30 rounded">
-          <Tooltip content="Stoch %K. <20 sobreventa, >80 sobrecompra.">
+          <Tooltip content={t('indicator.stochKTooltip')}>
             <span className="text-xs text-muted-foreground">Stoch %K</span>
           </Tooltip>
           <span
@@ -121,7 +123,7 @@ export function IndicatorsWidget({ symbol, timeframe }: WidgetProps) {
           </span>
         </div>
         <div className="flex items-center justify-between p-2 bg-muted/30 rounded">
-          <Tooltip content="Stoch %D. Media móvil de %K.">
+          <Tooltip content={t('indicator.stochDTooltip')}>
             <span className="text-xs text-muted-foreground">Stoch %D</span>
           </Tooltip>
           <span
@@ -138,7 +140,7 @@ export function IndicatorsWidget({ symbol, timeframe }: WidgetProps) {
           </span>
         </div>
         <div className="flex items-center justify-between p-2 bg-muted/30 rounded">
-          <Tooltip content="Bandas de Bollinger (20, 2).">
+          <Tooltip content={t('indicator.bbTooltip')}>
             <button
               onClick={() => setShowBollinger(!showBollinger)}
               className={`text-xs px-2 py-1 rounded transition-colors border ${

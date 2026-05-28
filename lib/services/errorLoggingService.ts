@@ -107,15 +107,15 @@ class ErrorLoggingService {
     const statusStr = statusCode ? ` (${statusCode})` : '';
 
     const messages: Record<ErrorCategory, string> = {
-      API_TIMEOUT: `⏱️ ${symbol}${providerStr}: Timeout - API tardó demasiado${statusStr}`,
-      INVALID_SYMBOL: `❌ ${symbol}: Símbolo inválido o no soportado${contextStr}`,
-      RATE_LIMITED: `🚫 ${symbol}${providerStr}: Demasiadas solicitudes (rate limited)${statusStr}`,
-      INVALID_DATA: `📊 ${symbol}: Datos inválidos recibidos${statusStr}${contextStr}`,
-      NETWORK_ERROR: `🌐 ${symbol}: Error de conexión de red${contextStr}`,
-      PROVIDER_UNAVAILABLE: `⛔ ${symbol}${providerStr}: Proveedor no disponible${statusStr}`,
-      PARSE_ERROR: `🔍 ${symbol}: Error al procesar datos${contextStr}`,
-      CACHE_MISS: `💾 ${symbol}: Caché no disponible${contextStr}`,
-      UNKNOWN: `⚠️  ${symbol}: Error desconocido${contextStr}`,
+      API_TIMEOUT: `⏱️ ${symbol}${providerStr}: Timeout - API took too long${statusStr}`,
+      INVALID_SYMBOL: `❌ ${symbol}: Invalid or unsupported symbol${contextStr}`,
+      RATE_LIMITED: `🚫 ${symbol}${providerStr}: Too many requests (rate limited)${statusStr}`,
+      INVALID_DATA: `📊 ${symbol}: Invalid data received${statusStr}${contextStr}`,
+      NETWORK_ERROR: `🌐 ${symbol}: Network connection error${contextStr}`,
+      PROVIDER_UNAVAILABLE: `⛔ ${symbol}${providerStr}: Provider unavailable${statusStr}`,
+      PARSE_ERROR: `🔍 ${symbol}: Error processing data${contextStr}`,
+      CACHE_MISS: `💾 ${symbol}: Cache unavailable${contextStr}`,
+      UNKNOWN: `⚠️  ${symbol}: Unknown error${contextStr}`,
     };
 
     return messages[category];
@@ -138,8 +138,8 @@ class ErrorLoggingService {
     };
 
     const style = styles[log.category];
-    const time = log.timestamp.toLocaleTimeString('es-ES');
-    const details = log.errorDetails ? `\n  Detalles: ${log.errorDetails}` : '';
+    const time = log.timestamp.toLocaleTimeString('en-US');
+    const details = log.errorDetails ? `\n  Details: ${log.errorDetails}` : '';
 
     console.log(
       `%c[${time}] ${log.message}${details}`,

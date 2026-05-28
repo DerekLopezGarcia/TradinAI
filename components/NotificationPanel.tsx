@@ -2,9 +2,11 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useMarketStore } from '@/lib/store';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import { Bell, X, TrendingUp, TrendingDown, Trash2, Clock } from 'lucide-react';
 
 export function NotificationPanel() {
+  const { t, locale } = useTranslation();
   const { alerts, removeAlert } = useMarketStore();
   const [isOpen, setIsOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -40,21 +42,21 @@ export function NotificationPanel() {
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 1) return 'Ahora';
+    if (diffMins < 1) return t('notification.now');
     if (diffMins < 60) return `${diffMins}m`;
     if (diffHours < 24) return `${diffHours}h`;
     if (diffDays < 7) return `${diffDays}d`;
-    return date.toLocaleDateString('es-ES');
+    return date.toLocaleDateString(locale === 'en' ? 'en-US' : 'es-ES');
   };
 
   const getAlertLabel = (type: string) => {
     const labels: Record<string, string> = {
-      'price_above': 'Precio >',
-      'price_below': 'Precio <',
-      'sma_cross': 'Cruce SMA',
-      'ema_cross': 'Cruce EMA',
+      'price_above': t('notification.priceAbove'),
+      'price_below': t('notification.priceBelow'),
+      'sma_cross': t('notification.smaCross'),
+      'ema_cross': t('notification.emaCross'),
     };
-    return labels[type] || 'Alerta';
+    return labels[type] || t('notification.alert');
   };
 
   return (
@@ -64,7 +66,7 @@ export function NotificationPanel() {
         ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
         className="p-2 rounded-lg transition-colors hover:bg-muted relative group"
-        title={hasAlerts ? `${alerts.length} notificación(es)` : 'Sin notificaciones'}
+        title={hasAlerts ? t('notification.count', { count: alerts.length }) : t('notification.noNotifications')}
       >
         <Bell className="w-5 h-5 text-foreground" />
         {hasAlerts && (
@@ -88,9 +90,9 @@ export function NotificationPanel() {
             <div className="flex items-center gap-2">
               <Bell className="w-5 h-5 text-primary" />
               <div>
-                <h3 className="font-semibold text-sm">Notificaciones</h3>
+                <h3 className="font-semibold text-sm">{t('notification.title')}</h3>
                 <p className="text-xs text-muted-foreground">
-                  {hasAlerts ? `${alerts.length} alerta(s)` : 'Sin alertas'}
+                  {hasAlerts ? t('notification.alertCount', { count: alerts.length }) : t('notification.noAlerts')}
                 </p>
               </div>
             </div>
@@ -108,10 +110,10 @@ export function NotificationPanel() {
               <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
                 <Bell className="w-10 h-10 text-muted-foreground/30 mb-2" />
                 <p className="text-sm font-medium text-muted-foreground">
-                  Sin notificaciones
+                  {t('notification.noNotifications')}
                 </p>
                 <p className="text-xs text-muted-foreground/70 mt-1">
-                  Crea alertas en el panel flotante para recibir notificaciones
+                  {t('notification.hint')}
                 </p>
               </div>
             ) : (
@@ -145,7 +147,7 @@ export function NotificationPanel() {
                       <button
                         onClick={() => removeAlert(alert.id)}
                         className="p-1 hover:bg-destructive/20 rounded transition-colors opacity-0 group-hover:opacity-100"
-                        title="Eliminar alerta"
+                        title={t('notification.delete')}
                       >
                         <Trash2 className="w-4 h-4 text-destructive" />
                       </button>
@@ -166,7 +168,7 @@ export function NotificationPanel() {
                 }}
                 className="w-full text-xs font-medium text-destructive hover:bg-destructive/10 px-3 py-2 rounded transition-colors"
               >
-                Limpiar todas las alertas
+                {t('notification.clearAll')}
               </button>
             </div>
           )}

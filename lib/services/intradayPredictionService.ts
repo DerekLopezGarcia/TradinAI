@@ -287,8 +287,8 @@ export class IntradayPredictionService extends BaseService {
       }
     }
 
-    const reasoning = `Predicción basada en: momentum ${momentum} (${probabilityUp > 55 ? '+' : ''}${Math.round(probabilityUp - 50)}%), ` +
-      `tendencia ${trend}, volatilidad ${volatility}, patrón histórico ${Math.round(historicalPattern.similarity)}% similar. ` +
+    const reasoning = `Prediction based on: momentum ${momentum} (${probabilityUp > 55 ? '+' : ''}${Math.round(probabilityUp - 50)}%), ` +
+      `trend ${trend}, volatility ${volatility}, historical pattern ${Math.round(historicalPattern.similarity)}% similar. ` +
       `Target: ${priceTarget?.toFixed(2) || 'N/A'} (${priceTargetPercent > 0 ? '+' : ''}${priceTargetPercent.toFixed(2)}%)`;
 
     return {
@@ -314,12 +314,12 @@ export class IntradayPredictionService extends BaseService {
     const now = new Date();
     const utcHour = now.getUTCHours();
 
-    if (utcHour >= 13 && utcHour < 21) return 'US Regular Hours (9:30-17:00 ET)';
-    if (utcHour >= 21 || utcHour < 4) return 'After Hours / Pre-market';
-    if (utcHour >= 8 && utcHour < 13) return 'European Markets';
-    if (utcHour >= 4 && utcHour < 8) return 'Asian Markets';
+    if (utcHour >= 13 && utcHour < 21) return 'intraday.timeUS';
+    if (utcHour >= 21 || utcHour < 4) return 'intraday.timeAfterHours';
+    if (utcHour >= 8 && utcHour < 13) return 'intraday.timeEuropean';
+    if (utcHour >= 4 && utcHour < 8) return 'intraday.timeAsian';
 
-    return 'Off-market hours';
+    return 'intraday.timeOff';
   }
 }
 

@@ -16,6 +16,7 @@ import {
   Cell,
 } from 'recharts';
 import { format } from 'date-fns';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 interface PriceChartProps {
   data: CandleData[];
@@ -29,6 +30,7 @@ interface PriceChartProps {
 }
 
 export function PriceChart({ data, symbol, showVolume = true, indicators }: PriceChartProps) {
+  const { t } = useTranslation();
   const [zoomLevel, setZoomLevel] = useState(50);
 
   // Validar que data no esté vacío
@@ -39,7 +41,7 @@ export function PriceChart({ data, symbol, showVolume = true, indicators }: Pric
           <p className="text-muted-foreground text-center">
             Cargando datos de velas japonesas...
             <br />
-            <span className="text-xs text-muted-foreground/70">Por favor espera mientras se obtienen los datos del mercado</span>
+            <span className="text-xs text-muted-foreground/70">{t('chart.loadingSubtext')}</span>
           </p>
         </div>
       </div>
@@ -95,21 +97,21 @@ export function PriceChart({ data, symbol, showVolume = true, indicators }: Pric
           <p className="text-emerald-400 font-bold text-sm mb-2">{data.time} {data.date}</p>
           <div className="space-y-1">
             <div className="flex justify-between gap-4">
-              <span className="text-slate-400">Apertura:</span>
+              <span className="text-slate-400">{t('chart.open')}:</span>
               <span className="text-white font-semibold">${data.open.toFixed(2)}</span>
             </div>
             <div className="flex justify-between gap-4">
-              <span className="text-slate-400">Cierre:</span>
+              <span className="text-slate-400">{t('chart.close')}:</span>
               <span className={isGreen ? 'text-emerald-400 font-semibold' : 'text-red-400 font-semibold'}>
                 ${data.close.toFixed(2)}
               </span>
             </div>
             <div className="flex justify-between gap-4">
-              <span className="text-slate-400">Máximo:</span>
+              <span className="text-slate-400">{t('chart.high')}:</span>
               <span className="text-cyan-300 font-semibold">${data.high.toFixed(2)}</span>
             </div>
             <div className="flex justify-between gap-4">
-              <span className="text-slate-400">Mínimo:</span>
+              <span className="text-slate-400">{t('chart.low')}:</span>
               <span className="text-orange-300 font-semibold">${data.low.toFixed(2)}</span>
             </div>
             {data.volume && (
@@ -128,7 +130,7 @@ export function PriceChart({ data, symbol, showVolume = true, indicators }: Pric
       <div className="flex items-center justify-between border-b border-slate-700 pb-4">
         <div>
           <h2 className="text-3xl font-bold text-white">{symbol}</h2>
-          <p className="text-xs text-slate-500 mt-1">Gráfico de Barras Coloreadas | {candlesToShow} barras visibles</p>
+          <p className="text-slate-500 mt-1">{t('chart.coloredBars')} | {candlesToShow} {t('chart.visibleBars')}</p>
         </div>
         <div className="text-right space-y-2">
           <p className={`text-3xl font-bold ${stats.change >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
@@ -143,23 +145,23 @@ export function PriceChart({ data, symbol, showVolume = true, indicators }: Pric
       {/* Estadísticas principales */}
       <div className="grid grid-cols-5 gap-2 text-xs bg-slate-800/30 p-3 rounded-lg border border-slate-700/50">
         <div>
-          <p className="text-slate-500 uppercase tracking-wider">Máximo</p>
+          <p className="text-slate-500 uppercase tracking-wider">{t('chart.high')}</p>
           <p className="text-emerald-400 font-bold text-sm mt-1">${stats.max.toFixed(2)}</p>
         </div>
         <div>
-          <p className="text-slate-500 uppercase tracking-wider">Mínimo</p>
+          <p className="text-slate-500 uppercase tracking-wider">{t('chart.low')}</p>
           <p className="text-red-400 font-bold text-sm mt-1">${stats.min.toFixed(2)}</p>
         </div>
         <div>
-          <p className="text-slate-500 uppercase tracking-wider">Apertura</p>
+          <p className="text-slate-500 uppercase tracking-wider">{t('chart.open')}</p>
           <p className="text-cyan-300 font-bold text-sm mt-1">${displayData[0]?.open.toFixed(2) || '0.00'}</p>
         </div>
         <div>
-          <p className="text-slate-500 uppercase tracking-wider">Rango</p>
+          <p className="text-slate-500 uppercase tracking-wider">{t('chart.range')}</p>
           <p className="text-yellow-300 font-bold text-sm mt-1">${(stats.max - stats.min).toFixed(2)}</p>
         </div>
         <div>
-          <p className="text-slate-500 uppercase tracking-wider">Promedio</p>
+          <p className="text-slate-500 uppercase tracking-wider">{t('chart.average')}</p>
           <p className="text-blue-300 font-bold text-sm mt-1">${stats.avg.toFixed(2)}</p>
         </div>
       </div>
@@ -167,9 +169,9 @@ export function PriceChart({ data, symbol, showVolume = true, indicators }: Pric
       {/* Gráfico candlestick personalizado */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">Precio (USD) - Gráfico de Velas</h3>
+          <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">{t('chart.priceChart')}</h3>
           <div className="flex items-center gap-2 text-xs">
-            <span className="text-slate-400">Zoom:</span>
+            <span className="text-slate-400">{t('chart.zoom')}:</span>
             <input
               type="range"
               min="10"
@@ -211,7 +213,7 @@ export function PriceChart({ data, symbol, showVolume = true, indicators }: Pric
                 stroke="#64748b"
                 style={{ fontSize: '12px' }}
                 tick={{ fill: '#94a3b8' }}
-                label={{ value: 'Precio (USD)', angle: -90, position: 'insideLeft' }}
+                label={{ value: t('chart.priceUsd'), angle: -90, position: 'insideLeft' }}
               />
 
               <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(34, 211, 238, 0.05)' }} />
@@ -256,11 +258,11 @@ export function PriceChart({ data, symbol, showVolume = true, indicators }: Pric
         <div className="flex items-center gap-4 text-xs px-2 flex-wrap">
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 bg-emerald-500 rounded-sm"></div>
-            <span className="text-slate-400">Sube (vs anterior)</span>
+            <span className="text-slate-400">{t('chart.up')}</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 bg-red-500 rounded-sm"></div>
-            <span className="text-slate-400">Baja (vs anterior)</span>
+            <span className="text-slate-400">{t('chart.down')}</span>
           </div>
           {indicators?.sma20 && (
             <div className="flex items-center gap-2">
@@ -280,7 +282,7 @@ export function PriceChart({ data, symbol, showVolume = true, indicators }: Pric
       {/* Volumen separado */}
       {showVolume && displayData.length > 0 && (
         <div className="space-y-2 border-t border-slate-700 pt-4">
-          <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">Volumen de Operaciones</h3>
+          <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">{t('chart.volume')}</h3>
           <div className="w-full h-32 bg-gradient-to-br from-slate-900 to-slate-950 rounded-lg border border-slate-700">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={displayData} margin={{ top: 10, right: 30, left: 60, bottom: 20 }}>
@@ -323,6 +325,7 @@ interface RSIChartProps {
 }
 
 export function RSIChart({ data }: RSIChartProps) {
+  const { t } = useTranslation();
   // Mostrar últimos 50 valores
   const displayData = useMemo(() => {
     const lastData = data.slice(-50);
@@ -336,10 +339,10 @@ export function RSIChart({ data }: RSIChartProps) {
   const currentRSI = displayData[displayData.length - 1]?.rsi || 0;
 
   const getStatus = (rsi: number) => {
-    if (rsi > 70) return { text: 'Sobrecomprado', color: 'text-red-400', bg: 'bg-red-900/20', border: 'border-red-500/50' };
-    if (rsi < 30) return { text: 'Sobrevendido', color: 'text-emerald-400', bg: 'bg-emerald-900/20', border: 'border-emerald-500/50' };
-    if (rsi > 50) return { text: 'Alcista', color: 'text-emerald-400', bg: 'bg-emerald-900/10', border: 'border-emerald-500/30' };
-    return { text: 'Bajista', color: 'text-red-400', bg: 'bg-red-900/10', border: 'border-red-500/30' };
+    if (rsi > 70) return { text: t('chart.overbought'), color: 'text-red-400', bg: 'bg-red-900/20', border: 'border-red-500/50' };
+    if (rsi < 30) return { text: t('chart.oversold'), color: 'text-emerald-400', bg: 'bg-emerald-900/20', border: 'border-emerald-500/50' };
+    if (rsi > 50) return { text: t('chart.bullish'), color: 'text-emerald-400', bg: 'bg-emerald-900/10', border: 'border-emerald-500/30' };
+    return { text: t('chart.bearish'), color: 'text-red-400', bg: 'bg-red-900/10', border: 'border-red-500/30' };
   };
 
   const status = getStatus(currentRSI);
@@ -365,7 +368,7 @@ export function RSIChart({ data }: RSIChartProps) {
       <div className="flex items-center justify-between border-b border-slate-700 pb-4">
         <div>
           <h3 className="text-2xl font-bold text-white">RSI (14)</h3>
-          <p className="text-xs text-slate-500 mt-1">Índice de Fuerza Relativa</p>
+          <p className="text-xs text-slate-500 mt-1">{t('chart.rsiTitle')}</p>
         </div>
         <div className={`text-right px-4 py-2 rounded-lg ${status.bg} border ${status.border}`}>
           <p className={`text-2xl font-bold ${status.color}`}>{currentRSI.toFixed(2)}</p>
@@ -376,15 +379,15 @@ export function RSIChart({ data }: RSIChartProps) {
       {/* Estadísticas de RSI */}
       <div className="grid grid-cols-3 gap-3 text-xs bg-slate-800/30 p-3 rounded-lg border border-slate-700/50">
         <div>
-          <p className="text-slate-500 uppercase tracking-wider">Máximo</p>
+          <p className="text-slate-500 uppercase tracking-wider">{t('chart.high')}</p>
           <p className="text-cyan-300 font-bold text-sm mt-1">{Math.max(...displayData.map(d => d.rsi || 0)).toFixed(2)}</p>
         </div>
         <div>
-          <p className="text-slate-500 uppercase tracking-wider">Mínimo</p>
+          <p className="text-slate-500 uppercase tracking-wider">{t('chart.low')}</p>
           <p className="text-orange-300 font-bold text-sm mt-1">{Math.min(...displayData.map(d => d.rsi || 0)).toFixed(2)}</p>
         </div>
         <div>
-          <p className="text-slate-500 uppercase tracking-wider">Promedio</p>
+          <p className="text-slate-500 uppercase tracking-wider">{t('chart.average')}</p>
           <p className="text-blue-300 font-bold text-sm mt-1">
             {(displayData.reduce((sum, d) => sum + (d.rsi || 0), 0) / displayData.length).toFixed(2)}
           </p>
@@ -393,7 +396,7 @@ export function RSIChart({ data }: RSIChartProps) {
 
       {/* Gráfico RSI */}
       <div className="space-y-2">
-        <h4 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">Evolución RSI</h4>
+        <h4 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">{t('chart.rsiEvolution')}</h4>
         <div className="w-full h-80 bg-gradient-to-br from-slate-900 to-slate-950 rounded-lg border border-slate-700 overflow-hidden">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={displayData} margin={{ top: 20, right: 30, left: 60, bottom: 30 }}>
@@ -436,7 +439,7 @@ export function RSIChart({ data }: RSIChartProps) {
                 strokeDasharray="5 5"
                 strokeWidth={2}
                 label={{
-                  value: '70 - Sobrecomprado',
+                  value: `70 - ${t('chart.overbought')}`,
                   position: 'right',
                   fill: '#ef4444',
                   fontSize: 11,
@@ -451,7 +454,7 @@ export function RSIChart({ data }: RSIChartProps) {
                 strokeDasharray="5 5"
                 strokeWidth={2}
                 label={{
-                  value: '30 - Sobrevendido',
+                  value: `30 - ${t('chart.oversold')}`,
                   position: 'right',
                   fill: '#10b981',
                   fontSize: 11,
@@ -483,14 +486,14 @@ export function RSIChart({ data }: RSIChartProps) {
         {/* Leyenda de zonas */}
         <div className="grid grid-cols-2 gap-3">
           <div className="p-3 bg-red-900/20 border border-red-500/50 rounded-lg">
-            <p className="text-red-400 font-bold text-sm">Sobrecomprado</p>
+            <p className="text-red-400 font-bold text-sm">{t('chart.overbought')}</p>
             <p className="text-slate-400 text-xs mt-1">RSI {'>'} 70</p>
-            <p className="text-slate-500 text-xs mt-1">Posible reversa bajista</p>
+            <p className="text-slate-500 text-xs mt-1">{t('chart.possibleBearishReversal')}</p>
           </div>
           <div className="p-3 bg-emerald-900/20 border border-emerald-500/50 rounded-lg">
-            <p className="text-emerald-400 font-bold text-sm">Sobrevendido</p>
+            <p className="text-emerald-400 font-bold text-sm">{t('chart.oversold')}</p>
             <p className="text-slate-400 text-xs mt-1">RSI {'<'} 30</p>
-            <p className="text-slate-500 text-xs mt-1">Posible reversa alcista</p>
+            <p className="text-slate-500 text-xs mt-1">{t('chart.possibleBullishReversal')}</p>
           </div>
         </div>
       </div>

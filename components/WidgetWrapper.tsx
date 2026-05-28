@@ -2,6 +2,7 @@
 
 import { GripVertical, X } from 'lucide-react';
 import { useWidgetStore } from '@/lib/widgetStore';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 interface WidgetWrapperProps {
   title: string;
@@ -10,6 +11,7 @@ interface WidgetWrapperProps {
 }
 
 export function WidgetWrapper({ title, widgetId, children }: WidgetWrapperProps) {
+  const { t } = useTranslation();
   const { editMode, toggleWidget } = useWidgetStore();
 
   return (
@@ -29,7 +31,7 @@ export function WidgetWrapper({ title, widgetId, children }: WidgetWrapperProps)
           <button
             onClick={() => toggleWidget(widgetId)}
             className="p-0.5 hover:bg-destructive/20 rounded transition-colors shrink-0"
-            title="Eliminar widget"
+            title={t('widgetWrapper.remove')}
           >
             <X className="w-3.5 h-3.5 text-destructive" />
           </button>

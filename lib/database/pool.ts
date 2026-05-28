@@ -95,16 +95,16 @@ export class RailwayConnectionPool {
    */
   private setupPoolListeners(): void {
     this.pool.on('error', (err: Error) => {
-      this.logger.error('❌ Pool error no capturado', err);
+      this.logger.error('Uncaught pool error', err);
       this.recordFailure();
     });
 
     this.pool.on('connect', () => {
-      this.logger.debug('📡 Nueva conexión establecida');
+      this.logger.debug('New connection established');
     });
 
     this.pool.on('remove', () => {
-      this.logger.debug('📡 Conexión removida del pool');
+      this.logger.debug('Connection removed from pool');
     });
   }
 
@@ -120,12 +120,12 @@ export class RailwayConnectionPool {
     if (this.circuitBreaker.status === 'OPEN') {
       const timeSinceFailure = Date.now() - (this.circuitBreaker.lastFailureTime || 0);
       if (timeSinceFailure > this.CIRCUIT_BREAKER_TIMEOUT) {
-        this.logger.info('🔄 Circuit breaker: intentando HALF_OPEN');
+        this.logger.info('Circuit breaker: attempting HALF_OPEN');
         this.circuitBreaker.status = 'HALF_OPEN';
         this.circuitBreaker.successCount = 0;
       } else {
         throw new Error(
-          `Circuit breaker OPEN: DB no disponible. Retry en ${this.CIRCUIT_BREAKER_TIMEOUT / 1000}s`
+          `Circuit breaker OPEN: DB unavailable. Retry in ${this.CIRCUIT_BREAKER_TIMEOUT / 1000}s`
         );
       }
     }
@@ -145,11 +145,11 @@ export class RailwayConnectionPool {
         if (attempt < retries) {
           const backoffMs = Math.pow(2, attempt - 1) * 100; // 100ms, 200ms, 400ms
           this.logger.warn(
-            `⚠️ Query falló (intento ${attempt}/${retries}), reintentando en ${backoffMs}ms: ${sql.substring(0, 50)}...`
+            `Query failed (attempt ${attempt}/${retries}), retrying in ${backoffMs}ms: ${sql.substring(0, 50)}...`
           );
           await this.delay(backoffMs);
         } else {
-          this.logger.error('❌ Query falló después de todos los reintentos', lastError);
+          this.logger.error('Query failed after all retries', lastError);
         }
       }
     }
@@ -163,7 +163,7 @@ export class RailwayConnectionPool {
    */
   async getClient(): Promise<PoolClient> {
     if (this.circuitBreaker.status === 'OPEN') {
-      throw new Error('Circuit breaker OPEN: no puedo obtener cliente');
+      throw new Error('Circuit breaker OPEN: cannot get client');
     }
 
     try {
@@ -182,10 +182,10 @@ export class RailwayConnectionPool {
   async healthCheck(): Promise<boolean> {
     try {
       const result = await this.query('SELECT 1');
-      this.logger.debug('✅ Health check OK');
+      this.logger.debug('Health check OK');
       return !!result;
     } catch (error) {
-      this.logger.error('❌ Health check falló', error as Error);
+      this.logger.error('Health check failed', error as Error);
       return false;
     }
   }
@@ -251,7 +251,7 @@ export class RailwayConnectionPool {
    */
   private recordFailure(): void {
     if (this.circuitBreaker.status === 'HALF_OPEN') {
-      this.logger.warn('❌ HALF_OPEN falló, reabriendo circuit breaker');
+      this.logger.warn('HALF_OPEN failed, reopening circuit breaker');
       this.circuitBreaker.status = 'OPEN';
       this.circuitBreaker.failureCount = 0;
       this.circuitBreaker.lastFailureTime = Date.now();

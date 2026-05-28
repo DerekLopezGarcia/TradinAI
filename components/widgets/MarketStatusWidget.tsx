@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { marketHoursService } from '@/lib/services/marketHoursService';
 import type { WidgetProps } from '@/lib/widgetRegistry';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 function fmtCountdown(ms: number): string {
   if (ms <= 0) return '';
@@ -14,6 +15,7 @@ function fmtCountdown(ms: number): string {
 }
 
 export function MarketStatusWidget({ symbol }: WidgetProps) {
+  const { t } = useTranslation();
   const [now, setNow] = useState(Date.now());
 
   const update = useCallback(() => setNow(Date.now()), []);
@@ -29,7 +31,7 @@ export function MarketStatusWidget({ symbol }: WidgetProps) {
       <div className="h-full flex flex-col items-center justify-center gap-1 p-4">
         <span className="text-lg">🔄</span>
         <span className="text-xs font-semibold text-green-400">24/7</span>
-        <span className="text-[10px] text-muted-foreground">Mercado continuo</span>
+        <span className="text-[10px] text-muted-foreground">{t('marketStatus.continuous')}</span>
       </div>
     );
   }
@@ -40,13 +42,13 @@ export function MarketStatusWidget({ symbol }: WidgetProps) {
     <div className="h-full flex flex-col items-center justify-center gap-2 p-4">
       <div className={`w-3 h-3 rounded-full ${status.isOpen ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
       <span className={`text-xs font-bold ${status.isOpen ? 'text-green-400' : 'text-red-400'}`}>
-        {status.isOpen ? 'ABIERTO' : 'CERRADO'}
+        {status.isOpen ? t('marketStatus.open') : t('marketStatus.closed')}
       </span>
       <div className="text-[10px] text-muted-foreground text-center leading-relaxed">
         {status.isOpen ? (
-          <>Cierre: {status.closeTime.getUTCHours().toString().padStart(2, '0')}:{status.closeTime.getUTCMinutes().toString().padStart(2, '0')} UTC</>
+          <>{t('marketStatus.closeAt')} {status.closeTime.getUTCHours().toString().padStart(2, '0')}:{status.closeTime.getUTCMinutes().toString().padStart(2, '0')} UTC</>
         ) : (
-          <>Apertura: {status.openTime.getUTCHours().toString().padStart(2, '0')}:{status.openTime.getUTCMinutes().toString().padStart(2, '0')} UTC</>
+          <>{t('marketStatus.openAt')} {status.openTime.getUTCHours().toString().padStart(2, '0')}:{status.openTime.getUTCMinutes().toString().padStart(2, '0')} UTC</>
         )}
       </div>
       <div className="text-[10px] font-mono text-foreground">

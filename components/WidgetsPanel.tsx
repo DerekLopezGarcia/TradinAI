@@ -5,10 +5,15 @@ import { useDrop } from 'react-dnd';
 import { X, Plus, Check, Grid3x3, Search } from 'lucide-react';
 import { useWidgetStore, WIDGET_DEFINITIONS } from '@/lib/widgetStore';
 import { getAllWidgets } from '@/lib/widgetRegistry';
+import { useTranslation } from '@/lib/i18n/useTranslation';
+
+const widgetTitleKey = (id: string) => `widget.${id.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase())}Title`;
+const widgetDescKey = (id: string) => `widget.${id.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase())}Desc`;
 
 const DRAG_TYPE = 'WIDGET';
 
 export function WidgetsPanel() {
+  const { t } = useTranslation();
   const { editMode, enabledWidgets, toggleWidget } = useWidgetStore();
   const [searchQuery, setSearchQuery] = useState('');
   const allWidgets = getAllWidgets();
@@ -35,15 +40,15 @@ export function WidgetsPanel() {
 
   const filteredActive = searchQuery
     ? activeWidgets.filter((w) =>
-        w.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        w.description.toLowerCase().includes(searchQuery.toLowerCase())
+        t(widgetTitleKey(w.id)).toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t(widgetDescKey(w.id)).toLowerCase().includes(searchQuery.toLowerCase())
       )
     : activeWidgets;
 
   const filteredAvailable = searchQuery
     ? availableWidgets.filter((w) =>
-        w.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        w.description.toLowerCase().includes(searchQuery.toLowerCase())
+        t(widgetTitleKey(w.id)).toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t(widgetDescKey(w.id)).toLowerCase().includes(searchQuery.toLowerCase())
       )
     : availableWidgets;
 
@@ -56,7 +61,7 @@ export function WidgetsPanel() {
       <div className="flex items-center justify-between p-4 border-b border-border">
         <div className="flex items-center gap-2">
           <Grid3x3 className="w-4 h-4 text-primary" />
-          <h2 className="text-sm font-bold text-foreground">Widgets</h2>
+          <h2 className="text-sm font-bold text-foreground">{t('widgetPanel.title')}</h2>
         </div>
       </div>
 
@@ -65,7 +70,7 @@ export function WidgetsPanel() {
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Buscar widget..."
+            placeholder={t('widgetPanel.search')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-muted/50 border border-border rounded-lg pl-8 pr-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/40 transition-all"
@@ -82,15 +87,15 @@ export function WidgetsPanel() {
         {filteredActive.length > 0 && (
           <div>
             <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 px-1">
-              Activos ({filteredActive.length})
+              {t('widgetPanel.active', { count: filteredActive.length })}
             </p>
             <div className="space-y-1">
               {filteredActive.map((widget) => (
                 <DraggableWidgetItem
                   key={widget.id}
                   id={widget.id}
-                  title={widget.title}
-                  description={widget.description}
+                  title={t(widgetTitleKey(widget.id))}
+                  description={t(widgetDescKey(widget.id))}
                   isActive={true}
                   onToggle={() => toggleWidget(widget.id)}
                 />
@@ -102,15 +107,15 @@ export function WidgetsPanel() {
         {filteredAvailable.length > 0 && (
           <div>
             <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 px-1">
-              Disponibles ({filteredAvailable.length})
+              {t('widgetPanel.available', { count: filteredAvailable.length })}
             </p>
             <div className="space-y-1">
               {filteredAvailable.map((widget) => (
                 <DraggableWidgetItem
                   key={widget.id}
                   id={widget.id}
-                  title={widget.title}
-                  description={widget.description}
+                  title={t(widgetTitleKey(widget.id))}
+                  description={t(widgetDescKey(widget.id))}
                   isActive={false}
                   onToggle={() => toggleWidget(widget.id)}
                 />
@@ -122,7 +127,7 @@ export function WidgetsPanel() {
         {searchQuery && filteredActive.length === 0 && filteredAvailable.length === 0 && (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <Search className="w-8 h-8 text-muted-foreground/30 mb-2" />
-            <p className="text-xs text-muted-foreground">Sin resultados</p>
+            <p className="text-xs text-muted-foreground">{t('widgetPanel.noResults')}</p>
           </div>
         )}
       </div>
@@ -145,6 +150,7 @@ interface DraggableWidgetItemProps {
 import { useDrag } from 'react-dnd';
 
 function DraggableWidgetItem({ id, title, description, isActive, onToggle }: DraggableWidgetItemProps) {
+  const { t } = useTranslation();
   const [{ isDragging }, dragConnect] = useDrag(() => ({
     type: DRAG_TYPE,
     item: { id },
@@ -171,7 +177,7 @@ function DraggableWidgetItem({ id, title, description, isActive, onToggle }: Dra
       onClick={() => {
         if (!isActive) onToggle();
       }}
-      title={isActive ? 'Click para eliminar del dashboard' : 'Arrastra o click para agregar al dashboard'}
+      title={isActive ? t('widgetPanel.removeFromDashboard') : t('widgetPanel.addToDashboard')}
     >
       <div className="flex-1 min-w-0">
         <p className={`text-xs font-medium truncate ${isActive ? 'text-primary' : 'text-foreground'}`}>
@@ -189,7 +195,7 @@ function DraggableWidgetItem({ id, title, description, isActive, onToggle }: Dra
             ? 'text-destructive hover:bg-destructive/10'
             : 'text-primary hover:bg-primary/10'
         }`}
-        title={isActive ? 'Eliminar' : 'Agregar'}
+        title={isActive ? t('widgetPanel.remove') : t('widgetPanel.add')}
       >
         {isActive ? (
           <X className="w-3.5 h-3.5" />

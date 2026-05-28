@@ -57,6 +57,7 @@ import {
   calculateStochastic 
 } from '@/lib/indicators';
 import { BaseService } from '@/lib/core/services';
+import { t } from '@/lib/i18n/t';
 
 // ==================== TIPOS ====================
 
@@ -272,7 +273,7 @@ export class CandleAnalyzer extends BaseService {
    */
   async analyze(): Promise<CandleAnalysisResponse> {
     if (this.candles.length < 20) {
-      throw new Error('Se requieren al menos 20 velas para un análisis confiable');
+      throw new Error('candle.errorNotEnoughCandles');
     }
 
     // Verificar cache primero
@@ -340,7 +341,7 @@ export class CandleAnalyzer extends BaseService {
 
     const summary = {
       trend: trendValue,
-      bias: `${mainPrediction.direction} (${mainPrediction.probability}% probabilidad)`,
+      bias: `${mainPrediction.direction} (${mainPrediction.probability}% probability)`,
       overallSentiment: this.getOverallSentiment(
         trendAnalysis,
         patterns,
@@ -371,10 +372,10 @@ export class CandleAnalyzer extends BaseService {
       detailedAnalysis,
       newsImpact: this.newsImpact,
       warnings: [
-        'Los análisis técnicos son probabilidades, no certezas',
-        'El rendimiento pasado no garantiza resultados futuros',
-        'Se recomienda gestión de riesgo apropiada',
-        'Considerar eventos macroeconómicos y noticias de última hora'
+        'candle.warning1',
+        'candle.warning2',
+        'candle.warning3',
+        'candle.warning4'
       ]
     };
 
@@ -488,11 +489,11 @@ export class CandleAnalyzer extends BaseService {
       if (lows[i] < lows[i - 1]) llCount++;
     }
 
-    if (hhCount >= 3 && hlCount >= 3) return 'Higher Highs y Higher Lows - Tendencia alcista clara';
-    if (llCount >= 3 && lhCount >= 3) return 'Lower Highs y Lower Lows - Tendencia bajista clara';
-    if (hhCount === llCount) return 'Estructura lateral - Mercado sin tendencia definida';
-    if (hhCount > llCount) return 'Tendencia alcista moderada';
-    return 'Tendencia bajista moderada';
+    if (hhCount >= 3 && hlCount >= 3) return 'candle.trendBullishClear';
+    if (llCount >= 3 && lhCount >= 3) return 'candle.trendBearishClear';
+    if (hhCount === llCount) return 'candle.trendLateral';
+    if (hhCount > llCount) return 'candle.trendBullishModerate';
+    return 'candle.trendBearishModerate';
   }
 
   // ==================== IDENTIFICACIÓN DE PATRONES ====================
@@ -574,7 +575,7 @@ export class CandleAnalyzer extends BaseService {
         type: 'indecision',
         positions: [index],
         reliability: 60,
-        description: 'Indecisión en el mercado. Se forma cuando open ≈ close'
+        description: 'candle.dojiDesc'
       };
     }
 
@@ -598,7 +599,7 @@ export class CandleAnalyzer extends BaseService {
         type,
         positions: [index],
         reliability,
-        description: `Vela fuerte sin mechas. Indica decisión del mercado. Volumen: ${candle.volume > avgVolume ? 'alto' : 'normal'}`
+        description: 'candle.marubozuDesc'
       };
     }
 
@@ -613,7 +614,7 @@ export class CandleAnalyzer extends BaseService {
         type: 'bullish_reversal',
         positions: [index],
         reliability,
-        description: `Potencial reversión alcista. Mecha inferior larga. ${volumeConfirming ? '✓ Volumen confirmador' : '⚠ Volumen bajo'}`
+        description: 'candle.hammerDesc'
       };
     }
 
@@ -628,7 +629,7 @@ export class CandleAnalyzer extends BaseService {
         type: 'bearish_reversal',
         positions: [index],
         reliability,
-        description: `Potencial reversión bajista. Mecha superior larga. ${volumeConfirming ? '✓ Volumen confirmador' : '⚠ Volumen bajo'}`
+        description: 'candle.shootingStarDesc'
       };
     }
 
@@ -639,7 +640,7 @@ export class CandleAnalyzer extends BaseService {
         type: 'indecision',
         positions: [index],
         reliability: 50,
-        description: 'Indecisión. Cuerpo pequeño con mechas largas arriba y abajo. Posible cambio próximo'
+        description: 'candle.spinningTopDesc'
       };
     }
 
@@ -652,7 +653,7 @@ export class CandleAnalyzer extends BaseService {
         type: 'bullish_reversal',
         positions: [index],
         reliability,
-        description: `Martillo invertido. Potencial reversión alcista. Mecha superior larga. ${volumeConfirming ? '✓ Volumen confirmador' : ''}`
+        description: 'candle.invertedHammerDesc'
       };
     }
 
@@ -692,7 +693,7 @@ export class CandleAnalyzer extends BaseService {
         type: 'bullish_reversal',
         positions: [index1, index2],
         reliability,
-        description: `Reversión alcista. Segunda vela verde envuelve completamente la primera roja. ${volumeIncreasing ? '✓ Volumen confirmador' : ''}`
+        description: 'candle.bullishEngulfingDesc'
       };
     }
 
@@ -720,7 +721,7 @@ export class CandleAnalyzer extends BaseService {
         type: 'bearish_reversal',
         positions: [index1, index2],
         reliability,
-        description: `Reversión bajista. Segunda vela roja envuelve completamente la primera verde. ${volumeIncreasing ? '✓ Volumen confirmador' : ''}`
+        description: 'candle.bearishEngulfingDesc'
       };
     }
 
@@ -739,7 +740,7 @@ export class CandleAnalyzer extends BaseService {
         type: 'bullish_reversal',
         positions: [index1, index2],
         reliability,
-        description: `Línea penetrante. Vela roja seguida de verde que penetra pasado el 50% de la roja. ${volumeConfirming ? '✓ Volumen confirmador' : ''}`
+        description: 'candle.piercingLineDesc'
       };
     }
 
@@ -758,7 +759,7 @@ export class CandleAnalyzer extends BaseService {
         type: 'bearish_reversal',
         positions: [index1, index2],
         reliability,
-        description: `Nube oscura. Vela verde seguida de roja que penetra pasado el 50% de la verde. ${volumeConfirming ? '✓ Volumen confirmador' : ''}`
+        description: 'candle.darkCloudCoverDesc'
       };
     }
 
@@ -774,7 +775,7 @@ export class CandleAnalyzer extends BaseService {
         type: 'indecision',
         positions: [index1, index2],
         reliability: 55,
-        description: 'Harami alcista. Segunda vela verde completamente contenida dentro de la roja. Posible reversión'
+        description: 'candle.bullishHaramiDesc'
       };
     }
 
@@ -790,7 +791,7 @@ export class CandleAnalyzer extends BaseService {
         type: 'indecision',
         positions: [index1, index2],
         reliability: 55,
-        description: 'Harami bajista. Segunda vela roja completamente contenida dentro de la verde. Posible reversión'
+        description: 'candle.bearishHaramiDesc'
       };
     }
 
@@ -805,7 +806,7 @@ export class CandleAnalyzer extends BaseService {
         type: 'bullish_reversal',
         positions: [index1, index2],
         reliability: 80,
-        description: 'Fuerte señal alcista. Gap alcista con segunda vela verde que abre por encima de la anterior'
+        description: 'candle.bullishKickerDesc'
       };
     }
 
@@ -820,7 +821,7 @@ export class CandleAnalyzer extends BaseService {
         type: 'bearish_reversal',
         positions: [index1, index2],
         reliability: 80,
-        description: 'Fuerte señal bajista. Gap bajista con segunda vela roja que abre por debajo de la anterior'
+        description: 'candle.bearishKickerDesc'
       };
     }
 
@@ -870,7 +871,7 @@ export class CandleAnalyzer extends BaseService {
         type: 'bullish_reversal',
         positions: [index1, index2, index3],
         reliability,
-        description: `Fuerte reversión alcista. Tres velas verdes consecutivas en orden creciente. ${volumeTrend ? '✓ Volumen confirmador' : ''}`
+        description: 'candle.threeWhiteSoldiersDesc'
       };
     }
 
@@ -906,7 +907,7 @@ export class CandleAnalyzer extends BaseService {
         type: 'bearish_reversal',
         positions: [index1, index2, index3],
         reliability,
-        description: `Fuerte reversión bajista. Tres velas rojas consecutivas en orden decreciente. ${volumeTrend ? '✓ Volumen confirmador' : ''}`
+        description: 'candle.threeBlackCrowsDesc'
       };
     }
 
@@ -924,7 +925,7 @@ export class CandleAnalyzer extends BaseService {
         type: 'bullish_reversal',
         positions: [index1, index2, index3],
         reliability,
-        description: `Estrella de la mañana. Patrón de reversión alcista fuerte. Roja + pequeña + verde. ${momentumConfirming ? '✓ Momentum confirmador' : ''}`
+        description: 'candle.morningStarDesc'
       };
     }
 
@@ -942,7 +943,7 @@ export class CandleAnalyzer extends BaseService {
         type: 'bearish_reversal',
         positions: [index1, index2, index3],
         reliability,
-        description: `Estrella de la tarde. Patrón de reversión bajista fuerte. Verde + pequeña + roja. ${momentumConfirming ? '✓ Momentum confirmador' : ''}`
+        description: 'candle.eveningStarDesc'
       };
     }
 
@@ -960,7 +961,7 @@ export class CandleAnalyzer extends BaseService {
         type: 'continuation',
         positions: [index1, index2, index3],
         reliability: 70,
-        description: 'Continuación alcista. Vela larga verde seguida de pequeñas velas rojas correctivas dentro del rango'
+        description: 'candle.risingThreeMethodsDesc'
       };
     }
 
@@ -978,7 +979,7 @@ export class CandleAnalyzer extends BaseService {
         type: 'continuation',
         positions: [index1, index2, index3],
         reliability: 70,
-        description: 'Continuación bajista. Vela larga roja seguida de pequeñas velas verdes correctivas dentro del rango'
+        description: 'candle.fallingThreeMethodsDesc'
       };
     }
 
@@ -1207,11 +1208,11 @@ export class CandleAnalyzer extends BaseService {
     const highProbabilityZones = [
       ...supports.map(level => ({
         level,
-        description: `Soporte en ${level.toFixed(2)}`
+        description: t('candle.supportAt', { level: level.toFixed(2) })
       })),
       ...resistances.map(level => ({
         level,
-        description: `Resistencia en ${level.toFixed(2)}`
+        description: t('candle.resistanceAt', { level: level.toFixed(2) })
       }))
     ];
 
@@ -1425,13 +1426,13 @@ export class CandleAnalyzer extends BaseService {
 
   private getTimeHorizon(timeframe: TimeFrame): string {
     const horizons: { [key in TimeFrame]: string } = {
-      '1m': '15-30 minutos',
-      '5m': '30-60 minutos',
-      '15m': '1-2 horas',
-      '1h': '4-8 horas',
-      '4h': '1-2 días',
-      '1d': '1-2 semanas',
-      '1w': '1-3 meses'
+      '1m': 'candle.timeShort',
+      '5m': 'candle.timeMedium',
+      '15m': 'candle.timeLong',
+      '1h': '4-8 hours',
+      '4h': 'candle.timeDaily',
+      '1d': 'candle.timeWeekly',
+      '1w': 'candle.timeMonthly'
     };
     return horizons[timeframe];
   }
@@ -1444,29 +1445,33 @@ export class CandleAnalyzer extends BaseService {
     indicators: IndicatorStatus
   ): string {
     if (scenario === 'main') {
-      const trend = trendAnalysis.direction === direction ? 'es coherente' : 'diverge de';
+      const trend = trendAnalysis.direction === direction ? 'candle.justifyAlignsWith' : 'candle.justifyDivergesFrom';
       const patternMatch = patterns.some(p =>
         direction === 'bullish' ?
           p.type === 'bullish_reversal' :
           p.type === 'bearish_reversal'
       );
-      return `El escenario ${direction} ${trend} la tendencia actual. ${
-        patternMatch ? 'Se han identificado patrones de confirmación.' : 'Los patrones ofrecen señales mixtas.'
-      } Los indicadores ${indicators.rsi.status === 'neutral' ? 'no muestran extremos' : 'muestran condiciones extremas'}.`;
+      return 'candle.justifyScenario';
     }
-    return `Escenario alternativo considerando cambios en las condiciones del mercado.`;
+    return 'candle.justifyAlternative';
   }
 
-  // ==================== ANÁLISIS Y RESÚMENES ====================
+  // ==================== ANALYSIS AND SUMMARIES ====================
 
   private generateShortAnalysis(
     trendAnalysis: TrendAnalysis,
     patterns: CandlePattern[],
     prediction: Prediction
   ): string {
-    const trend = trendAnalysis.direction === 'bullish' ? 'alcista' : 'bajista';
-    const pattern = patterns[0]?.name || 'ningún patrón específico';
-    return `El mercado muestra una tendencia ${trend} con ${pattern} identificado. La predicción principal es ${prediction.direction} con ${prediction.probability}% de probabilidad.`;
+    const trendShort = trendAnalysis.direction === 'bullish' ? t('candle.directionBullish') : t('candle.directionBearish');
+    const pattern = patterns[0]?.name || t('candle.shortNoPattern');
+    const dirShort = prediction.direction === 'bullish' ? t('candle.directionBullish') : t('candle.directionBearish');
+    return t('candle.shortTemplate', {
+      trend: trendShort,
+      pattern,
+      direction: dirShort,
+      probability: prediction.probability.toFixed(0),
+    });
   }
 
   private generateDetailedAnalysis(
@@ -1476,32 +1481,32 @@ export class CandleAnalyzer extends BaseService {
     keyLevels: KeyLevels,
     prediction: Prediction
   ): string {
-    let analysis = `## ANÁLISIS DETALLADO\n\n`;
+    let analysis = `${t('candle.detailedHeader')}\n\n`;
 
-    analysis += `### Tendencia\n`;
+    analysis += `${t('candle.detailedTrend')}\n`;
     analysis += `${trendAnalysis.structure}\n`;
-    analysis += `Fuerza: ${trendAnalysis.strength}/100\n\n`;
+    analysis += `${t('candle.detailedStrength')}${trendAnalysis.strength}/100\n\n`;
 
-    analysis += `### Patrones Identificados\n`;
+    analysis += `${t('candle.detailedPatterns')}\n`;
     patterns.slice(0, 3).forEach(p => {
-      analysis += `- ${p.name}: ${p.description} (Fiabilidad: ${p.reliability}%)\n`;
+      analysis += `- ${p.name}: ${p.description} (Reliability: ${p.reliability}%)\n`;
     });
 
-    analysis += `\n### Indicadores\n`;
+    analysis += `\n${t('candle.detailedIndicators')}\n`;
     analysis += `- RSI: ${indicators.rsi.value.toFixed(2)} (${indicators.rsi.status})\n`;
     analysis += `- MACD: ${indicators.macd.histogram.toFixed(4)} (${indicators.macd.status})\n`;
-    analysis += `- Bollinger Bands: Precio ${indicators.bollingerBands.position}\n`;
+    analysis += `- Bollinger Bands: Price ${indicators.bollingerBands.position}\n`;
 
-    analysis += `\n### Niveles Clave\n`;
-    analysis += `- Soportes: ${keyLevels.supports.map(s => s.toFixed(2)).join(', ')}\n`;
-    analysis += `- Resistencias: ${keyLevels.resistances.map(r => r.toFixed(2)).join(', ')}\n`;
+    analysis += `\n${t('candle.detailedLevels')}\n`;
+    analysis += `- ${t('candle.detailedSupports')}${keyLevels.supports.map(s => s.toFixed(2)).join(', ')}\n`;
+    analysis += `- ${t('candle.detailedResistances')}${keyLevels.resistances.map(r => r.toFixed(2)).join(', ')}\n`;
 
     if (this.newsImpact) {
-      analysis += `\n### Impacto de Noticias\n`;
-      analysis += `- Sentimiento general: ${this.newsImpact.overallSentimentScore.toFixed(2)} (${this.newsImpact.dominantDirection})\n`;
-      analysis += `- Confianza: ${this.newsImpact.confidence}%\n`;
-      analysis += `- Impacto: ${this.newsImpact.impactLevel}\n`;
-      analysis += `- Artículos analizados: ${this.newsImpact.articleCount}\n`;
+      analysis += `\n${t('candle.detailedNews')}\n`;
+      analysis += `- ${t('candle.detailedSentiment')}${this.newsImpact.overallSentimentScore.toFixed(2)} (${this.newsImpact.dominantDirection})\n`;
+      analysis += `- ${t('candle.detailedConfidence')}${this.newsImpact.confidence}%\n`;
+      analysis += `- Impact: ${this.newsImpact.impactLevel}\n`;
+      analysis += `- ${t('candle.detailedArticles')}${this.newsImpact.articleCount}\n`;
     }
 
     return analysis;
@@ -1515,11 +1520,11 @@ export class CandleAnalyzer extends BaseService {
     const bullish = this.countBullishSignals(trendAnalysis, patterns, indicators);
     const bearish = this.countBearishSignals(trendAnalysis, patterns, indicators);
 
-    if (bullish > bearish * 1.5) return 'Fuertemente alcista';
-    if (bullish > bearish) return 'Moderadamente alcista';
-    if (bearish > bullish * 1.5) return 'Fuertemente bajista';
-    if (bearish > bullish) return 'Moderadamente bajista';
-    return 'Neutral - Sin sesgo claro';
+    if (bullish > bearish * 1.5) return 'candle.sentimentStronglyBullish';
+    if (bullish > bearish) return 'candle.sentimentModeratelyBullish';
+    if (bearish > bullish * 1.5) return 'candle.sentimentStronglyBearish';
+    if (bearish > bullish) return 'candle.sentimentModeratelyBearish';
+    return 'candle.sentimentNeutral';
   }
 
   private identifyRiskFactors(
@@ -1530,31 +1535,31 @@ export class CandleAnalyzer extends BaseService {
     const risks: string[] = [];
 
     if (indicators.rsi.status === 'overbought') {
-      risks.push('RSI en zona de sobrecompra - Posible corrección');
+      risks.push('candle.riskOverbought');
     }
     if (indicators.rsi.status === 'oversold') {
-      risks.push('RSI en zona de sobreventa - Posible rebote');
+      risks.push('candle.riskOversold');
     }
     if (trendAnalysis.strength < 25) {
-      risks.push('Tendencia débil - Mayor probabilidad de cambio');
+      risks.push('candle.riskWeakTrend');
     }
     if (indicators.volume.status === 'low') {
-      risks.push('Bajo volumen - Movimientos menos confiables');
+      risks.push('candle.riskLowVolume');
     }
     if (patterns.filter(p => p.type === 'bearish_reversal').length > 2) {
-      risks.push('Múltiples patrones de reversión bajista - Mayor presión vendedora');
+      risks.push('candle.riskBearishPatterns');
     }
 
     // News-based risk factors
     if (this.newsImpact) {
       if (this.newsImpact.impactLevel === 'high') {
-        risks.push(`Alto impacto noticioso (${this.newsImpact.articleCount} artículos) - Eventos de mercado significativos en desarrollo`);
+        risks.push('candle.riskNewsHigh');
       }
       if (this.newsImpact.overallSentimentScore < -0.3) {
-        risks.push('Sentimiento de noticias negativo - Presión bajista adicional por factores fundamentales');
+        risks.push('candle.riskNewsNegative');
       }
       if (this.newsImpact.overallSentimentScore > 0.3) {
-        risks.push('Sentimiento de noticias positivo - Respaldo fundamental que puede reforzar tendencia actual');
+        risks.push('candle.riskNewsPositive');
       }
     }
 
@@ -1563,7 +1568,7 @@ export class CandleAnalyzer extends BaseService {
 }
 
 /**
- * Función simplificada para análisis rápido
+ * Simplified function for quick analysis
  */
 export async function analyzeCandles(input: CandleAnalysisInput): Promise<CandleAnalysisResponse> {
   const analyzer = new CandleAnalyzer(input);

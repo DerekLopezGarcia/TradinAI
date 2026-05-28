@@ -179,8 +179,8 @@ class BinanceService {
       const errorMsg = error instanceof Error ? error.message : String(error);
       
       if (symbol === 'LTCUSD') {
-        console.warn(`⚠️ Binance: Fallo para LTCUSD: ${errorMsg}`);
-        console.log(`   Razón probable: ${errorMsg.includes('401') ? 'No autorizado' : errorMsg.includes('404') ? 'Par no existe en Binance' : 'Timeout o conexión'}`);
+        console.warn(`⚠️ Binance: Failed for LTCUSD: ${errorMsg}`);
+        console.log(`   Likely reason: ${errorMsg.includes('401') ? 'Not authorized' : errorMsg.includes('404') ? 'Pair does not exist on Binance' : 'Timeout or connection'}`);
       }
       
       throw error;

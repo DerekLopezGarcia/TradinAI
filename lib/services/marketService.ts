@@ -85,8 +85,8 @@ const API_TIMEOUTS = {
 } as const;
 
 const SENTIMENT_KEYWORDS = {
-  positive: ['sube', 'gana', 'crece', 'récord', 'alcista', 'compra', 'bullish', 'rally', 'boom', 'éxito', 'ganancias', 'aprueban', 'acuerdo'],
-  negative: ['baja', 'pierde', 'caída', 'crisis', 'bajista', 'vende', 'bearish', 'crash', 'pánico', 'fracaso', 'pérdidas', 'rechazo', 'conflicto'],
+  positive: ['sube', 'gana', 'crece', 'récord', 'alcista', 'compra', 'bullish', 'rally', 'boom', 'éxito', 'ganancias', 'aprueban', 'acuerdo', 'surge', 'rise', 'gain', 'growth', 'profit', 'record', 'upgrade', 'beat', 'outperform', 'success', 'partnership', 'innovation', 'expansion'],
+  negative: ['baja', 'pierde', 'caída', 'crisis', 'bajista', 'vende', 'bearish', 'crash', 'pánico', 'fracaso', 'pérdidas', 'rechazo', 'conflicto', 'decline', 'drop', 'fall', 'loss', 'downgrade', 'miss', 'weak', 'risk', 'recession', 'failure', 'lawsuit', 'investigation', 'layoff', 'debt'],
 } as const;
 
 // ==================== CACHE MANAGER ====================

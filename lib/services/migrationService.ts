@@ -78,14 +78,14 @@ export class MigrationService extends BaseService {
       // 2. Crear o actualizar usuario
       let userId: string;
       if (!data.user?.email) {
-        result.errors.push('Email de usuario requerido');
+        result.errors.push('User email required');
         return result;
       }
 
       const existingUser = await userService.findByEmail(data.user.email);
       if (existingUser) {
         userId = existingUser.id;
-        this.logger.info(`Usuario existente encontrado: ${userId}`);
+        this.logger.info(`Existing user found: ${userId}`);
       } else {
         const newUser = await userService.createUser({
           email: data.user.email,
@@ -95,7 +95,7 @@ export class MigrationService extends BaseService {
           notifications_enabled: true,
         });
         userId = newUser.id;
-        this.logger.info(`Usuario nuevo creado: ${userId}`);
+        this.logger.info(`New user created: ${userId}`);
       }
 
       result.userId = userId;
@@ -131,7 +131,7 @@ export class MigrationService extends BaseService {
             result.watchlistsCount++;
           } catch (err) {
             result.warnings.push(
-              `No se pudo migrar watchlist ${wl.name}: ${err instanceof Error ? err.message : 'Error desconocido'}`
+              `Failed to migrate watchlist ${wl.name}: ${err instanceof Error ? err.message : 'Unknown error'}`
             );
           }
         }
@@ -154,19 +154,19 @@ export class MigrationService extends BaseService {
             result.alertsCount++;
           } catch (err) {
             result.warnings.push(
-              `No se pudo migrar alerta para ${alert.symbol}: ${err instanceof Error ? err.message : 'Error desconocido'}`
+              `Failed to migrate alert for ${alert.symbol}: ${err instanceof Error ? err.message : 'Unknown error'}`
             );
           }
         }
       }
 
       result.success = true;
-      this.logger.info('✅ Migración completada exitosamente', result);
+      this.logger.info('Migration completed successfully', result);
       return result;
     } catch (error) {
-      const err = error instanceof Error ? error.message : 'Error desconocido';
-      result.errors.push(`Error en migración: ${err}`);
-      this.logger.error('❌ Error en migración', error as Error);
+      const err = error instanceof Error ? error.message : 'migration.errorUnknown';
+      result.errors.push(`Migration error: ${err}`);
+      this.logger.error('Migration error', error as Error);
       return result;
     }
   }
@@ -183,30 +183,30 @@ export class MigrationService extends BaseService {
     const warnings: string[] = [];
 
     if (!data) {
-      errors.push('Datos de migración vacíos');
+      errors.push('migration.errorEmpty');
       return { valid: false, errors, warnings };
     }
 
     // Validar usuario
     if (!data.user) {
-      errors.push('Datos de usuario requeridos');
+      errors.push('migration.errorUserRequired');
     } else {
       if (!data.user.email || !data.user.email.includes('@')) {
-        errors.push('Email de usuario inválido');
+        errors.push('migration.errorInvalidEmail');
       }
     }
 
     // Validar watchlists
     if (data.watchlists) {
       if (!Array.isArray(data.watchlists)) {
-        errors.push('Watchlists debe ser un array');
+        errors.push('migration.errorWatchlistsArray');
       } else {
         for (const wl of data.watchlists) {
           if (!wl.name) {
-            warnings.push('Watchlist sin nombre encontrada, será omitida');
+            warnings.push('migration.warningWatchlistNoName');
           }
           if (wl.items && !Array.isArray(wl.items)) {
-            warnings.push(`Watchlist ${wl.name}: items debe ser un array`);
+            warnings.push('migration.warningItemsArray');
           }
         }
       }
@@ -215,15 +215,15 @@ export class MigrationService extends BaseService {
     // Validar alertas
     if (data.alerts) {
       if (!Array.isArray(data.alerts)) {
-        errors.push('Alerts debe ser un array');
+        errors.push('migration.errorAlertsArray');
       } else {
         for (const alert of data.alerts) {
           if (!alert.symbol) {
-            warnings.push('Alerta sin símbolo encontrada, será omitida');
+            warnings.push('migration.warningAlertNoSymbol');
           }
           if (!['crypto', 'stock', 'forex', 'commodity'].includes(alert.asset_type)) {
             warnings.push(
-              `Alerta ${alert.symbol}: asset_type inválido ${alert.asset_type}`
+              `Alert ${alert.symbol}: invalid asset_type ${alert.asset_type}`
             );
           }
         }
@@ -247,7 +247,7 @@ export class MigrationService extends BaseService {
       // Verificar si ya existe
       const existing = await userService.findByEmail(demoEmail);
       if (existing) {
-        this.logger.info(`Usuario demo ya existe: ${existing.id}`);
+        this.logger.info(`Demo user already exists: ${existing.id}`);
         return existing.id;
       }
 
@@ -260,10 +260,10 @@ export class MigrationService extends BaseService {
         notifications_enabled: true,
       });
 
-      this.logger.info(`✅ Usuario demo creado: ${demoUser.id}`);
+      this.logger.info(`Demo user created: ${demoUser.id}`);
       return demoUser.id;
     } catch (error) {
-      this.logger.error('Error creando usuario demo', error as Error);
+      this.logger.error('Error creating demo user', error as Error);
       throw error;
     }
   }
@@ -275,7 +275,7 @@ export class MigrationService extends BaseService {
     try {
       const user = await userService.getUserById(userId);
       if (!user) {
-        throw new Error('Usuario no encontrado');
+        throw new Error('User not found');
       }
 
       const watchlists = await watchlistService.getUserWatchlists(userId);
@@ -318,7 +318,7 @@ export class MigrationService extends BaseService {
         })),
       };
     } catch (error) {
-      this.logger.error('Error exportando datos de usuario', error as Error);
+      this.logger.error('Error exporting user data', error as Error);
       throw error;
     }
   }

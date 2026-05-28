@@ -5,15 +5,10 @@ import { Alert, AlertType } from '@/lib/types';
 import { useMarketStore } from '@/lib/store';
 import { Bell, Plus, X, TrendingUp, TrendingDown } from 'lucide-react';
 import toast from 'react-hot-toast';
-
-const ALERT_LABELS: Record<AlertType, string> = {
-  price_above: 'Precio mayor que',
-  price_below: 'Precio menor que',
-  sma_cross: 'Cruce de SMA',
-  ema_cross: 'Cruce de EMA',
-};
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 export function AlertManager() {
+  const { t } = useTranslation();
   const { alerts, selectedAsset, addAlert, removeAlert } = useMarketStore();
   const [isOpen, setIsOpen] = useState(false);
   const [formData, setFormData] = useState({ type: 'price_above' as AlertType, value: '' });
@@ -34,7 +29,7 @@ export function AlertManager() {
   const handleAddAlert = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.value || !selectedAsset) {
-      toast.error('Completa todos los campos');
+      toast.error(t('alerts.completeFields'));
       return;
     }
 
@@ -47,7 +42,7 @@ export function AlertManager() {
       createdAt: Date.now(),
     });
     setFormData({ type: 'price_above', value: '' });
-    toast.success('Alerta creada');
+    toast.success(t('alerts.created'));
   };
 
   const recentAlerts = alerts.slice(-5).reverse();
@@ -72,7 +67,7 @@ export function AlertManager() {
             <div className="flex items-center justify-between p-4 border-b border-border">
               <div className="flex items-center gap-2">
                 <Bell className="w-5 h-5 text-primary" />
-                <h3 className="font-bold">Alertas</h3>
+                  <h3 className="font-bold">{t('alerts.title')}</h3>
               </div>
               <button onClick={() => setIsOpen(false)} className="p-1 hover:bg-muted rounded-lg">
                 <X className="w-5 h-5" />
@@ -82,14 +77,19 @@ export function AlertManager() {
             <div className="p-4 space-y-4">
               <form onSubmit={handleAddAlert} className="space-y-3">
                 <p className="text-sm font-medium">
-                  Nueva alerta para <span className="text-primary">{selectedAsset?.symbol}</span>
+                  {t('alerts.newFor')} <span className="text-primary">{selectedAsset?.symbol}</span>
                 </p>
                 <select
                   value={formData.type}
                   onChange={(e) => setFormData({ ...formData, type: e.target.value as AlertType })}
                   className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm"
                 >
-                  {Object.entries(ALERT_LABELS).map(([value, label]) => (
+                  {([
+    ['price_above', t('alerts.priceAbove')],
+    ['price_below', t('alerts.priceBelow')],
+    ['sma_cross', t('alerts.crossSMA')],
+    ['ema_cross', t('notification.emaCross')],
+  ] as const).map(([value, label]) => (
                     <option key={value} value={value}>{label}</option>
                   ))}
                 </select>
@@ -103,14 +103,14 @@ export function AlertManager() {
                 />
                 <button type="submit" className="w-full btn-primary">
                   <Plus className="w-4 h-4 inline mr-2" />
-                  Crear Alerta
+                  {t('alerts.createAlert')}
                 </button>
               </form>
 
               <div className="pt-4 border-t border-border">
-                <p className="text-sm font-medium mb-2">Alertas activas</p>
+                <p className="text-sm font-medium mb-2">{t('alerts.activeAlerts')}</p>
                 {recentAlerts.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">Sin alertas</p>
+                  <p className="text-sm text-muted-foreground text-center py-4">{t('alerts.noAlerts')}</p>
                 ) : (
                   <div className="space-y-2 max-h-48 overflow-y-auto">
                     {recentAlerts.map((alert) => (
@@ -124,7 +124,10 @@ export function AlertManager() {
                           <div>
                             <p className="text-sm font-medium">{alert.symbol}</p>
                             <p className="text-xs text-muted-foreground">
-                              {ALERT_LABELS[alert.type]} ${alert.value.toFixed(2)}
+                              {(alert.type === 'price_above' ? t('alerts.priceAbove') :
+                                alert.type === 'price_below' ? t('alerts.priceBelow') :
+                                alert.type === 'sma_cross' ? t('alerts.crossSMA') :
+                                t('notification.emaCross'))} ${alert.value.toFixed(2)}
                             </p>
                           </div>
                         </div>

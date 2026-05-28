@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 
 interface TooltipProps {
   content: string;
@@ -62,43 +63,44 @@ interface IndicatorLegendProps {
 }
 
 export function IndicatorLegend({ isOpen = false }: IndicatorLegendProps) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(isOpen);
 
   const indicators = [
     {
       name: 'SMA(20)',
-      description: 'Media Móvil Simple',
-      details: 'Promedio aritmético de los últimos 20 períodos de cierre. Indicador de tendencia general. Valores altos = tendencia alcista, valores bajos = tendencia bajista. Reacciona lentamente a cambios de precio.',
+      description: t('indicator.sma'),
+      details: t('indicator.smaDesc'),
     },
     {
       name: 'EMA(20)',
-      description: 'Media Móvil Exponencial',
-      details: 'Similar a SMA pero da mayor peso a los precios más recientes. Más reactiva y sensible a cambios actuales. Ideal para identificar cambios de tendencia rápidamente. Suele estar más cercana al precio actual que SMA.',
+      description: t('indicator.ema'),
+      details: t('indicator.emaDesc'),
     },
     {
       name: 'RSI(14)',
-      description: 'Índice de Fuerza Relativa',
-      details: '• Escala 0-100. Mide momentum y velocidad de cambio de precio.\n• <30: Sobreventa (posible rebote al alza)\n• 30-70: Zona neutral\n• >70: Sobrecompra (posible corrección a la baja)\n• Útil para identificar puntos de entrada/salida.',
+      description: t('indicator.rsi'),
+      details: t('indicator.rsiDesc'),
     },
     {
       name: 'ADX(14)',
-      description: 'Índice Direccional Promedio',
-      details: '• Mide la fuerza de una tendencia (no su dirección) en escala 0-100.\n• <20: Sin tendencia clara o débil (rango lateral)\n• 20-40: Tendencia moderada\n• >40: Tendencia fuerte y confiable\n• Útil para confirmar que el precio se mueve direccionalmente.',
+      description: t('indicator.adx'),
+      details: t('indicator.adxDesc'),
     },
     {
       name: 'Stoch %K',
-      description: 'Estocástico Rápido',
-      details: 'Línea más sensible del oscilador estocástico (escala 0-100).\n• <20: Sobreventa (posible compra)\n• >80: Sobrecompra (posible venta)\n• Indica posición del precio vs rango reciente. Más volátil que %D.',
+      description: t('indicator.stochK'),
+      details: t('indicator.stochKDesc'),
     },
     {
       name: 'Stoch %D',
-      description: 'Estocástico Lento',
-      details: 'Media móvil suavizada de %K (escala 0-100). Más estable y confiable.\n• Busca cruces: %K arriba %D = señal alcista, %K abajo %D = señal bajista\n• Confirmación de señales del estocástico. Menos falsas señales que %K.',
+      description: t('indicator.stochD'),
+      details: t('indicator.stochDDesc'),
     },
     {
       name: 'Bollinger Bands',
-      description: 'Bandas de Bollinger',
-      details: '• Banda superior e inferior = desviación estándar del precio\n• Línea central = SMA(20)\n• Precio tocando banda superior = posible sobrecompra\n• Precio tocando banda inferior = posible sobreventa\n• Estrechamiento de bandas = baja volatilidad (posible ruptura próxima)',
+      description: t('indicator.bb'),
+      details: t('indicator.bbDesc'),
     },
   ];
 
@@ -109,7 +111,7 @@ export function IndicatorLegend({ isOpen = false }: IndicatorLegendProps) {
         className="w-full px-4 py-3 flex items-center justify-between hover:bg-muted/50 transition-colors"
       >
         <h3 className="text-sm font-semibold uppercase tracking-widest text-primary">
-          Leyenda de Indicadores
+          {t('indicator.legend')}
         </h3>
         {expanded ? (
           <ChevronUp className="w-5 h-5 text-muted-foreground" />

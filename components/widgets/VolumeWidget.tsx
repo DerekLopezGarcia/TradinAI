@@ -4,6 +4,7 @@ import { useRef, useEffect, useMemo } from 'react';
 import { createChart, ColorType, HistogramData, CrosshairMode } from 'lightweight-charts';
 import { useMarketData } from '@/app/hooks/useMarketData';
 import { useTheme } from 'next-themes';
+import { useTranslation } from '@/lib/i18n/useTranslation';
 import type { WidgetProps } from '@/lib/widgetRegistry';
 
 function fmtVolume(v: number): string {
@@ -17,6 +18,7 @@ export function VolumeWidget({ symbol, timeframe }: WidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { data, loading, error } = useMarketData(symbol, timeframe);
   const { resolvedTheme } = useTheme();
+  const { t } = useTranslation();
   const isDark = resolvedTheme === 'dark';
 
   const colors = useMemo(() => ({
@@ -103,7 +105,7 @@ export function VolumeWidget({ symbol, timeframe }: WidgetProps) {
   if (volumeData.length === 0) {
     return (
       <div className="h-full flex items-center justify-center">
-        <p className="text-muted-foreground text-xs">Sin datos de volumen</p>
+        <p className="text-muted-foreground text-xs">{t('volume.noData')}</p>
       </div>
     );
   }
@@ -111,8 +113,8 @@ export function VolumeWidget({ symbol, timeframe }: WidgetProps) {
   return (
     <div className="h-full flex flex-col overflow-hidden">
       <div className="flex items-center gap-3 px-3 py-1.5 border-b border-border/50 shrink-0">
-        <span className="text-xs font-semibold text-foreground">Volumen</span>
-        <span className="text-xs font-mono text-muted-foreground">Total: {fmtVolume(totalVol)}</span>
+        <span className="text-xs font-semibold text-foreground">{t('volume.title')}</span>
+        <span className="text-xs font-mono text-muted-foreground">{t('volume.total')} {fmtVolume(totalVol)}</span>
       </div>
       <div ref={containerRef} className="flex-1 min-h-0" />
     </div>
